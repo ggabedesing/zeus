@@ -1,4 +1,5 @@
 using Zeus.Windows;
+using System.Text.Json;
 using CpuTimes = Zeus.Windows.WindowsPerformanceProbe.SystemCpuTimes;
 
 namespace Zeus.Hardware.Tests;
@@ -70,6 +71,32 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void ComparisonReportsPerSamplePeakGpuEngineAndDiskActivityWithCoverage()
+    {
+        var reference = new[]
+        {
+            Sample(20) with { GpuEngines = [new("a", 1, "3D", 40), new("b", 2, "Copy", 70)], Disks = [new("0", null, 20, null)] },
+            Sample(30) with { GpuEngines = [], Disks = [new("0", null, 10, null), new("1", null, 30, null)] }
+        };
+        var later = new[]
+        {
+            Sample(40) with { GpuEngines = [new("a", 1, "3D", 30)], Disks = [new("0", null, 40, null)] },
+            Sample(50) with { GpuEngines = [new("a", 1, "3D", 50), new("b", 2, "Copy", 60)], Disks = [] }
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+
+        Assert.Equal(70d, comparison.GpuEnginePeak!.ReferencePercent);
+        Assert.Equal(45d, comparison.GpuEnginePeak.LaterPercent);
+        Assert.Equal(1, comparison.GpuEnginePeak.ReferenceAvailableSamples);
+        Assert.Equal(2, comparison.GpuEnginePeak.LaterAvailableSamples);
+        Assert.Equal(25d, comparison.DiskActivityPeak!.ReferencePercent);
+        Assert.Equal(40d, comparison.DiskActivityPeak.LaterPercent);
+        Assert.Equal(2, comparison.DiskActivityPeak.ReferenceAvailableSamples);
+        Assert.Equal(1, comparison.DiskActivityPeak.LaterAvailableSamples);
+    }
+
+    [Fact]
     public void ComparisonKeepsUnavailableCountersUnknown()
     {
         var unavailable = Sample(null) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 };
@@ -78,6 +105,21 @@ public sealed class PerformanceCounterTests
         Assert.Null(comparison.LaterCpuPercent);
         Assert.Null(comparison.ReferenceUsedMemoryPercent);
         Assert.Null(comparison.LaterUsedMemoryPercent);
+        Assert.Null(comparison.GpuEnginePeak!.ReferencePercent);
+        Assert.Equal(0, comparison.GpuEnginePeak.ReferenceAvailableSamples);
+        Assert.Null(comparison.DiskActivityPeak!.ReferencePercent);
+    }
+
+    [Fact]
+    public void OlderPersistedComparisonsWithoutNewMetricsLoadWithMetricsUnavailable()
+    {
+        const string legacy = """{"ReferenceSampleCount":3,"LaterSampleCount":3,"ReferenceCpuPercent":20,"LaterCpuPercent":30,"ReferenceUsedMemoryPercent":40,"LaterUsedMemoryPercent":50,"ReferenceEndedAt":"2026-10-08T12:00:00Z","LaterEndedAt":"2026-10-08T12:05:00Z"}""";
+
+        var comparison = JsonSerializer.Deserialize<PerformanceComparison>(legacy);
+
+        Assert.NotNull(comparison);
+        Assert.Null(comparison.GpuEnginePeak);
+        Assert.Null(comparison.DiskActivityPeak);
     }
 
     [Fact]

@@ -97,7 +97,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _performanceHistory.Snapshot().Count(entry => entry.Observation.CollectedAt > _performanceBaseline[^1].CollectedAt) >= 3;
     public string PerformanceComparisonSummary => _performanceComparison is not { } comparison
         ? "Defina uma referência com pelo menos três amostras e colete outras três para comparar."
-        : $"CPU média: {FormatMetric(comparison.ReferenceCpuPercent)} → {FormatMetric(comparison.LaterCpuPercent)} · RAM em uso: {FormatMetric(comparison.ReferenceUsedMemoryPercent)} → {FormatMetric(comparison.LaterUsedMemoryPercent)}. Comparação descritiva; repita a mesma tarefa e condições para interpretar.";
+        : $"CPU média: {FormatMetric(comparison.ReferenceCpuPercent)} → {FormatMetric(comparison.LaterCpuPercent)} · RAM em uso: {FormatMetric(comparison.ReferenceUsedMemoryPercent)} → {FormatMetric(comparison.LaterUsedMemoryPercent)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}. Engines individuais não são uso total da GPU; comparação descritiva, sem atribuir causa ou ganho.";
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
     public ObservableCollection<DeviceRow> GraphicsRows { get; } = [];
@@ -484,6 +484,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or DbException;
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "Indisponível" : value;
     private static string FormatMetric(double? value) => value is { } number ? $"{number:0.#}%" : "indisponível";
+    private static string FormatMetricCoverage(PerformanceMetricComparison? metric, int referenceTotal, int laterTotal) => metric is null
+        ? "indisponível"
+        : $"{FormatMetric(metric.ReferencePercent)} ({metric.ReferenceAvailableSamples}/{referenceTotal}) → {FormatMetric(metric.LaterPercent)} ({metric.LaterAvailableSamples}/{laterTotal})";
     private static string BooleanStatus(bool? value) => value switch { true => "Ativo", false => "Desativado", null => "Indisponível" };
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; Notify(name); return true; }
     private void Notify([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));

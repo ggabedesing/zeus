@@ -10,7 +10,15 @@ public sealed record PerformanceComparison(
     double? ReferenceUsedMemoryPercent,
     double? LaterUsedMemoryPercent,
     DateTimeOffset ReferenceEndedAt,
-    DateTimeOffset LaterEndedAt);
+    DateTimeOffset LaterEndedAt,
+    PerformanceMetricComparison? GpuEnginePeak = null,
+    PerformanceMetricComparison? DiskActivityPeak = null);
+
+public sealed record PerformanceMetricComparison(
+    double? ReferencePercent,
+    double? LaterPercent,
+    int ReferenceAvailableSamples,
+    int LaterAvailableSamples);
 
 /// <summary>A process-local, bounded history that preserves observations until exported.</summary>
 public sealed class PerformanceHistoryBuffer
@@ -80,11 +88,38 @@ public static class PerformanceComparisonBuilder
                 : (observation.TotalMemoryBytes - observation.AvailableMemoryBytes) /
                     (double)observation.TotalMemoryBytes * 100;
 
+        static PerformanceMetricComparison CompareSamplePeaks(
+            IReadOnlyList<PerformanceObservation> first, IReadOnlyList<PerformanceObservation> second,
+            Func<PerformanceObservation, IEnumerable<double?>> values, bool enforceGpuPercentageRange = false)
+        {
+            static (double? Average, int Count) Summarize(IReadOnlyList<PerformanceObservation> samples,
+                Func<PerformanceObservation, IEnumerable<double?>> selector, bool enforceRange)
+            {
+                var peaks = new List<double>();
+                foreach (var sample in samples)
+                {
+                    var available = selector(sample).Where(value => value is { } number && double.IsFinite(number) && number >= 0 &&
+                        (!enforceRange || number <= 100)).Select(value => value!.Value).ToArray();
+                    if (available.Length > 0) peaks.Add(available.Max());
+                }
+                return (peaks.Count == 0 ? null : peaks.Average(), peaks.Count);
+            }
+
+            var left = Summarize(first, values, enforceGpuPercentageRange);
+            var right = Summarize(second, values, enforceGpuPercentageRange);
+            return new(left.Average, right.Average, left.Count, right.Count);
+        }
+
+        var gpu = CompareSamplePeaks(reference, later,
+            sample => (sample.GpuEngines ?? []).Select(engine => (double?)engine.UtilizationPercent), enforceGpuPercentageRange: true);
+        var disk = CompareSamplePeaks(reference, later,
+            sample => (sample.Disks ?? []).Select(device => device.ActivePercent));
+
         return new(reference.Count, later.Count,
             Average(reference.Select(sample => sample.CpuPercent)),
             Average(later.Select(sample => sample.CpuPercent)),
             Average(reference.Select(UsedMemoryPercent)),
             Average(later.Select(UsedMemoryPercent)),
-            reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt));
+            reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk);
     }
 }
