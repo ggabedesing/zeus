@@ -135,6 +135,9 @@ public sealed class WpfExperienceTests
         var backupDatabaseButton = Assert.IsType<Button>(window.FindName("BackupDatabaseButton"));
         Assert.Equal("backup-local-data", AutomationProperties.GetAutomationId(backupDatabaseButton));
         Assert.True(backupDatabaseButton.IsEnabled, "O usuário deve conseguir criar um backup local a partir do histórico.");
+        var restoreDatabaseButton = Assert.IsType<Button>(window.FindName("RestoreDatabaseButton"));
+        Assert.Equal("restore-local-data", AutomationProperties.GetAutomationId(restoreDatabaseButton));
+        Assert.True(restoreDatabaseButton.IsEnabled, "A restauração deve ficar visível no histórico e aguardar a confirmação explícita do usuário.");
         var expectedIds = new[]
         {
             "OverviewTab", "MaintenanceTab", "CleanupTab", "StartupTab",

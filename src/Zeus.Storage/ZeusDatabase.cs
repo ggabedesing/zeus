@@ -105,15 +105,7 @@ public sealed class ZeusDatabase
                 }.ToString());
                 backup.Open();
                 source.BackupDatabase(backup);
-                using var command = backup.CreateCommand();
-                command.CommandText = "PRAGMA integrity_check; PRAGMA user_version;";
-                using var reader = command.ExecuteReader();
-                if (!reader.Read() ||
-                    !string.Equals(reader.GetString(0), "ok", StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("A cópia criada não passou na verificação de integridade do SQLite.");
-                if (!reader.NextResult() || !reader.Read() ||
-                    reader.GetInt32(0) != CurrentSchemaVersion)
-                    throw new InvalidDataException("A cópia criada não preservou a versão de esquema esperada.");
+                VerifyDatabaseFile(backup);
             }, CancellationToken.None);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -123,6 +115,123 @@ public sealed class ZeusDatabase
         {
             if (File.Exists(temporary)) File.Delete(temporary);
         }
+    }
+
+    public Task<string> RestoreFromAsync(string sourcePath, CancellationToken cancellationToken = default) =>
+        RestoreCoreAsync(sourcePath, null, cancellationToken);
+
+    internal Task<string> RestoreFromAsyncForTest(string sourcePath, Action beforeApply,
+        CancellationToken cancellationToken = default) =>
+        RestoreCoreAsync(sourcePath, beforeApply, cancellationToken);
+
+    private async Task<string> RestoreCoreAsync(string sourcePath, Action? beforeApply,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        cancellationToken.ThrowIfCancellationRequested();
+        var source = Path.GetFullPath(sourcePath);
+        if (string.Equals(source, _path, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("O banco em uso não pode ser restaurado sobre si mesmo.", nameof(sourcePath));
+        if (!File.Exists(source)) throw new FileNotFoundException("O arquivo de backup não foi encontrado.", source);
+
+        await InitializeAsync(cancellationToken);
+        var directory = Path.GetDirectoryName(_path)!;
+        var staging = Path.Combine(directory, $".{Path.GetFileName(_path)}.restore-{Guid.NewGuid():N}.tmp");
+        string? safetyCopy = null;
+        try
+        {
+            await Task.Run(() => CopyDatabase(source, staging, requireCurrentSchema: false), CancellationToken.None);
+            var stagedDatabase = new ZeusDatabase(staging);
+            await stagedDatabase.InitializeAsync(cancellationToken);
+            var stagedHealth = await stagedDatabase.CheckHealthAsync(cancellationToken);
+            if (!stagedHealth.IsHealthy)
+                throw new InvalidDataException($"O backup não passou na verificação do SQLite: {stagedHealth.IntegrityCheck}.");
+            SqliteConnection.ClearAllPools();
+
+            var recoveryDirectory = Path.Combine(directory, "recovery");
+            Directory.CreateDirectory(recoveryDirectory);
+            safetyCopy = Path.Combine(recoveryDirectory,
+                $"zeus-pre-restore-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.db");
+            await BackupToAsync(safetyCopy, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                beforeApply?.Invoke();
+                await Task.Run(() => CopyDatabase(staging, _path), CancellationToken.None);
+                await VerifyLiveDatabaseAsync(cancellationToken);
+                return safetyCopy;
+            }
+            catch (Exception restoreError)
+            {
+                try
+                {
+                    await Task.Run(() => CopyDatabase(safetyCopy, _path), CancellationToken.None);
+                    await VerifyLiveDatabaseAsync(CancellationToken.None);
+                }
+                catch (Exception rollbackError)
+                {
+                    throw new AggregateException(
+                        $"A restauração e a recuperação automática falharam. A cópia anterior foi preservada em: {safetyCopy}",
+                        restoreError, rollbackError);
+                }
+
+                if (restoreError is OperationCanceledException) throw;
+                throw new InvalidOperationException(
+                    $"A restauração falhou e o banco anterior foi recuperado. Cópia de segurança adicional: {safetyCopy}",
+                    restoreError);
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(staging)) File.Delete(staging);
+            if (File.Exists(staging + "-wal")) File.Delete(staging + "-wal");
+            if (File.Exists(staging + "-shm")) File.Delete(staging + "-shm");
+        }
+    }
+
+    private async Task VerifyLiveDatabaseAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        VerifyDatabaseFile(connection);
+    }
+
+    private static void CopyDatabase(string sourcePath, string destinationPath, bool requireCurrentSchema = true)
+    {
+        using var source = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = Path.GetFullPath(sourcePath),
+            Mode = SqliteOpenMode.ReadOnly,
+            Pooling = false,
+            DefaultTimeout = 5
+        }.ToString());
+        using var destination = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = Path.GetFullPath(destinationPath),
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Pooling = false,
+            DefaultTimeout = 5
+        }.ToString());
+        source.Open();
+        destination.Open();
+        source.BackupDatabase(destination);
+        VerifyDatabaseFile(destination, requireCurrentSchema);
+    }
+
+    private static void VerifyDatabaseFile(SqliteConnection connection, bool requireCurrentSchema = true)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA integrity_check; PRAGMA user_version;";
+        using var reader = command.ExecuteReader();
+        if (!reader.Read() || !string.Equals(reader.GetString(0), "ok", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("O banco não passou na verificação de integridade do SQLite.");
+        if (!reader.NextResult() || !reader.Read())
+            throw new InvalidDataException("Não foi possível ler a versão do esquema do banco.");
+        var schemaVersion = reader.GetInt32(0);
+        if ((requireCurrentSchema && schemaVersion != CurrentSchemaVersion) ||
+            (!requireCurrentSchema && (schemaVersion < 1 || schemaVersion > CurrentSchemaVersion)))
+            throw new InvalidDataException("O banco não tem a versão de esquema esperada.");
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)

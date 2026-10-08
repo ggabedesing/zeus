@@ -96,6 +96,8 @@ internal sealed class DesktopStorage
     public Task<DatabaseHealth> CheckHealthAsync() => _database.CheckHealthAsync();
     public Task BackupDatabaseAsync(string destinationPath, CancellationToken cancellationToken = default) =>
         _database.BackupToAsync(destinationPath, cancellationToken);
+    public Task<string> RestoreDatabaseAsync(string sourcePath, CancellationToken cancellationToken = default) =>
+        _database.RestoreFromAsync(sourcePath, cancellationToken);
 
     public Task StartPerformanceSessionAsync(Guid sessionId, string label, DateTimeOffset startedAt) =>
         _database.StartPerformanceSessionAsync(sessionId.ToString("D"), label, startedAt);

@@ -621,6 +621,47 @@ public partial class MainWindow
         }, cancellable: true);
     }
 
+    private async void RestoreDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Escolher cópia de segurança do ZEUS",
+            Filter = "Banco SQLite (*.db)|*.db|Todos os arquivos (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        if (!Confirm(
+            $"Restaurar esta cópia substituirá as preferências e o histórico local atuais.\n\nArquivo: {dialog.FileName}\n\nAntes da troca, o ZEUS criará e verificará uma cópia de segurança do banco atual na pasta local do aplicativo. Após a restauração, o ZEUS será reiniciado para carregar os dados recuperados.\n\nContinuar?",
+            "Confirmar restauração dos dados")) return;
+
+        var restored = false;
+        var safetyCopy = string.Empty;
+        await RunOperationAsync("Restaurando dados do ZEUS", "Validando a cópia escolhida e protegendo o banco atual antes de substituir os dados.", async token =>
+        {
+            await DrainLocalWritesAsync(token);
+            safetyCopy = await _storage.RestoreDatabaseAsync(dialog.FileName, token);
+            restored = true;
+            StatusTitle = "Dados restaurados";
+            StatusDetail = $"Cópia de segurança do estado anterior: {safetyCopy}. Reiniciando o ZEUS para recarregar as preferências e o histórico.";
+        }, cancellable: true, mutation: true);
+
+        if (!restored) return;
+        try
+        {
+            var executable = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executable)) throw new InvalidOperationException("O caminho do executável atual não está disponível.");
+            _ = Process.Start(new ProcessStartInfo(executable) { UseShellExecute = true })
+                ?? throw new InvalidOperationException("O Windows não iniciou a nova janela do ZEUS.");
+            Application.Current.Shutdown();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or Win32Exception or InvalidOperationException)
+        {
+            StatusTitle = "Dados restaurados; reinício manual necessário";
+            StatusDetail = $"Feche e abra o ZEUS para carregar a cópia. O estado anterior continua guardado em {safetyCopy}. Detalhe: {error.Message}";
+        }
+    }
+
     private void OpenLogs_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: Guid id }) return;

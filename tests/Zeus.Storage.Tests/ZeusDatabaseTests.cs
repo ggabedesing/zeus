@@ -53,6 +53,69 @@ public sealed class ZeusDatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task RestoreValidatesBackupCreatesSafetyCopyAndRestoresLocalData()
+    {
+        var database = CreateDatabase();
+        await database.WriteSettingAsync("preferences", "{\"theme\":\"Current\"}");
+        await database.AppendActivityAsync(new(DateTimeOffset.UtcNow, "application", "current", "info", "Before restore"));
+        var source = new ZeusDatabase(Path.Combine(_root, "selected-backup.db"));
+        await source.WriteSettingAsync("preferences", "{\"theme\":\"Restored\"}");
+        await source.AppendActivityAsync(new(DateTimeOffset.UtcNow, "application", "backup", "info", "From backup"));
+
+        var recoveryPath = await database.RestoreFromAsync(source.PathName);
+
+        Assert.Equal("{\"theme\":\"Restored\"}", await database.ReadSettingAsync("preferences"));
+        Assert.Equal("From backup", Assert.Single(await database.ReadRecentActivityAsync()).Summary);
+        var safety = new ZeusDatabase(recoveryPath);
+        Assert.Equal("{\"theme\":\"Current\"}", await safety.ReadSettingAsync("preferences"));
+        Assert.Equal("Before restore", Assert.Single(await safety.ReadRecentActivityAsync()).Summary);
+        Assert.True((await safety.CheckHealthAsync()).IsHealthy);
+        Assert.Equal("{\"theme\":\"Restored\"}", await source.ReadSettingAsync("preferences"));
+        Assert.True((await database.CheckHealthAsync()).IsHealthy);
+    }
+
+    [Fact]
+    public async Task RestoreFailureAfterSafetyCopyAutomaticallyRestoresTheOriginalDatabase()
+    {
+        var database = CreateDatabase();
+        await database.WriteSettingAsync("preferences", "{\"theme\":\"Keep\"}");
+        var source = new ZeusDatabase(Path.Combine(_root, "selected-backup.db"));
+        await source.WriteSettingAsync("preferences", "{\"theme\":\"Do not apply\"}");
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            database.RestoreFromAsyncForTest(source.PathName, () => throw new IOException("simulated failure before applying staged data")));
+
+        Assert.Contains("banco anterior foi recuperado", error.Message);
+        Assert.Equal("{\"theme\":\"Keep\"}", await database.ReadSettingAsync("preferences"));
+        var safetyPath = Assert.Single(Directory.GetFiles(Path.Combine(_root, "recovery"), "*.db"));
+        var safety = new ZeusDatabase(safetyPath);
+        Assert.Equal("{\"theme\":\"Keep\"}", await safety.ReadSettingAsync("preferences"));
+        Assert.True((await database.CheckHealthAsync()).IsHealthy);
+    }
+
+    [Fact]
+    public async Task RestoreRejectsFutureSchemaWithoutChangingLiveDatabase()
+    {
+        var database = CreateDatabase();
+        await database.WriteSettingAsync("preferences", "{\"theme\":\"Keep\"}");
+        var sourcePath = Path.Combine(_root, "future-backup.db");
+        await new ZeusDatabase(sourcePath).InitializeAsync();
+        SqliteConnectionClear();
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={sourcePath};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA user_version=99;";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => database.RestoreFromAsync(sourcePath));
+
+        Assert.Equal("{\"theme\":\"Keep\"}", await database.ReadSettingAsync("preferences"));
+        Assert.False(Directory.Exists(Path.Combine(_root, "recovery")));
+    }
+
+    [Fact]
     public async Task SettingsUpsertAndRoundTripWithoutLosingUnknownFields()
     {
         var database = CreateDatabase();

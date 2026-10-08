@@ -386,6 +386,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         finally { _preferenceLock.Release(); }
     }
 
+    private async Task DrainLocalWritesAsync(CancellationToken cancellationToken)
+    {
+        await _preferenceLock.WaitAsync(cancellationToken);
+        _preferenceLock.Release();
+        var pending = _activityWrites.ToArray();
+        if (pending.Length > 0) await Task.WhenAll(pending).WaitAsync(cancellationToken);
+    }
+
     private void ApplyTheme()
     {
         if (SystemParameters.HighContrast) return;

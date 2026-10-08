@@ -20,8 +20,8 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 | Atualizações de programas | Consulta `winget` sob demanda. Cada pacote pode ser atualizado individualmente após confirmação, nova checagem da identidade/versões, WinGet interativo e verificação posterior; termos não são aceitos automaticamente. Tentativas são registradas no SQLite, ficam bloqueadas quando o resultado é incerto e exigem revisão manual, pois a reversão depende do fornecedor. Microsoft Store e pacotes não correspondidos não são incluídos. |
 | Plano geral | Reúne preferências visuais explicitamente incluídas e as seleções de limpeza, inicialização e manutenção. Exibe o plano antes de executar sequencialmente. |
 | Aparência | Temas Completo, Mínimo e Aurora, inspirado no macOS, para a interface do ZEUS. |
-| Histórico | Resultados, logs, estados anteriores e recuperação de sessões interrompidas; exportação de relatório JSON e cópia verificada do banco SQLite. Restauração guiada ainda pendente. |
-| Persistência local | SQLite versionado para preferências, atividades, manutenção e sessões/amostras de desempenho; importação dos JSON antigos sem removê-los, verificação rápida de integridade e backup consistente sob demanda. |
+| Histórico | Resultados, logs, estados anteriores e recuperação de sessões interrompidas; exportação de relatório JSON, cópia verificada do SQLite e restauração confirmada com proteção do estado atual. |
+| Persistência local | SQLite versionado para preferências, atividades, manutenção e sessões/amostras de desempenho; importação dos JSON antigos sem removê-los, verificação de integridade, backup consistente e restauração de cópias compatíveis. |
 
 Nenhuma manutenção é selecionada automaticamente. Drivers e Defender offline possuem fluxos de revisão específicos. O tema altera a interface do ZEUS; as preferências de efeitos do Windows são uma operação separada.
 
