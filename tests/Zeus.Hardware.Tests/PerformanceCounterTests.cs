@@ -58,6 +58,46 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void GpuOccupancySignalRequiresAtLeastFiveValidSamplesAcrossTenSeconds()
+    {
+        var samples = Enumerable.Range(0, 5).Select(index => GpuSample(index * 2, 950)).ToArray();
+
+        var assessment = Assert.Single(GpuMemoryOccupancyAnalyzer.Assess(samples));
+
+        Assert.Equal(GpuMemoryOccupancyState.InsufficientEvidence, assessment.State);
+        Assert.Equal(5, assessment.ValidSamples);
+        Assert.Equal(TimeSpan.FromSeconds(8), assessment.Window);
+    }
+
+    [Fact]
+    public void GpuOccupancySignalReportsSustainedHighOccupancyWithoutCallingItPressure()
+    {
+        var samples = new[] { GpuSample(0, 950), GpuSample(3, 950), GpuSample(6, 950), GpuSample(9, 950), GpuSample(12, 700) };
+
+        var assessment = Assert.Single(GpuMemoryOccupancyAnalyzer.Assess(samples));
+
+        Assert.Equal(GpuMemoryOccupancyState.SustainedHighOccupancy, assessment.State);
+        Assert.Equal(4, assessment.HighOccupancySamples);
+        Assert.Equal(90d, GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent);
+    }
+
+    [Fact]
+    public void GpuOccupancySignalNeedsSustainedThresholdAndKeepsInvalidReadingsOutOfCoverage()
+    {
+        var samples = new[]
+        {
+            GpuSample(0, 950), GpuSample(3, 700), GpuSample(6, 950), GpuSample(9, 700), GpuSample(12, 700),
+            GpuSample(15, 1200)
+        };
+
+        var assessment = Assert.Single(GpuMemoryOccupancyAnalyzer.Assess(samples));
+
+        Assert.Equal(GpuMemoryOccupancyState.NoSustainedHighOccupancy, assessment.State);
+        Assert.Equal(5, assessment.ValidSamples);
+        Assert.Equal(2, assessment.HighOccupancySamples);
+    }
+
+    [Fact]
     public void DxgiLuidMapsToWindowsGpuCounterInstanceFormat()
     {
         var instance = DxgiAdapterMemoryReader.FormatInstance(new() { HighPart = 0, LowPart = 0x1057F });
@@ -270,6 +310,13 @@ public sealed class PerformanceCounterTests
 
     private static PerformanceObservation Sample(double? cpu) =>
         new(DateTimeOffset.UnixEpoch, TimeSpan.FromSeconds(2), cpu, 1024, 512, [], []);
+
+    private static PerformanceObservation GpuSample(int seconds, ulong usage) =>
+        Sample(20) with
+        {
+            CollectedAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds),
+            GpuMemory = [new("gpu-test", usage, 100, usage + 100, 1_000)]
+        };
 
     [Theory]
     [InlineData(0U, false)]

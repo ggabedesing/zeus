@@ -312,6 +312,10 @@ public partial class MainWindow
         foreach (var gpuMemory in observation.GpuMemory ?? [])
             PerformanceResourceRows.Add(new($"Memória GPU · {gpuMemory.AdapterInstance}",
                 $"Uso dedicado reportado: {FormatBytes(gpuMemory.DedicatedUsageBytes)} de {FormatBytes(gpuMemory.DedicatedCapacityBytes)} · ocupação: {FormatMetric(gpuMemory.DedicatedOccupancyPercent)} · compartilhado: {FormatBytes(gpuMemory.SharedUsageBytes)} · comprometido: {FormatBytes(gpuMemory.TotalCommittedBytes)}"));
+        var sessionSamples = _performanceHistory.Snapshot().Where(entry => entry.SessionId == _performanceSessionId)
+            .TakeLast(20).Select(entry => entry.Observation).ToArray();
+        foreach (var assessment in GpuMemoryOccupancyAnalyzer.Assess(sessionSamples))
+            PerformanceResourceRows.Add(new($"Sinal de ocupação GPU · {assessment.AdapterInstance}", FormatGpuOccupancyAssessment(assessment)));
         foreach (var disk in observation.Disks ?? [])
             PerformanceResourceRows.Add(new($"Disco · {disk.InstanceName}", $"Transferência: {FormatBytesPerSecond(disk.BytesPerSecond)} · ativo: {(disk.ActivePercent is { } active ? $"{active:0.#}%" : "indisponível")} · leitura: {(disk.AverageReadLatencyMilliseconds is { } latency ? $"{latency:0.##} ms" : "indisponível")}"));
         foreach (var network in observation.Networks ?? [])
@@ -320,6 +324,13 @@ public partial class MainWindow
             if (!Warnings.Contains(warning)) Warnings.Add(warning);
         Notify(nameof(Performance)); Notify(nameof(CanSetPerformanceBaseline)); Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
     }
+
+    private static string FormatGpuOccupancyAssessment(GpuMemoryOccupancyAssessment assessment) => assessment.State switch
+    {
+        GpuMemoryOccupancyState.InsufficientEvidence => $"Evidência insuficiente: {assessment.ValidSamples} leitura(s) válida(s) em {assessment.Window.TotalSeconds:0.#} s; exigidos {GpuMemoryOccupancyAnalyzer.MinimumSamples} leituras e pelo menos {GpuMemoryOccupancyAnalyzer.MinimumWindow.TotalSeconds:0} s.",
+        GpuMemoryOccupancyState.SustainedHighOccupancy => $"Ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% em {assessment.HighOccupancySamples}/{assessment.ValidSamples} leituras; média {assessment.AverageOccupancyPercent:0.#}%. Sinal para investigar; não confirma pressão, gargalo ou impacto no jogo.",
+        _ => $"Sem ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% sustentada nesta janela ({assessment.ValidSamples} leituras). Isso não exclui pressão ou gargalo por outra causa."
+    };
 
     private async void SetPerformanceBaseline_Click(object sender, RoutedEventArgs e)
     {
