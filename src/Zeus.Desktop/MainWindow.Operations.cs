@@ -472,6 +472,23 @@ public partial class MainWindow
         }, cancellable: true);
     }
 
+    private async void SearchPendingWindowsUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        await RunOperationAsync("Consultando Windows Update", "Busca online e somente leitura pela fonte configurada no Windows. Nenhuma atualização será baixada ou instalada.", async token =>
+        {
+            var search = await _windowsUpdate.SearchPendingSoftwareUpdatesAsync(token);
+            QueueActivity(new(DateTimeOffset.UtcNow, "windows-update", "software-search", search.IsComplete ? "info" : "warning",
+                $"Busca de atualizações de software {(search.IsComplete ? "concluída" : "incompleta")}: {search.Updates.Count} item(ns)",
+                JsonSerializer.Serialize(new { search.CheckedAt, search.IsComplete, count = search.Updates.Count, search.Warnings })));
+            PendingWindowsUpdates.Clear();
+            foreach (var update in search.Updates)
+                PendingWindowsUpdates.Add(new(update.Title, update.KnowledgeBaseIds.Count == 0 ? "KB não informado" : string.Join(", ", update.KnowledgeBaseIds), update.Downloaded ? "Já baixada pelo Windows" : "Ainda não baixada", update.UpdateId));
+            WindowsUpdateSummary = $"{(search.IsComplete ? "Busca concluída" : "Resultado incompleto/desconhecido")} · {search.Updates.Count} item(ns) · {search.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}. " + string.Join(" ", search.Warnings);
+            StatusTitle = search.IsComplete ? "Diagnóstico do Windows Update concluído" : "Diagnóstico incompleto";
+            StatusDetail = WindowsUpdateSummary;
+        }, cancellable: true);
+    }
+
     private async void UpgradeWinget_Click(object sender, RoutedEventArgs e)
     {
         if (_isBusy || sender is not FrameworkElement { Tag: WingetUpdateRow row } || !row.CanInstall || !_wingetAuditReadable) return;

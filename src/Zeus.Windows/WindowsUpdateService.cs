@@ -10,9 +10,31 @@ public sealed record DriverUpdateCandidate(string Id, string Title, string? Manu
 public sealed record DriverUpdateSearch(DateTimeOffset CheckedAt,
     IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
 
+public sealed record PendingWindowsUpdate(string Title, IReadOnlyList<string> KnowledgeBaseIds, bool Downloaded, string UpdateId);
+public sealed record PendingWindowsUpdateSearch(DateTimeOffset CheckedAt, bool IsComplete,
+    IReadOnlyList<PendingWindowsUpdate> Updates, IReadOnlyList<string> Warnings);
+
 /// <summary>Read-only discovery through the native Windows Update Agent and its configured trusted sources.</summary>
 public sealed class WindowsUpdateService
 {
+    private const string SearchPendingScript = """
+        $session = [System.Activator]::CreateInstance([System.Type]::GetTypeFromProgID('Microsoft.Update.Session'));
+        $session.ClientApplicationID = 'ZEUS';
+        $searcher = $session.CreateUpdateSearcher();
+        $searcher.Online = $true;
+        $searcher.CanAutomaticallyUpgradeService = $false;
+        $search = $searcher.Search("IsInstalled=0 and IsHidden=0 and Type='Software'");
+        $warnings = [System.Collections.Generic.List[string]]::new();
+        if ([int]$search.ResultCode -ne 2) { $warnings.Add('O Windows Update retornou resultado parcial ou incompleto (código ' + [int]$search.ResultCode + ').'); };
+        $updates = [System.Collections.Generic.List[object]]::new();
+        for ($i = 0; $i -lt $search.Updates.Count; $i++) {
+            $update = $search.Updates.Item($i);
+            $updates.Add([pscustomobject]@{ Title=[string]$update.Title; KnowledgeBaseIds=@($update.KBArticleIDs | ForEach-Object { [string]$_ }); Downloaded=[bool]$update.IsDownloaded; UpdateId=[string]$update.Identity.UpdateID });
+        };
+        [pscustomobject]@{ IsComplete=([int]$search.ResultCode -eq 2); Updates=@($updates.ToArray()); Warnings=@($warnings.ToArray()) } |
+            Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 5 -Compress;
+        """;
+
     private const string SearchScript = """
         $session = [System.Activator]::CreateInstance([System.Type]::GetTypeFromProgID('Microsoft.Update.Session'));
         $session.ClientApplicationID = 'ZEUS';
@@ -105,8 +127,70 @@ public sealed class WindowsUpdateService
         }
     }
 
+    /// <summary>Performs an explicit online, read-only search of configured Windows Update sources; no update is downloaded or installed.</summary>
+    public async Task<PendingWindowsUpdateSearch> SearchPendingSoftwareUpdatesAsync(CancellationToken cancellationToken = default)
+    {
+        if (!OperatingSystem.IsWindows()) return FailedPending("A busca de atualizações do Windows requer Windows.");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(3));
+        using var process = new Process { StartInfo = TrustedPowerShell.Create(SearchPendingScript, WindowsPowerShellModule.Utility) };
+        try
+        {
+            if (!process.Start()) return FailedPending("A consulta do Windows Update não iniciou.");
+            var outputTask = ReadBoundedAsync(process.StandardOutput, 2 * 1024 * 1024, timeout.Token);
+            var errorTask = ReadBoundedAsync(process.StandardError, 16 * 1024, timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            var output = await outputTask;
+            var diagnostic = await errorTask;
+            if (process.ExitCode != 0) return FailedPending("A consulta ao Windows Update falhou. " + diagnostic.Trim());
+            var parsed = ParsePendingSoftwareUpdatesPayload(output);
+            var warnings = parsed.Warnings.ToList();
+            warnings.Add("Busca online somente leitura pela fonte configurada no Windows Update; nenhum download, instalação ou reinicialização foi solicitado.");
+            if (parsed.Updates.Count == 0 && parsed.IsComplete) warnings.Add("Nenhuma atualização de software pendente foi encontrada nesta busca. Isso não avalia drivers nem atualizações ocultas.");
+            return parsed with { CheckedAt = DateTimeOffset.UtcNow, Warnings = warnings.AsReadOnly() };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return FailedPending("A busca excedeu três minutos. Estado desconhecido; confira conexão, políticas e o Windows Update.");
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            return FailedPending("Não foi possível concluir a busca do Windows Update: " + exception.Message);
+        }
+        finally
+        {
+            try { if (process.Id > 0 && !process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) { }
+        }
+    }
+
+    public static PendingWindowsUpdateSearch ParsePendingSoftwareUpdatesPayload(string output)
+    {
+        var result = JsonSerializer.Deserialize<PendingSearchPayload>(output)
+            ?? throw new InvalidDataException("Resposta vazia do Windows Update.");
+        if (result.Updates is null || result.Warnings is null) throw new InvalidDataException("Resposta incompleta do Windows Update.");
+        var warnings = result.Warnings.ToList();
+        var updates = new List<PendingWindowsUpdate>();
+        var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var malformed = false;
+        foreach (var update in result.Updates)
+        {
+            if (update is null || string.IsNullOrWhiteSpace(update.Title) || !Guid.TryParse(update.UpdateId, out var id) || id == Guid.Empty || !identities.Add(id.ToString("D")))
+            {
+                malformed = true;
+                warnings.Add("Uma atualização foi omitida porque o título ou a identidade retornada era inválida ou repetida.");
+                continue;
+            }
+            updates.Add(update with { UpdateId = id.ToString("D"), KnowledgeBaseIds = update.KnowledgeBaseIds ?? [] });
+        }
+        return new(DateTimeOffset.UtcNow, result.IsComplete && !malformed, updates.AsReadOnly(), warnings.AsReadOnly());
+    }
+
     private static DriverUpdateSearch Failed(string message) =>
         new(DateTimeOffset.UtcNow, [], [message]);
+
+    private static PendingWindowsUpdateSearch FailedPending(string message) =>
+        new(DateTimeOffset.UtcNow, false, [], [message]);
 
     private static async Task<string> ReadBoundedAsync(StreamReader reader, int maximumCharacters, CancellationToken cancellationToken)
     {
@@ -122,4 +206,5 @@ public sealed class WindowsUpdateService
     }
 
     private sealed record SearchPayload(IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
+    private sealed record PendingSearchPayload(bool IsComplete, IReadOnlyList<PendingWindowsUpdate>? Updates, IReadOnlyList<string>? Warnings);
 }

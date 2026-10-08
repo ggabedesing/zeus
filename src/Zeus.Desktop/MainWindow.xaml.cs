@@ -116,6 +116,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
     public ObservableCollection<WingetUpdateRow> WingetUpdates { get; } = [];
+    public ObservableCollection<WindowsUpdateRow> PendingWindowsUpdates { get; } = [];
     public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
     public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS")];
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -139,6 +140,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string ProfileSummary { get => _profileSummary; private set => Set(ref _profileSummary, value); }
     public string DriverSummary { get => _driverSummary; private set => Set(ref _driverSummary, value); }
     public string WingetSummary { get => _wingetSummary; private set => Set(ref _wingetSummary, value); }
+    private string _windowsUpdateSummary = "A busca online só começa quando você solicitar. Não baixa nem instala atualizações.";
+    public string WindowsUpdateSummary { get => _windowsUpdateSummary; private set => Set(ref _windowsUpdateSummary, value); }
     public string PerformanceSummary { get => _performanceSummary; private set => Set(ref _performanceSummary, value); }
     public string CollectionDate => _snapshot is null ? "Leitura pendente" : _snapshot.CollectedAt.ToLocalTime().ToString("dd/MM HH:mm:ss");
     public string SystemDescription => _snapshot is null ? "Inventário local do Windows" : $"{_snapshot.ComputerName} · {_snapshot.OperatingSystem}";

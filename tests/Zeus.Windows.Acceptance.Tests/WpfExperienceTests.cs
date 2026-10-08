@@ -129,6 +129,9 @@ public sealed class WpfExperienceTests
 
         var tabs = Assert.IsType<TabControl>(window.FindName("WorkspaceTabs"));
         Assert.Equal("workspace-tabs", AutomationProperties.GetAutomationId(tabs));
+        var updateSearchButton = Assert.IsType<Button>(window.FindName("SearchPendingWindowsUpdatesButton"));
+        Assert.Equal("search-pending-windows-updates", AutomationProperties.GetAutomationId(updateSearchButton));
+        Assert.True(updateSearchButton.IsEnabled, "A busca online somente leitura deve exigir ação explícita do usuário.");
         var expectedIds = new[]
         {
             "OverviewTab", "MaintenanceTab", "CleanupTab", "StartupTab",

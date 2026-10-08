@@ -91,6 +91,8 @@ public sealed record WingetUpdateRow(WingetUpdateCandidate Candidate, bool Pendi
     public string InstallabilityReason => PendingReview ? "Tentativa anterior sem resultado confirmado. Confira manualmente o programa e consulte novamente antes de qualquer nova ação." : Candidate.InstallabilityReason;
 }
 
+public sealed record WindowsUpdateRow(string Title, string KnowledgeBase, string DownloadState, string UpdateId);
+
 public sealed record ChangeRow(Guid Id, string Title, string Detail, bool CanRestore);
 public sealed record CleanupSessionRow(Guid Id, string Title, string Detail, bool CanRestore, bool CanPurge);
 public sealed record HistoryRow(Guid SessionId, string Title, string Summary, string Protection, IReadOnlyList<string> Steps, string Error, bool HasLogFiles)
