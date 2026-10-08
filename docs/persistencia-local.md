@@ -4,10 +4,10 @@
 
 O banco do usuário fica em `%LOCALAPPDATA%\Zeus\zeus.db`. Ele é criado na primeira execução com SQLite e registra a versão em `PRAGMA user_version` e em `schema_migrations`. A inicialização valida tabelas obrigatórias, recusa uma versão de esquema mais nova que a do aplicativo e não substitui um banco incompatível.
 
-O esquema atual (versão 3) contém:
+O esquema atual (versão 4) contém:
 
 - `app_settings`: preferências da interface serializadas em JSON, com chave estável e data de atualização;
-- `maintenance_sessions` e `maintenance_steps`: sessões e etapas normalizadas, com chaves estrangeiras e sequência;
+- `maintenance_sessions` e `maintenance_steps`: sessões e etapas normalizadas, com chaves estrangeiras e sequência; as etapas de drivers também guardam a seleção lógica do servidor WUA e, quando aplicável, o ID do serviço adicional consultado;
 - `performance_sessions` e `performance_samples`: sessões de observação, referência antes/depois e amostras com CPU/RAM em colunas tipadas e demais contadores em JSON validado;
 - `activity_entries`: eventos locais com data UTC, categoria, tipo, severidade, resumo, detalhes JSON opcional e correlação;
 - `app_metadata`: marcadores de importação idempotente dos arquivos JSON antigos;
@@ -25,8 +25,8 @@ Novas preferências e sessões são gravadas no SQLite. Os arquivos JSON antigos
 
 O observador conserva até 600 amostras em memória por processo aberto e também grava sessões no SQLite. A referência marcada e as sessões mais recentes são recuperadas na próxima abertura. O banco limita o histórico a 200 sessões comuns e 4.000 amostras; cada payload JSON tem limite de 64 KiB. O JSON detalhado inclui nomes de processos e contadores locais; trate o banco e o relatório exportado como dados pessoais.
 
-O estado interno consulta `PRAGMA quick_check`, versão do SQLite, versão do esquema, tamanho do arquivo principal e contagens de eventos e sessões de manutenção. A falha da checagem aparece como estado degradado; o aplicativo não tenta reparar nem apagar o banco automaticamente. As migrações da versão 1 para 2 e da versão 2 para 3 são transacionais e preservam as configurações, eventos e histórico existentes; versões futuras devem seguir o mesmo padrão e preservar esquemas desconhecidos.
+O estado interno consulta `PRAGMA quick_check`, versão do SQLite, versão do esquema, tamanho do arquivo principal e contagens de eventos e sessões de manutenção. A falha da checagem aparece como estado degradado; o aplicativo não tenta reparar nem apagar o banco automaticamente. As migrações v1→v2→v3→v4 são transacionais; a v4 acrescenta à etapa de manutenção a seleção lógica do servidor WUA e o ID opcional do serviço, sem inferir valores para registros antigos. As versões futuras devem seguir o mesmo padrão e preservar esquemas desconhecidos.
 
 ## Testes
 
-`Zeus.Storage.Tests` exercita criação/versionamento, migração 1→2, integridade, gravação de preferências e atividade, sessões/etapas, amostras de desempenho e idempotência da importação. `DesktopStorageTests` verifica a migração dos JSON legados e confirma que os arquivos de origem permanecem iguais.
+`Zeus.Storage.Tests` exercita criação/versionamento, migrações desde v1 e v2 até v4, integridade, gravação de preferências e atividade, sessões/etapas (incluindo metadados de origem WUA), amostras de desempenho e idempotência da importação. `DesktopStorageTests` verifica a migração dos JSON legados e confirma que os arquivos de origem permanecem iguais.
