@@ -77,6 +77,54 @@ public sealed class ZeusDatabase
 
     public string PathName => _path;
 
+    public async Task BackupToAsync(string destinationPath, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        cancellationToken.ThrowIfCancellationRequested();
+        var destination = Path.GetFullPath(destinationPath);
+        if (string.Equals(destination, _path, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("O arquivo de backup precisa ser diferente do banco em uso.", nameof(destinationPath));
+
+        await InitializeAsync(cancellationToken);
+        var directory = Path.GetDirectoryName(destination)
+            ?? throw new ArgumentException("O destino do backup não tem uma pasta válida.", nameof(destinationPath));
+        Directory.CreateDirectory(directory);
+        var temporary = Path.Combine(directory, $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var source = new SqliteConnection(_connectionString);
+                source.Open();
+                using var backup = new SqliteConnection(new SqliteConnectionStringBuilder
+                {
+                    DataSource = temporary,
+                    Mode = SqliteOpenMode.ReadWriteCreate,
+                    Pooling = false,
+                    DefaultTimeout = 5
+                }.ToString());
+                backup.Open();
+                source.BackupDatabase(backup);
+                using var command = backup.CreateCommand();
+                command.CommandText = "PRAGMA integrity_check; PRAGMA user_version;";
+                using var reader = command.ExecuteReader();
+                if (!reader.Read() ||
+                    !string.Equals(reader.GetString(0), "ok", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("A cópia criada não passou na verificação de integridade do SQLite.");
+                if (!reader.NextResult() || !reader.Read() ||
+                    reader.GetInt32(0) != CurrentSchemaVersion)
+                    throw new InvalidDataException("A cópia criada não preservou a versão de esquema esperada.");
+            }, CancellationToken.None);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(temporary, destination, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
+    }
+
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await _initializeGate.WaitAsync(cancellationToken);

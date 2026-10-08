@@ -22,6 +22,37 @@ public sealed class ZeusDatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task OnlineBackupPreservesSettingsActivityAndSchemaAndCanReplaceAnOlderBackup()
+    {
+        var database = CreateDatabase();
+        await database.WriteSettingAsync("preferences", "{\"theme\":\"Aurora\"}");
+        await database.AppendActivityAsync(new(DateTimeOffset.UtcNow, "diagnostics", "completed", "info", "Backup test"));
+        var destination = Path.Combine(_root, "backup", "zeus.db");
+        var olderBackup = new ZeusDatabase(destination);
+        await olderBackup.WriteSettingAsync("preferences", "{\"theme\":\"Old\"}");
+        SqliteConnectionClear();
+
+        await database.BackupToAsync(destination);
+
+        var restored = new ZeusDatabase(destination);
+        Assert.Equal("{\"theme\":\"Aurora\"}", await restored.ReadSettingAsync("preferences"));
+        Assert.Equal("Backup test", Assert.Single(await restored.ReadRecentActivityAsync()).Summary);
+        var health = await restored.CheckHealthAsync();
+        Assert.True(health.IsHealthy);
+        Assert.Equal(ZeusDatabase.CurrentSchemaVersion, health.SchemaVersion);
+    }
+
+    [Fact]
+    public async Task OnlineBackupRejectsTheLiveDatabaseAsItsOwnDestination()
+    {
+        var database = CreateDatabase();
+        await database.InitializeAsync();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => database.BackupToAsync(database.PathName));
+        Assert.True((await database.CheckHealthAsync()).IsHealthy);
+    }
+
+    [Fact]
     public async Task SettingsUpsertAndRoundTripWithoutLosingUnknownFields()
     {
         var database = CreateDatabase();

@@ -599,6 +599,28 @@ public partial class MainWindow
             StatusTitle = "Relatório exportado"; StatusDetail = "O JSON contém nomes de computador, usuários e processos. Revise essas informações antes de compartilhar.";
         });
     }
+
+    private async void BackupDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Criar cópia de segurança dos dados do ZEUS",
+            Filter = "Banco SQLite do ZEUS (*.db)|*.db",
+            FileName = $"zeus-backup-{DateTime.Now:yyyyMMdd-HHmmss}.db",
+            DefaultExt = ".db",
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        await RunOperationAsync("Criando cópia de segurança", "O SQLite copia o banco em uso e verifica a integridade antes de gravar o destino escolhido.", async token =>
+        {
+            await _storage.BackupDatabaseAsync(dialog.FileName, token);
+            StatusTitle = "Cópia de segurança verificada";
+            StatusDetail = $"Banco SQLite salvo em {dialog.FileName}. O arquivo contém preferências e histórico local; guarde-o como dado pessoal.";
+        }, cancellable: true);
+    }
+
     private void OpenLogs_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: Guid id }) return;

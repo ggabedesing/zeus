@@ -21,7 +21,7 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 | Observador | buffer circular limitado, política adaptativa, comparação descritiva antes/depois de CPU/RAM com cobertura de valores válidos sobre o total, picos médios por amostra da engine GPU mais ativa/atividade de disco e uso dedicado médio/ocupação por adaptador (com número de amostras disponíveis), contadores locais de GPU/disco/rede e memória dedicada/compartilhada/comprometida/capacidade dedicada quando disponíveis, PID de engine associado ao nome apenas quando corresponde ao processo amostrado, heurísticas de jogos/OBS sobre processos acessíveis e utilização de `VideoEncode` quando ligada ao PID do OBS, sessões/referência SQLite e exportação; interpretação/classificação de pressão VRAM, telemetria de codec/quadros e detecção confiável de partida/transmissão continuam pendentes |
 | Latência ICMP | teste sob demanda para IP/host informado, resolução DNS limitada a 5 s, cinco tentativas com timeout de 1 s, respostas/status/latência registrados no SQLite; ausência de resposta não é classificada como falta de Internet nem como perda geral de pacotes |
 | Auxiliar | Argumentos inválidos rejeitados antes de operação e armazenamento administrativo protegido |
-| Persistência SQLite | Migração transacional v1→v2, integridade, sessões/etapas de manutenção e desempenho, amostras/referência, preferências, eventos e importação idempotente sem remover JSON de origem |
+| Persistência SQLite | Migrações transacionais v1→v2→v3, integridade, sessões/etapas de manutenção e desempenho, amostras/referência, preferências, eventos, importação idempotente sem remover JSON de origem e backup SQLite consistente verificado antes da gravação |
 | Interface | Aplicação WPF real com inventário, oito áreas e três temas capturados em PNG |
 | Publicação | Pacote autocontido com interface, auxiliar e dependências |
 
@@ -46,6 +46,8 @@ Os coletores WMI de desempenho agora mantêm instâncias válidas já lidas se a
 Esta revisão compilou a solução Release sem avisos/erros; 66 testes de hardware passaram, incluindo os dois casos de preservação parcial/indisponibilidade. A aceitação Windows passou em 39 testes, com 1 teste administrativo ignorado. O smoke test nativo foi concluído sem executar reparos; nesta amostra a telemetria de encoder continuou indisponível.
 
 A comparação de CPU e RAM agora informa cobertura válida por período e descarta valores percentuais fora de 0–100; campos opcionais preservam a leitura de comparações antigas. A revisão passou na compilação Release sem avisos/erros, em 67 testes de hardware e em 39 testes de aceitação Windows (1 teste administrativo ignorado). Um caso sintético valida coberturas 1/3 e 3/3 para CPU e amostras indisponíveis para RAM.
+
+O backup do SQLite foi validado em teste de armazenamento: substituiu uma cópia anterior, preservou preferências e atividades, e passou pela verificação de esquema e integridade. Outro caso confirma que o caminho do banco ativo é rejeitado como destino. A interface adiciona o comando na aba Histórico e informa que restauração guiada ainda não está disponível.
 
 ## Aceitação administrativa em máquinas de teste
 

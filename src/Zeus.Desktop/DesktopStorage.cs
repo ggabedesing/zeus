@@ -94,6 +94,8 @@ internal sealed class DesktopStorage
     public Task AppendActivityAsync(ActivityEntry entry) => _database.AppendActivityAsync(entry);
     public Task<IReadOnlyList<ActivityEntry>> ReadRecentActivityAsync(int limit = 500) => _database.ReadRecentActivityAsync(limit);
     public Task<DatabaseHealth> CheckHealthAsync() => _database.CheckHealthAsync();
+    public Task BackupDatabaseAsync(string destinationPath, CancellationToken cancellationToken = default) =>
+        _database.BackupToAsync(destinationPath, cancellationToken);
 
     public Task StartPerformanceSessionAsync(Guid sessionId, string label, DateTimeOffset startedAt) =>
         _database.StartPerformanceSessionAsync(sessionId.ToString("D"), label, startedAt);

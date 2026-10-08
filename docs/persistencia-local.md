@@ -4,7 +4,7 @@
 
 O banco do usuário fica em `%LOCALAPPDATA%\Zeus\zeus.db`. Ele é criado na primeira execução com SQLite e registra a versão em `PRAGMA user_version` e em `schema_migrations`. A inicialização valida tabelas obrigatórias, recusa uma versão de esquema mais nova que a do aplicativo e não substitui um banco incompatível.
 
-O esquema atual (versão 2) contém:
+O esquema atual (versão 3) contém:
 
 - `app_settings`: preferências da interface serializadas em JSON, com chave estável e data de atualização;
 - `maintenance_sessions` e `maintenance_steps`: sessões e etapas normalizadas, com chaves estrangeiras e sequência;
@@ -19,13 +19,13 @@ O banco usa transações para gravações de histórico e eventos. O registro de
 
 Na primeira leitura, `history.json` e `preferences.json` são validados e importados quando existem. O marcador é gravado na mesma transação que os dados importados. A origem JSON permanece intacta como cópia local. Uma entrada já presente no banco não é sobrescrita pelo arquivo legado. Se a validação ou a gravação falhar, o arquivo JSON não é apagado.
 
-Novas preferências e sessões são gravadas no SQLite. Os arquivos JSON antigos não são atualizados depois da migração. Não remova o banco nem os arquivos de origem durante a migração; backup e restauração administrados pelo aplicativo ficam para a fase de liberação.
+Novas preferências e sessões são gravadas no SQLite. Os arquivos JSON antigos não são atualizados depois da migração. Não remova o banco nem os arquivos de origem durante a migração. Na aba Histórico, o usuário pode criar uma cópia de segurança do banco em uso: o SQLite produz uma cópia consistente, o ZEUS confere `integrity_check` e versão do esquema, e só então grava o arquivo no destino escolhido. O backup inclui configurações e dados locais, podendo conter nomes de processos, caminhos e eventos; guarde-o em local privado. O aplicativo ainda não oferece restauração guiada desse arquivo.
 
 ## Saúde e recuperação
 
 O observador conserva até 600 amostras em memória por processo aberto e também grava sessões no SQLite. A referência marcada e as sessões mais recentes são recuperadas na próxima abertura. O banco limita o histórico a 200 sessões comuns e 4.000 amostras; cada payload JSON tem limite de 64 KiB. O JSON detalhado inclui nomes de processos e contadores locais; trate o banco e o relatório exportado como dados pessoais.
 
-O estado interno consulta `PRAGMA quick_check`, versão do SQLite, versão do esquema, tamanho do arquivo principal e contagens de eventos e sessões de manutenção. A falha da checagem aparece como estado degradado; o aplicativo não tenta reparar nem apagar o banco automaticamente. A migração da versão 1 para 2 cria as tabelas de desempenho em transação e preserva configurações, eventos e histórico existentes; versões futuras devem seguir o mesmo padrão e preservar esquemas desconhecidos.
+O estado interno consulta `PRAGMA quick_check`, versão do SQLite, versão do esquema, tamanho do arquivo principal e contagens de eventos e sessões de manutenção. A falha da checagem aparece como estado degradado; o aplicativo não tenta reparar nem apagar o banco automaticamente. As migrações da versão 1 para 2 e da versão 2 para 3 são transacionais e preservam as configurações, eventos e histórico existentes; versões futuras devem seguir o mesmo padrão e preservar esquemas desconhecidos.
 
 ## Testes
 

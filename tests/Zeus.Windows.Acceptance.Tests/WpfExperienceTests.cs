@@ -132,6 +132,9 @@ public sealed class WpfExperienceTests
         var updateSearchButton = Assert.IsType<Button>(window.FindName("SearchPendingWindowsUpdatesButton"));
         Assert.Equal("search-pending-windows-updates", AutomationProperties.GetAutomationId(updateSearchButton));
         Assert.True(updateSearchButton.IsEnabled, "A busca online somente leitura deve exigir ação explícita do usuário.");
+        var backupDatabaseButton = Assert.IsType<Button>(window.FindName("BackupDatabaseButton"));
+        Assert.Equal("backup-local-data", AutomationProperties.GetAutomationId(backupDatabaseButton));
+        Assert.True(backupDatabaseButton.IsEnabled, "O usuário deve conseguir criar um backup local a partir do histórico.");
         var expectedIds = new[]
         {
             "OverviewTab", "MaintenanceTab", "CleanupTab", "StartupTab",
