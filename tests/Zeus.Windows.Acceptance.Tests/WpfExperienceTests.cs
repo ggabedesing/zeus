@@ -198,6 +198,16 @@ public sealed class WpfExperienceTests
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
         licensed.IsSelected = true; unlicensed.IsSelected = true;
         Assert.False(window.CanInstallDriver);
+        var workspaceTabs = Assert.IsType<TabControl>(window.FindName("WorkspaceTabs"));
+        var previousTab = workspaceTabs.SelectedItem;
+        var driverTab = workspaceTabs.Items.Cast<TabItem>()
+            .Single(tab => AutomationProperties.GetAutomationId(tab) == "DriverTab");
+        workspaceTabs.SelectedItem = driverTab;
+        await Task.Delay(25);
+        window.UpdateLayout();
+        Assert.Contains(FindVisualDescendants<TextBlock>(window), block =>
+            block.Text == licensed.PackageIntegritySummary);
+        workspaceTabs.SelectedItem = previousTab;
 
         var wingetCandidate = new WingetUpdateCandidate("Fixture App", "Vendor.Fixture", "1.0", "2.0", "winget");
         var availableUpdate = new WingetUpdateRow(wingetCandidate);
@@ -304,6 +314,16 @@ public sealed class WpfExperienceTests
         await using (var file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
             encoder.Save(file);
         Assert.True(new FileInfo(path).Length > 10_000, "Acceptance must capture the rendered window, not an empty image.");
+    }
+
+    private static IEnumerable<T> FindVisualDescendants<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is T match) yield return match;
+            foreach (var descendant in FindVisualDescendants<T>(child)) yield return descendant;
+        }
     }
 
     private sealed class BindingErrorListener : TraceListener
