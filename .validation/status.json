@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "e2ed1df25ed0a633d58643bc0d66f5c1c87cbc54",
+  "sourceBranch": "feat/zeus-windows-mvp",
+  "runId": "37721829955",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37721829955",
+  "recordedAtUtc": "2026-10-08T03:17:01.9398807+00:00",
+  "runner": "windows-latest",
+  "accepted": false,
+  "outcomes": {
+    "build": "success",
+    "windowsTests": "failure",
+    "smoke": "success",
+    "publish": "success"
+  },
+  "testCounts": {
+    "failed": 1,
+    "skipped": 0,
+    "passed": 187,
+    "total": 188
+  },
+  "testProjects": [
+    {
+      "project": "Zeus.Cleanup.Tests",
+      "total": 33,
+      "passed": 33,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Core.Tests",
+      "total": 31,
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Hardware.Tests",
+      "total": 34,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Maintenance.Protocol.Tests",
+      "total": 43,
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.UserOptimization.Tests",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Windows.Acceptance.Tests",
+      "total": 27,
+      "passed": 26,
+      "failed": 1,
+      "skipped": 0
+    }
+  ],
+  "failures": [
+    {
+      "test": "Zeus.Windows.Acceptance.Tests.WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+      "message": "System.ArgumentNullException : Value cannot be null. (Parameter 'value')"
+    }
+  ],
+  "screenshots": [],
+  "limitations": [
+    "Acceptance runs on a Windows CI virtual machine, not on every physical hardware configuration.",
+    "Repair, restore-point creation, driver installation, offline scan and reboot are not executed by CI.",
+    "CI does not establish measured performance gains or production code-signing status."
+  ]
+}
