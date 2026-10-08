@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/TestResults/
+artifacts/
+.vs/
+.idea/
+*.user
+*.suo
+*.log
+.DS_Store
+.dotnet/
+.nuget/

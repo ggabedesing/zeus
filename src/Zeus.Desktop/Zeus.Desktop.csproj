@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Zeus.Core/Zeus.Core.csproj" />
+    <ProjectReference Include="../Zeus.Windows/Zeus.Windows.csproj" />
+    <ProjectReference Include="../Zeus.Maintenance/Zeus.Maintenance.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Target Name="CopyMaintenanceHelper" AfterTargets="Build">
+    <PropertyGroup>
+      <MaintenanceOutputDirectory>$(MSBuildProjectDirectory)/../Zeus.Maintenance/bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)</MaintenanceOutputDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <MaintenanceHelperFiles Include="$(MaintenanceOutputDirectory)/Zeus.Maintenance.exe" Condition="Exists('$(MaintenanceOutputDirectory)/Zeus.Maintenance.exe')" />
+      <MaintenanceHelperFiles Include="$(MaintenanceOutputDirectory)/Zeus.Maintenance.dll" Condition="Exists('$(MaintenanceOutputDirectory)/Zeus.Maintenance.dll')" />
+      <MaintenanceHelperFiles Include="$(MaintenanceOutputDirectory)/Zeus.Maintenance.deps.json" Condition="Exists('$(MaintenanceOutputDirectory)/Zeus.Maintenance.deps.json')" />
+      <MaintenanceHelperFiles Include="$(MaintenanceOutputDirectory)/Zeus.Maintenance.runtimeconfig.json" Condition="Exists('$(MaintenanceOutputDirectory)/Zeus.Maintenance.runtimeconfig.json')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(MaintenanceHelperFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
