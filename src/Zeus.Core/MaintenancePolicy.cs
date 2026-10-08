@@ -60,11 +60,8 @@ public static class MaintenancePolicy
             {
                 if (!MaintenanceRequestProtocol.TryParseDriverIdentity(request.TargetId, out var id, out var revision))
                     throw new ArgumentException("Selecione a identidade exata do driver oferecido pelo Windows Update.", nameof(requests));
-                if (request.UpdateServerSelection is not (0 or 1 or 2 or 3) ||
-                    (request.UpdateServerSelection == 3
-                        ? !MaintenanceRequestProtocol.TryParseUpdateServiceId(request.UpdateServiceId)
-                        : request.UpdateServiceId is not null))
-                    throw new ArgumentException("A instalação de driver exige a origem exata da busca no Windows Update Agent.", nameof(requests));
+                if (request.UpdateServerSelection is not (0 or 1 or 2))
+                    throw new ArgumentException("A instalação de driver exige uma origem do Windows Update Agent reconhecida e permitida.", nameof(requests));
                 if (!driverTargets.Add(id.ToString("D") + ":" + revision))
                     throw new ArgumentException("O plano contém a mesma identidade de driver mais de uma vez.", nameof(requests));
             }
@@ -79,7 +76,7 @@ public static class MaintenancePolicy
             {
                 if (!selectedActions.Add(request.Action))
                     throw new ArgumentException("O plano contém uma ação repetida.", nameof(requests));
-                if (request.TargetId is not null || request.EulaAccepted || request.UpdateServerSelection is not null || request.UpdateServiceId is not null)
+                if (request.TargetId is not null || request.EulaAccepted || request.UpdateServerSelection is not null)
                     throw new ArgumentException("Somente a instalação de driver permite identidade e aceite de licença.", nameof(requests));
             }
         }

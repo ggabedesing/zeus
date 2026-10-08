@@ -75,7 +75,7 @@ public sealed class WindowsUpdateServiceTests
         var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
 
         Assert.Single(result.Updates);
-        Assert.Contains(result.Warnings, warning => warning.Contains("origem reconhecível", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Warnings, warning => warning.Contains("não é permitida", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

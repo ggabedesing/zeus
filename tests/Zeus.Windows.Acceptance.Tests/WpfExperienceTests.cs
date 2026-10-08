@@ -182,10 +182,12 @@ public sealed class WpfExperienceTests
             DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 1));
         Assert.Equal("Windows Update Agent · servidor gerenciado", managedSource.DriverSource);
         Assert.True(managedSource.CanSelectForInstall);
-        var invalidSource = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":6", "Invalid source fixture", "Fixture", "Fixture adapter", null, false,
-            DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 3, UpdateServiceId: "invalid"));
+        var invalidSource = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":6", "Additional service fixture", "Fixture", "Fixture adapter", null, false,
+            DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 3,
+            UpdateServiceId: "12345678-1234-1234-1234-123456789abc"));
         Assert.False(invalidSource.CanSelectForInstall);
         Assert.Contains("origem", invalidSource.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("serviço adicional não permitido", invalidSource.DriverSource, StringComparison.OrdinalIgnoreCase);
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
         licensed.IsSelected = true; unlicensed.IsSelected = true;
         Assert.False(window.CanInstallDriver);

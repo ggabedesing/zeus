@@ -211,12 +211,9 @@ public sealed class WindowsUpdateService
         if (result.Updates is null || result.Warnings is null)
             throw new InvalidDataException("Resposta incompleta do Windows Update.");
         var warnings = result.Warnings.ToList();
-        var sourceValid = result.ServerSelection is 0 or 1 or 2 or 3 &&
-            (result.ServerSelection == 3
-                ? MaintenanceRequestProtocol.TryParseUpdateServiceId(result.ServiceId)
-                : result.ServiceId is null);
+        var sourceValid = result.ServerSelection is 0 or 1 or 2 && result.ServiceId is null;
         if (!sourceValid)
-            warnings.Add("O Windows Update Agent não retornou uma origem reconhecível; os candidatos ficam bloqueados para instalação pelo ZEUS.");
+            warnings.Add("A seleção de servidor do Windows Update Agent não é permitida pelo ZEUS; os candidatos ficam visíveis, mas bloqueados para instalação.");
         var drivers = new List<DriverUpdateCandidate>();
         var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var driver in result.Updates)

@@ -48,14 +48,20 @@ public sealed class MaintenanceRequestProtocolTests
     }
 
     [Fact]
-    public void DriverInstallRequestPreservesExactWindowsUpdateServerSelection()
+    public void DriverInstallRequestPreservesAllowedWindowsUpdateServerSelection()
     {
-        var serviceId = "12345678-1234-1234-1234-123456789abc";
-        var selected = new[] { new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, DriverId, false, 3, serviceId) };
+        var selected = new[] { new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, DriverId, false, 2) };
         var encoded = MaintenanceRequestProtocol.Encode(selected);
 
         Assert.True(MaintenanceRequestProtocol.TryReadArguments(["--session", SessionId, "--requests", encoded], out _, out var requests));
         Assert.Equal(selected, requests);
+    }
+
+    [Fact]
+    public void DriverInstallRejectsOtherWindowsUpdateServices()
+    {
+        Assert.Throws<ArgumentException>(() => MaintenanceRequestProtocol.Encode([
+            new(MaintenanceActionId.InstallDriverUpdate, DriverId, false, 3)]));
     }
 
     [Theory]

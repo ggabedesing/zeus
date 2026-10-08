@@ -693,7 +693,7 @@ public partial class MainWindow
         var candidate = selected[0];
         if (!Confirm($"Instalar este candidato de driver?\n\n{candidate.Title}\nDispositivo: {Available(candidate.DeviceName)} · Fabricante: {Available(candidate.Manufacturer)}\nFornecedor declarado: {candidate.DriverProvider} · Categoria inferida: {candidate.ProviderCategory}\nClasse: {candidate.DriverClass} · Data do driver: {candidate.DriverDate}\nVersão: {Available(candidate.DriverVersion)}\nOrigem: {candidate.DriverSource}\nIdentidade: {candidate.Id}\n\nA versão numérica e a assinatura/hash do arquivo não são confirmados nesta busca. Pode haver reinicialização e incompatibilidade; o auxiliar exigirá proteção e exportará os drivers atuais antes desta instalação.", "Revisar candidato de driver")) return;
         await ReviewAndExecuteAsync([new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, candidate.Id,
-            candidate.RequiresEula && candidate.EulaAccepted, candidate.Candidate.UpdateServerSelection, candidate.Candidate.UpdateServiceId)]);
+            candidate.RequiresEula && candidate.EulaAccepted, candidate.Candidate.UpdateServerSelection)]);
     }
 
     private async void RollbackDriver_Click(object sender, RoutedEventArgs e)
