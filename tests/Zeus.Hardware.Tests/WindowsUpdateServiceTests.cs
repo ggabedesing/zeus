@@ -81,8 +81,8 @@ public sealed class WindowsUpdateServiceTests
     [Fact]
     public void MicrosoftUpdateServiceIdIsAcceptedButUnrelatedAdditionalServiceIsNot()
     {
-        var microsoftPayload = $$"""{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"Vendor","DeviceName":"Device","RequiresEula":false,"DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":3,"ServiceId":"{{Zeus.Core.MaintenanceRequestProtocol.MicrosoftUpdateServiceId}}"}""";
-        var unrelatedPayload = microsoftPayload.Replace(Zeus.Core.MaintenanceRequestProtocol.MicrosoftUpdateServiceId,
+        var microsoftPayload = $$"""{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"Vendor","DeviceName":"Device","RequiresEula":false,"DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":3,"ServiceId":"{{Zeus.Core.WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId}}"}""";
+        var unrelatedPayload = microsoftPayload.Replace(Zeus.Core.WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId,
             "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", StringComparison.OrdinalIgnoreCase);
 
         var accepted = WindowsUpdateService.ParseDriverUpdatesPayload(microsoftPayload);

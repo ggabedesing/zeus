@@ -70,11 +70,24 @@ public sealed class MaintenanceRequestProtocolTests
     public void DriverInstallPreservesOnlyTheKnownMicrosoftUpdateServiceId()
     {
         var selected = new[] { new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, DriverId, false, 3,
-            MaintenanceRequestProtocol.MicrosoftUpdateServiceId) };
+            WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId) };
         var encoded = MaintenanceRequestProtocol.Encode(selected);
 
         Assert.True(MaintenanceRequestProtocol.TryReadArguments(["--session", SessionId, "--requests", encoded], out _, out var requests));
         Assert.Equal(selected, requests);
+    }
+
+    [Theory]
+    [InlineData(0, null, true, "origem efetiva desconhecida")]
+    [InlineData(1, null, true, "servidor gerenciado")]
+    [InlineData(2, null, true, "Windows Update")]
+    [InlineData(3, "7971f918-a847-4430-9279-4a52d1efe18d", true, "Microsoft Update")]
+    [InlineData(3, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", false, "não permitido")]
+    [InlineData(9, null, false, "origem indisponível")]
+    public void UpdateSourcePolicyHasOneConsistentAllowlistAndDescription(int selection, string? serviceId, bool allowed, string description)
+    {
+        Assert.Equal(allowed, WindowsUpdateSourcePolicy.IsAllowed(selection, serviceId));
+        Assert.Contains(description, WindowsUpdateSourcePolicy.Describe(selection, serviceId), StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

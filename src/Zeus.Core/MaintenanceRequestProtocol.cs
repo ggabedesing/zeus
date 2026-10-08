@@ -8,7 +8,6 @@ namespace Zeus.Core;
 public static class MaintenanceRequestProtocol
 {
     public const int MaximumPayloadBytes = 8192;
-    public const string MicrosoftUpdateServiceId = "7971f918-a847-4430-9279-4a52d1efe18d";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public static string Encode(IReadOnlyCollection<MaintenanceRequest> requests)

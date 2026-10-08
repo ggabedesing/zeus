@@ -60,10 +60,7 @@ public static class MaintenancePolicy
             {
                 if (!MaintenanceRequestProtocol.TryParseDriverIdentity(request.TargetId, out var id, out var revision))
                     throw new ArgumentException("Selecione a identidade exata do driver oferecido pelo Windows Update.", nameof(requests));
-                var serverSelectionAllowed = request.UpdateServerSelection is 0 or 1 or 2 && request.UpdateServiceId is null;
-                var microsoftUpdateAllowed = request.UpdateServerSelection == 3 &&
-                    string.Equals(request.UpdateServiceId, MaintenanceRequestProtocol.MicrosoftUpdateServiceId, StringComparison.OrdinalIgnoreCase);
-                if (!serverSelectionAllowed && !microsoftUpdateAllowed)
+                if (!WindowsUpdateSourcePolicy.IsAllowed(request.UpdateServerSelection, request.UpdateServiceId))
                     throw new ArgumentException("A instalação de driver exige uma origem do Windows Update Agent reconhecida e permitida.", nameof(requests));
                 if (!driverTargets.Add(id.ToString("D") + ":" + revision))
                     throw new ArgumentException("O plano contém a mesma identidade de driver mais de uma vez.", nameof(requests));

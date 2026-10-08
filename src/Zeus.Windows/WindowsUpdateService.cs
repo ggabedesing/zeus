@@ -211,8 +211,7 @@ public sealed class WindowsUpdateService
         if (result.Updates is null || result.Warnings is null)
             throw new InvalidDataException("Resposta incompleta do Windows Update.");
         var warnings = result.Warnings.ToList();
-        var sourceValid = result.ServerSelection is 0 or 1 or 2 && result.ServiceId is null ||
-            result.ServerSelection == 3 && string.Equals(result.ServiceId, MaintenanceRequestProtocol.MicrosoftUpdateServiceId, StringComparison.OrdinalIgnoreCase);
+        var sourceValid = WindowsUpdateSourcePolicy.IsAllowed(result.ServerSelection, result.ServiceId);
         if (!sourceValid)
             warnings.Add("A seleção de servidor do Windows Update Agent não é reconhecida como Windows Update ou Microsoft Update oficial; os candidatos ficam visíveis, mas bloqueados para instalação.");
         var drivers = new List<DriverUpdateCandidate>();

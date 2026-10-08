@@ -190,7 +190,7 @@ public sealed class WpfExperienceTests
         Assert.Contains("serviço adicional não permitido", invalidSource.DriverSource, StringComparison.OrdinalIgnoreCase);
         var microsoftUpdate = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":7", "Microsoft Update fixture", "Fixture", "Fixture adapter", null, false,
             DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 3,
-            UpdateServiceId: Zeus.Core.MaintenanceRequestProtocol.MicrosoftUpdateServiceId));
+            UpdateServiceId: Zeus.Core.WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId));
         Assert.True(microsoftUpdate.CanSelectForInstall);
         Assert.Contains("Microsoft Update", microsoftUpdate.DriverSource, StringComparison.Ordinal);
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
