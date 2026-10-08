@@ -5,7 +5,8 @@ using Zeus.Core;
 namespace Zeus.Windows;
 
 public sealed record DriverUpdateCandidate(string Id, string Title, string? Manufacturer,
-    string? DeviceName, string? DriverVersion, bool RequiresEula, string? EulaText = null);
+    string? DeviceName, string? DriverVersion, bool RequiresEula, string? EulaText = null,
+    string? DriverProvider = null, string? DriverClass = null, DateOnly? DriverDate = null);
 
 public sealed record DriverUpdateSearch(DateTimeOffset CheckedAt,
     IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
@@ -58,6 +59,8 @@ public sealed class WindowsUpdateService
             $requiresEula = -not [bool]$update.EulaAccepted;
             $eula = $null;
             if ($requiresEula) { $eula = [string]$update.EulaText };
+            $driverDate = $null;
+            try { $driverDate = ([datetime]$update.DriverVerDate).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture) } catch { };
             $drivers.Add([pscustomobject]@{
                 Id = $identity.ToString('D') + ':' + $revision;
                 Title = $title;
@@ -65,7 +68,10 @@ public sealed class WindowsUpdateService
                 DeviceName = [string]$update.DriverModel;
                 DriverVersion = $null;
                 RequiresEula = $requiresEula;
-                EulaText = $eula
+                EulaText = $eula;
+                DriverProvider = [string]$update.DriverProvider;
+                DriverClass = $class;
+                DriverDate = $driverDate
             });
         };
         [pscustomobject]@{ Updates = @($drivers.ToArray()); Warnings = @($warnings.ToArray()) } |
@@ -91,25 +97,7 @@ public sealed class WindowsUpdateService
             var diagnostic = await errors;
             if (process.ExitCode != 0)
                 return Failed("A consulta ao Windows Update falhou. " + diagnostic.Trim());
-            var data = JsonSerializer.Deserialize<SearchPayload>(payload)
-                ?? throw new InvalidDataException("Resposta vazia do Windows Update.");
-            if (data.Updates is null || data.Warnings is null)
-                throw new InvalidDataException("Resposta incompleta do Windows Update.");
-            var warnings = data.Warnings.ToList();
-            var drivers = new List<DriverUpdateCandidate>();
-            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var driver in data.Updates)
-            {
-                if (driver is null || !MaintenanceRequestProtocol.TryParseDriverIdentity(driver.Id, out _, out _) ||
-                    string.IsNullOrWhiteSpace(driver.Title) || !ids.Add(driver.Id))
-                {
-                    warnings.Add("Uma oferta de driver foi ignorada porque sua identidade era inválida ou repetida.");
-                    continue;
-                }
-                drivers.Add(driver);
-            }
-            warnings.Add("As ofertas seguem as fontes configuradas no Windows Update. Em notebooks, confira a recomendação do fabricante antes de instalar.");
-            return new DriverUpdateSearch(DateTimeOffset.UtcNow, drivers.AsReadOnly(), warnings.AsReadOnly());
+            return ParseDriverUpdatesPayload(payload);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -207,4 +195,28 @@ public sealed class WindowsUpdateService
 
     private sealed record SearchPayload(IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
     private sealed record PendingSearchPayload(bool IsComplete, IReadOnlyList<PendingWindowsUpdate>? Updates, IReadOnlyList<string>? Warnings);
+
+    internal static DriverUpdateSearch ParseDriverUpdatesPayload(string output)
+    {
+        var result = JsonSerializer.Deserialize<SearchPayload>(output)
+            ?? throw new InvalidDataException("Resposta vazia do Windows Update.");
+        if (result.Updates is null || result.Warnings is null)
+            throw new InvalidDataException("Resposta incompleta do Windows Update.");
+        var warnings = result.Warnings.ToList();
+        var drivers = new List<DriverUpdateCandidate>();
+        var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var driver in result.Updates)
+        {
+            if (driver is null || !MaintenanceRequestProtocol.TryParseDriverIdentity(driver.Id, out _, out _) ||
+                string.IsNullOrWhiteSpace(driver.Title) || !identities.Add(driver.Id))
+            {
+                warnings.Add("Uma oferta de driver foi ignorada porque sua identidade era inválida ou repetida.");
+                continue;
+            }
+            drivers.Add(driver);
+        }
+        warnings.Add("As ofertas seguem as fontes configuradas no Windows Update. Em notebooks, confira a recomendação do fabricante antes de instalar.");
+        warnings.Add("O Windows Update informa fornecedor, classe e data do driver, mas não uma versão numérica nem hash/assinatura do arquivo nesta busca; esses itens permanecem indisponíveis e não são inferidos do título.");
+        return new(DateTimeOffset.UtcNow, drivers.AsReadOnly(), warnings.AsReadOnly());
+    }
 }

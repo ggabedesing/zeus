@@ -671,7 +671,7 @@ public partial class MainWindow
     {
         if (!CanInstallDriver) return;
         var selected = DriverCandidates.Where(d => d.IsSelected).ToArray();
-        if (!Confirm($"Instalar os candidatos selecionados?\n\n{string.Join("\n\n", selected.Select(d => $"• {d.Title}\nDispositivo: {Available(d.DeviceName)} · Fabricante: {Available(d.Manufacturer)}\nVersão: {Available(d.DriverVersion)}\nIdentidade: {d.Id}"))}\n\nConfirme a indicação para cada atualização. Pode haver reinicialização e incompatibilidade; o auxiliar exigirá proteção e exportará os drivers atuais antes do lote.", "Revisar candidatos de drivers")) return;
+        if (!Confirm($"Instalar os candidatos selecionados?\n\n{string.Join("\n\n", selected.Select(d => $"• {d.Title}\nDispositivo: {Available(d.DeviceName)} · Fabricante: {Available(d.Manufacturer)}\nFornecedor declarado: {d.DriverProvider} · Categoria inferida: {d.ProviderCategory}\nClasse: {d.DriverClass} · Data do driver: {d.DriverDate}\nVersão: {Available(d.DriverVersion)}\nOrigem: {d.DriverSource}\nIdentidade: {d.Id}"))}\n\nConfirme a indicação para cada atualização. A versão numérica e a assinatura/hash do arquivo não são confirmados nesta busca. Pode haver reinicialização e incompatibilidade; o auxiliar exigirá proteção e exportará os drivers atuais antes do lote.", "Revisar candidatos de drivers")) return;
         await ReviewAndExecuteAsync(selected.Select(d => new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, d.Id, d.RequiresEula && d.EulaAccepted)).ToArray());
     }
 

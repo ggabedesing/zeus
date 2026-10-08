@@ -87,6 +87,11 @@
        <CheckBox IsChecked="{Binding IsSelected}" AutomationProperties.Name="{Binding Title}"><TextBlock Text="{Binding Title}" FontWeight="SemiBold"/></CheckBox>
        <TextBlock Text="{Binding DeviceName, StringFormat='Dispositivo: {0}', TargetNullValue='indisponível'}" Style="{StaticResource MutedText}" Margin="0,8,0,0"/>
        <TextBlock Text="{Binding Manufacturer, StringFormat='Fabricante: {0}', TargetNullValue='indisponível'}" Style="{StaticResource MutedText}"/>
+       <TextBlock Text="{Binding DriverProvider, StringFormat='Fornecedor declarado: {0}', TargetNullValue='indisponível'}" Style="{StaticResource MutedText}"/>
+       <TextBlock Text="{Binding ProviderCategory, StringFormat='Categoria inferida: {0}'}" Style="{StaticResource MutedText}"/>
+       <TextBlock Text="{Binding DriverClass, StringFormat='Classe: {0}'}" Style="{StaticResource MutedText}"/>
+       <TextBlock Text="{Binding DriverDate, StringFormat='Data do driver: {0}'}" Style="{StaticResource MutedText}"/>
+       <TextBlock Text="{Binding DriverSource, StringFormat='Origem: {0}'}" Style="{StaticResource MutedText}"/>
        <TextBlock Text="{Binding DriverVersion, StringFormat='Versão: {0}', TargetNullValue='indisponível'}" Style="{StaticResource MutedText}"/>
        <TextBlock Text="{Binding Id, StringFormat='Identidade: {0}'}" FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
        <Expander Header="Revisar licença deste candidato" Margin="0,12,0,0"><Expander.Style><Style TargetType="Expander"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding RequiresEula}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Expander.Style>
@@ -94,7 +99,7 @@
        </Expander>
       </StackPanel></Border>
      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-     <Button Content="Revisar e instalar drivers selecionados" Click="InstallDriver_Click" IsEnabled="{Binding CanInstallDriver}" HorizontalAlignment="Left" Margin="0,18,0,18" AutomationProperties.AutomationId="install-selected-drivers"/><TextBlock Text="O auxiliar consulta novamente a identidade escolhida, exige proteção confirmada e exporta os drivers atuais. A instalação pode exigir reinicialização; uma versão mais recente não garante desempenho melhor." Style="{StaticResource MutedText}"/>
+     <Button Content="Revisar e instalar drivers selecionados" Click="InstallDriver_Click" IsEnabled="{Binding CanInstallDriver}" HorizontalAlignment="Left" Margin="0,18,0,18" AutomationProperties.AutomationId="install-selected-drivers"/><TextBlock Text="O auxiliar consulta novamente a identidade escolhida, exige proteção confirmada e exporta os drivers atuais. A instalação usa Windows Update e pode exigir reinicialização. Esta tela não valida previamente assinatura/hash do arquivo; versão numérica pode não ser fornecida pelo Windows Update. Uma versão mais recente não garante desempenho melhor." Style="{StaticResource MutedText}" TextWrapping="Wrap"/>
     </StackPanel></ScrollViewer>
    </TabItem>
    <TabItem Header="Hardware e carga" AutomationProperties.AutomationId="HardwareTab">

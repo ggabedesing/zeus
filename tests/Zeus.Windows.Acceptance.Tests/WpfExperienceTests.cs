@@ -144,8 +144,13 @@ public sealed class WpfExperienceTests
         selectedMaintenance.IsSelected = false;
         Assert.False(window.CanGeneralOptimize);
         // A missing license on any selected driver must block the entire batch.
-        var licensed = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":1", "Acceptance fixture", "Fixture", "Fixture", null, true, "Fixture terms"));
+        var licensed = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":1", "Acceptance fixture", "Fixture", "Fixture", null, true, "Fixture terms",
+            DriverProvider: "NVIDIA", DriverClass: "Display", DriverDate: new DateOnly(2025, 11, 4)));
         var unlicensed = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":2", "Acceptance fixture", "Fixture", "Fixture", null, false));
+        Assert.Equal("NVIDIA (heurística pelo nome declarado)", licensed.ProviderCategory);
+        Assert.Equal("2025-11-04", licensed.DriverDate);
+        Assert.Equal("Windows Update · origem configurada no sistema", licensed.DriverSource);
+        Assert.Equal("indisponível", unlicensed.DriverDate);
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
         licensed.IsSelected = true; unlicensed.IsSelected = true;
         Assert.False(window.CanInstallDriver);

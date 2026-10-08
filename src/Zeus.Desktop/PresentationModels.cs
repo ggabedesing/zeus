@@ -74,10 +74,44 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
     public string? DeviceName => Candidate.DeviceName;
     public string? Manufacturer => Candidate.Manufacturer;
     public string? DriverVersion => Candidate.DriverVersion;
+    public string DriverProvider => string.IsNullOrWhiteSpace(Candidate.DriverProvider) ? "indisponível" : Candidate.DriverProvider;
+    public string DriverClass => string.IsNullOrWhiteSpace(Candidate.DriverClass) ? "indisponível" : Candidate.DriverClass;
+    public string DriverDate => Candidate.DriverDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "indisponível";
+    public string ProviderCategory => ClassifyProvider(Candidate.DriverProvider, Candidate.Manufacturer);
+    public string DriverSource => "Windows Update · origem configurada no sistema";
     public bool RequiresEula => Candidate.RequiresEula;
     public string EulaText => Candidate.EulaText ?? "A licença não está disponível. Instale este candidato pelo Windows Update para revisar os termos.";
     public bool LicenseReady => !RequiresEula || (EulaAccepted && !string.IsNullOrWhiteSpace(Candidate.EulaText));
     public bool EulaAccepted { get => _eulaAccepted; set { if (_eulaAccepted == value) return; _eulaAccepted = value; Raise(nameof(EulaAccepted)); Raise(nameof(LicenseReady)); } }
+
+    private static string ClassifyProvider(string? provider, string? manufacturer)
+    {
+        var declaredName = string.IsNullOrWhiteSpace(provider) ? manufacturer : provider;
+        if (string.IsNullOrWhiteSpace(declaredName)) return "indisponível";
+        if (declaredName.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)) return "NVIDIA (heurística pelo nome declarado)";
+        if (declaredName.Contains("AMD", StringComparison.OrdinalIgnoreCase) || ContainsToken(declaredName, "ATI") ||
+            declaredName.Contains("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase)) return "AMD (heurística pelo nome declarado)";
+        if (declaredName.Contains("Intel", StringComparison.OrdinalIgnoreCase)) return "Intel (heurística pelo nome declarado)";
+        if (new[] { "Dell", "HP Inc", "Hewlett-Packard", "Hewlett Packard", "Lenovo", "ASUS", "Acer", "MSI", "Samsung", "Gigabyte", "Toshiba" }
+            .Any(name => declaredName.Contains(name, StringComparison.OrdinalIgnoreCase)))
+            return "OEM (heurística pelo nome declarado)";
+        if (ContainsToken(declaredName, "HP")) return "OEM (heurística pelo nome declarado)";
+        return "Outro fornecedor (nome declarado)";
+    }
+
+    private static bool ContainsToken(string value, string token)
+    {
+        var index = value.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+        while (index >= 0)
+        {
+            var beforeIsWord = index > 0 && char.IsLetterOrDigit(value[index - 1]);
+            var afterIndex = index + token.Length;
+            var afterIsWord = afterIndex < value.Length && char.IsLetterOrDigit(value[afterIndex]);
+            if (!beforeIsWord && !afterIsWord) return true;
+            index = value.IndexOf(token, index + token.Length, StringComparison.OrdinalIgnoreCase);
+        }
+        return false;
+    }
 }
 
 public sealed record WingetUpdateRow(WingetUpdateCandidate Candidate, bool PendingReview = false)
