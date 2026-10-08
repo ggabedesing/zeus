@@ -92,6 +92,48 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void MemoryPressureSignalRequiresSustainedLowAvailableMemoryTogetherWithPageReads()
+    {
+        var sustained = Enumerable.Range(0, 6).Select(index => Sample(20) with
+        {
+            CollectedAt = DateTimeOffset.UnixEpoch.AddSeconds(index * 2.4),
+            TotalMemoryBytes = 1000,
+            AvailableMemoryBytes = 80,
+            MemoryPaging = new(900, 2000, 2, 4)
+        }).ToArray();
+        var noPageReads = sustained.Select(sample => sample with { MemoryPaging = new(900, 2000, 0, 0) }).ToArray();
+        var enoughMemory = sustained.Select(sample => sample with { AvailableMemoryBytes = 300 }).ToArray();
+        var shortWindow = sustained.Take(5).Select((sample, index) => sample with
+        {
+            CollectedAt = DateTimeOffset.UnixEpoch.AddSeconds(index * 2)
+        }).ToArray();
+        var missingCounter = sustained.Select(sample => sample with { MemoryPaging = null }).ToArray();
+
+        var signal = MemoryPressureAnalyzer.Assess(sustained);
+        var noSignal = MemoryPressureAnalyzer.Assess(noPageReads);
+        var enough = MemoryPressureAnalyzer.Assess(enoughMemory);
+        var shortEvidence = MemoryPressureAnalyzer.Assess(shortWindow);
+        var unavailable = MemoryPressureAnalyzer.Assess(missingCounter);
+
+        Assert.Equal(MemoryPressureSignalState.SustainedLowMemoryWithPageReads, signal.State);
+        Assert.Equal(6, signal.ValidSamples);
+        Assert.Equal(6, signal.CombinedSamples);
+        Assert.Equal(MemoryPressureSignalState.NoSustainedCombinedSignal, noSignal.State);
+        Assert.Equal(MemoryPressureSignalState.NoSustainedCombinedSignal, enough.State);
+        Assert.Equal(MemoryPressureSignalState.InsufficientEvidence, shortEvidence.State);
+        Assert.Equal(MemoryPressureSignalState.InsufficientEvidence, unavailable.State);
+    }
+
+    [Fact]
+    public void MemoryCommitPercentRequiresCompleteConsistentCounters()
+    {
+        Assert.Equal(75, new MemoryPagingObservation(750, 1000, 0, 0).CommitPercent);
+        Assert.Null(new MemoryPagingObservation(1001, 1000, 0, 0).CommitPercent);
+        Assert.Null(new MemoryPagingObservation(10, 0, 0, 0).CommitPercent);
+        Assert.Null(new MemoryPagingObservation(null, 1000, 0, 0).CommitPercent);
+    }
+
+    [Fact]
     public void InterruptedCounterReadPreservesValidRowsAndMarksTheListPartial()
     {
         var rows = new[] { new ProcessObservation(1, "process", 10, 1024) };
@@ -114,6 +156,20 @@ public sealed class PerformanceCounterTests
 
         Assert.Empty(result);
         Assert.Contains("indisponível", Assert.Single(warnings));
+    }
+
+    [Fact]
+    public void CounterLimitWarnsOnlyWhenAnAdditionalValidRowWouldBeDropped()
+    {
+        var rows = new List<ProcessObservation>();
+        var warnings = new List<string>();
+
+        Assert.True(WindowsPerformanceProbe.TryAddCounterRow(rows, new(1, "first", 0, 1), 1, "GPU", warnings));
+        Assert.Empty(warnings);
+        Assert.False(WindowsPerformanceProbe.TryAddCounterRow(rows, new(2, "second", 0, 1), 1, "GPU", warnings));
+
+        Assert.Single(rows);
+        Assert.Contains("pode estar incompleta", Assert.Single(warnings));
     }
 
     [Fact]

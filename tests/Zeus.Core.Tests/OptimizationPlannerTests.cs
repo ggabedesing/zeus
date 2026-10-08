@@ -12,7 +12,8 @@ public sealed class OptimizationPlannerTests
     [Fact]
     public void FormalPlanDistinguishesNoReviewFromUnavailableEvidence()
     {
-        var healthy = ruleEngine.Evaluate(HealthySnapshot(), OptimizationProfile.General);
+        var healthy = ruleEngine.Evaluate(HealthySnapshot(), OptimizationProfile.General,
+            new OptimizationWorkloadEvidence(null, 50, false, false, null, null, null, false, 5, 12));
         var incomplete = ruleEngine.Evaluate(HealthySnapshot() with { Memory = null, Disks = [], Security = null }, OptimizationProfile.General);
 
         Assert.Equal(OptimizationPlanStatus.NoOptimizationRequired, healthy.Status);
@@ -47,14 +48,16 @@ public sealed class OptimizationPlannerTests
     {
         var snapshot = HealthySnapshot() with { Memory = new MemoryInfo(10 * GiB, GiB) };
 
-        var plan = ruleEngine.Evaluate(snapshot, OptimizationProfile.General);
+        var plan = ruleEngine.Evaluate(snapshot, OptimizationProfile.General,
+            new OptimizationWorkloadEvidence(null, 8, false, false, null, null, null, true, 6, 12));
         var rule = Assert.Single(plan.Rules, result => result.Rule.Id == "memory.pressure");
 
         Assert.Equal(OptimizationPlanStatus.RecommendationsAvailable, plan.Status);
         Assert.True(rule.EvidenceAvailable);
         Assert.True(rule.Triggered);
         Assert.Null(rule.Action);
-        Assert.Contains("paginação", rule.Rule.TestPlan);
+        Assert.Contains("Page Reads/sec", rule.Rule.EvidenceRequired);
+        Assert.Contains("não um diagnóstico", rule.Reason);
     }
 
     [Fact]
@@ -82,7 +85,8 @@ public sealed class OptimizationPlannerTests
         var engine = new OptimizationRuleEngine(conflicting);
         var snapshot = HealthySnapshot() with { Memory = new MemoryInfo(4 * GiB, 300UL * 1024 * 1024) };
 
-        var plan = engine.Evaluate(snapshot, OptimizationProfile.General);
+        var plan = engine.Evaluate(snapshot, OptimizationProfile.General,
+            new OptimizationWorkloadEvidence(null, 7.3, false, false, null, null, null, true, 6, 12));
 
         Assert.Single(plan.Conflicts);
         Assert.Contains(plan.Rules, result => result.Rule.Id == "memory.pressure" && result.Triggered);
@@ -96,7 +100,8 @@ public sealed class OptimizationPlannerTests
         var engine = new OptimizationRuleEngine([ruleEngine.GetDefinitions().Single(rule => rule.Id == "memory.pressure"), storage]);
         var snapshot = HealthySnapshot() with { Disks = [new DiskInfo("SSD", "C:", 100 * GiB, 5 * GiB, "NTFS")] };
 
-        var plan = engine.Evaluate(snapshot, OptimizationProfile.General);
+        var plan = engine.Evaluate(snapshot, OptimizationProfile.General,
+            new OptimizationWorkloadEvidence(null, 50, false, false, null, null, null, false, 6, 12));
 
         Assert.Equal(OptimizationPlanStatus.PrerequisitesNotMet, plan.Status);
         Assert.NotEmpty(plan.UnmetDependencies);
@@ -123,7 +128,7 @@ public sealed class OptimizationPlannerTests
         var snapshot = HealthySnapshot();
         var unknown = ruleEngine.Evaluate(snapshot, OptimizationProfile.GamingStreaming);
         var observed = ruleEngine.Evaluate(snapshot, OptimizationProfile.GamingStreaming,
-            new OptimizationWorkloadEvidence(55, 60, true, true, false, 6, 12));
+            new OptimizationWorkloadEvidence(55, 60, true, true, false, 6, 12, false, 6, 12));
         var contextRule = Assert.Single(observed.Rules, result => result.Rule.Id == "gaming.streaming-context");
 
         Assert.Equal(OptimizationPlanStatus.NeedsMoreData, unknown.Status);
@@ -137,7 +142,7 @@ public sealed class OptimizationPlannerTests
     {
         var snapshot = HealthySnapshot();
         var plan = ruleEngine.Evaluate(snapshot, OptimizationProfile.Gaming,
-            new OptimizationWorkloadEvidence(65, 8, true, false));
+            new OptimizationWorkloadEvidence(65, 8, true, false, null, null, null, true, 6, 12));
         var memoryRule = Assert.Single(plan.Rules, result => result.Rule.Id == "gaming.memory-pressure");
 
         Assert.True(memoryRule.Triggered);

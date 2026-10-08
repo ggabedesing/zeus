@@ -23,6 +23,13 @@ public sealed record GpuProcessMemoryObservation(string InstanceName, string Ada
     long? ProcessStartTimeUtcTicks,
     ulong? DedicatedUsageBytes, ulong? SharedUsageBytes, ulong? NonLocalUsageBytes,
     ulong? LocalUsageBytes, ulong? TotalCommittedBytes);
+public sealed record MemoryPagingObservation(ulong? CommittedBytes, ulong? CommitLimitBytes,
+    double? PageReadsPerSecond, double? PagesInputPerSecond)
+{
+    public double? CommitPercent => CommittedBytes is { } committed && CommitLimitBytes is > 0 and { } limit && committed <= limit
+        ? committed / (double)limit * 100
+        : null;
+}
 
 /// <summary>SamplingDuration is the CPU system-counter interval; GPU, disk, and network counters are read afterward.</summary>
 public sealed record PerformanceObservation(
@@ -38,7 +45,8 @@ public sealed record PerformanceObservation(
     IReadOnlyList<NetworkPerformanceObservation>? Networks = null,
     ActivityContextInfo? ActivityContext = null,
     IReadOnlyList<GpuMemoryObservation>? GpuMemory = null,
-    IReadOnlyList<GpuProcessMemoryObservation>? GpuProcessMemory = null);
+    IReadOnlyList<GpuProcessMemoryObservation>? GpuProcessMemory = null,
+    MemoryPagingObservation? MemoryPaging = null);
 
 /// <summary>
 /// A bounded, read-only observation, not a benchmark or prediction of performance
@@ -103,6 +111,12 @@ public sealed class WindowsPerformanceProbe
             .ThenByDescending(process => process.CpuPercent)
             .ThenByDescending(process => process.WorkingSetBytes).ThenBy(process => process.Id).Take(50).ToArray();
 
+        var gpuEngines = MapGpuEnginesToProcesses(ReadGpuCounters(token, warnings), allObservedProcesses);
+        var gpuMemory = ReadGpuMemoryCounters(token, warnings);
+        var gpuProcessMemory = ReadGpuProcessMemoryCounters(token, warnings, allObservedProcesses);
+        var memoryPaging = ReadMemoryPagingCounters(token, warnings);
+        // Keep available-memory and hard-page-read counters adjacent so each pressure
+        // assessment combines readings from nearly the same point in the sample.
         ulong total = 0;
         ulong available = 0;
         var memory = new MemoryStatus { Length = (uint)Marshal.SizeOf<MemoryStatus>() };
@@ -112,19 +126,17 @@ public sealed class WindowsPerformanceProbe
             available = memory.AvailablePhysical;
         }
         else warnings.Add("Memória física indisponível via GlobalMemoryStatusEx; zero neste relatório indica ausência de leitura.");
-        var gpuEngines = MapGpuEnginesToProcesses(ReadGpuCounters(token, warnings), allObservedProcesses);
-        var gpuMemory = ReadGpuMemoryCounters(token, warnings);
-        var gpuProcessMemory = ReadGpuProcessMemoryCounters(token, warnings, allObservedProcesses);
         var disks = ReadDiskCounters(token, warnings);
         var networks = ReadNetworkCounters(token, warnings);
         var activityContext = ActivityContextDetector.Detect(allObservedProcesses, gpuEngines);
         warnings.Add("GPU: utilização por instância/engine não é uso total. Ocupação de memória dedicada compara uso reportado com capacidade DXGI correspondente e, sozinha, não diagnostica pressão ou gargalo; sensores ausentes permanecem desconhecidos.");
         warnings.Add("Memória GPU por processo: alocações dedicada/compartilhada são contadores reportados pelo Windows; nome depende do PID observado. Orçamento por processo e pressão não são fornecidos por essa leitura.");
+        warnings.Add("RAM e paginação: baixa memória disponível combinada com Page Reads/sec sustentado é somente um sinal para revisar a tarefa; hard faults também podem ler executáveis, DLLs e arquivos mapeados, não apenas o arquivo de paginação.");
         warnings.Add("Disco e rede: contadores são taxas locais; tráfego não mede latência ou qualidade da Internet e erros são contagens reportadas pelo adaptador.");
         warnings.Add("A lista de processos exibida é limitada aos 50 maiores por CPU/RAM. Heurísticas de jogo/OBS consultam todos os processos acessíveis nesta amostra; processos inacessíveis e engines GPU não informadas permanecem desconhecidos. VideoEncode associado ao PID do OBS não confirma transmissão ao vivo.");
         warnings.Add("A amostra reflete a carga atual. Compare tarefas e condições equivalentes; CPU/RAM livres não medem FPS ou garantem melhorias.");
         return new PerformanceObservation(DateTimeOffset.UtcNow, Stopwatch.GetElapsedTime(start, cpuEnd),
-            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks, activityContext, gpuMemory, gpuProcessMemory);
+            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks, activityContext, gpuMemory, gpuProcessMemory, memoryPaging);
     }
 
     internal readonly record struct SystemCpuTimes(ulong Idle, ulong Kernel, ulong User);
@@ -240,6 +252,15 @@ public sealed class WindowsPerformanceProbe
                 CounterUInt64(row, "NonLocalUsage"), CounterUInt64(row, "LocalUsage"), CounterUInt64(row, "TotalCommitted"), processesById));
     }
 
+    private static MemoryPagingObservation? ReadMemoryPagingCounters(CancellationToken token, List<string> warnings)
+    {
+        var rows = ReadCounterRows("RAM e paginação", "Win32_PerfFormattedData_PerfOS_Memory",
+            "SELECT CommittedBytes,CommitLimit,PageReadsPerSec,PagesInputPerSec FROM Win32_PerfFormattedData_PerfOS_Memory",
+            1, token, warnings, row => new MemoryPagingObservation(CounterUInt64(row, "CommittedBytes"),
+                CounterUInt64(row, "CommitLimit"), CounterDouble(row, "PageReadsPerSec"), CounterDouble(row, "PagesInputPerSec")));
+        return rows.FirstOrDefault();
+    }
+
     private static IReadOnlyList<DiskPerformanceObservation> ReadDiskCounters(CancellationToken token, List<string> warnings) =>
         ReadCounterRows("Disco", "Win32_PerfFormattedData_PerfDisk_PhysicalDisk",
             "SELECT Name,DiskBytesPersec,PercentDiskTime,AvgDisksecPerRead FROM Win32_PerfFormattedData_PerfDisk_PhysicalDisk WHERE Name <> '_Total'", 64, token, warnings, row =>
@@ -279,10 +300,7 @@ public sealed class WindowsPerformanceProbe
                 using (row)
                 {
                     token.ThrowIfCancellationRequested();
-                    if (convert(row) is { } value) result.Add(value);
-                    if (result.Count < limit) continue;
-                    warnings.Add($"{label}: limite de {limit} contadores atingido; a lista pode estar incompleta.");
-                    break;
+                    if (convert(row) is { } value && !TryAddCounterRow(result, value, limit, label, warnings)) break;
                 }
             }
         }
@@ -309,6 +327,22 @@ public sealed class WindowsPerformanceProbe
 
         warnings.Add($"{label}: leitura interrompida após {validRows.Count} instância(s) válidas ({error.GetType().Name}); os dados parciais foram preservados e a lista pode estar incompleta.");
         return validRows;
+    }
+
+    internal static bool TryAddCounterRow<T>(ICollection<T> rows, T value, int limit, string label,
+        ICollection<string> warnings) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(warnings);
+        if (limit < 1) throw new ArgumentOutOfRangeException(nameof(limit));
+        if (rows.Count >= limit)
+        {
+            warnings.Add($"{label}: limite de {limit} contadores atingido; a lista pode estar incompleta.");
+            return false;
+        }
+        rows.Add(value);
+        return true;
     }
 
     private static double? CounterDouble(ManagementBaseObject row, string property)

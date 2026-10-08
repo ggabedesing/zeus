@@ -342,6 +342,9 @@ public partial class MainWindow
             PerformanceResourceRows.Add(new($"Memória GPU · {gpuMemory.AdapterInstance} · {process}",
                 $"Alocações reportadas: dedicada {FormatBytes(gpuMemory.DedicatedUsageBytes)} · compartilhada {FormatBytes(gpuMemory.SharedUsageBytes)} · local {FormatBytes(gpuMemory.LocalUsageBytes)} · não local {FormatBytes(gpuMemory.NonLocalUsageBytes)} · comprometida {FormatBytes(gpuMemory.TotalCommittedBytes)}. Isso não informa o orçamento do processo nem confirma pressão."));
         }
+        if (observation.MemoryPaging is { } paging)
+            PerformanceResourceRows.Add(new("RAM e paginação",
+                $"Memória comprometida: {FormatBytes(paging.CommittedBytes)} de {FormatBytes(paging.CommitLimitBytes)} ({FormatMetric(paging.CommitPercent)}) · leituras de páginas: {FormatMetric(paging.PageReadsPerSecond)}/s · páginas lidas: {FormatMetric(paging.PagesInputPerSecond)}/s. Hard faults podem vir de executáveis, DLLs ou arquivos mapeados; não provam falta de RAM."));
         var sessionSamples = _performanceHistory.Snapshot().Where(entry => entry.SessionId == _performanceSessionId)
             .TakeLast(20).Select(entry => entry.Observation).ToArray();
         foreach (var assessment in GpuMemoryOccupancyAnalyzer.Assess(sessionSamples))
@@ -350,6 +353,9 @@ public partial class MainWindow
             PerformanceResourceRows.Add(new($"Disco · {disk.InstanceName}", $"Transferência: {FormatBytesPerSecond(disk.BytesPerSecond)} · ativo: {(disk.ActivePercent is { } active ? $"{active:0.#}%" : "indisponível")} · leitura: {(disk.AverageReadLatencyMilliseconds is { } latency ? $"{latency:0.##} ms" : "indisponível")}"));
         foreach (var network in observation.Networks ?? [])
             PerformanceResourceRows.Add(new($"Rede · {network.Adapter}", $"Tráfego: {FormatBytesPerSecond(network.BytesPerSecond)} · enlace reportado: {FormatBitsPerSecond(network.LinkBitsPerSecond)} · erros acumulados: {network.ErrorPackets?.ToString() ?? "indisponível"}"));
+        var memoryAssessment = MemoryPressureAnalyzer.Assess(_performanceHistory.Snapshot()
+            .Where(entry => entry.SessionId == _performanceSessionId).Select(entry => entry.Observation));
+        PerformanceResourceRows.Add(new("Sinal de RAM", FormatMemoryPressureAssessment(memoryAssessment)));
         foreach (var warning in observation.Warnings)
             if (!Warnings.Contains(warning)) Warnings.Add(warning);
         Notify(nameof(Performance)); Notify(nameof(CanSetPerformanceBaseline)); Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
@@ -360,6 +366,13 @@ public partial class MainWindow
         GpuMemoryOccupancyState.InsufficientEvidence => $"Evidência insuficiente: {assessment.ValidSamples} leitura(s) válida(s) em {assessment.Window.TotalSeconds:0.#} s; exigidos {GpuMemoryOccupancyAnalyzer.MinimumSamples} leituras e pelo menos {GpuMemoryOccupancyAnalyzer.MinimumWindow.TotalSeconds:0} s.",
         GpuMemoryOccupancyState.SustainedHighOccupancy => $"Ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% em {assessment.HighOccupancySamples}/{assessment.ValidSamples} leituras; média {assessment.AverageOccupancyPercent:0.#}%. Sinal para investigar. Pressão de VRAM permanece desconhecida: há alocações agregadas e por processo, mas sem orçamento por processo ou evidência de paginação.",
         _ => $"Sem ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% sustentada nesta janela ({assessment.ValidSamples} leituras). Pressão de VRAM permanece desconhecida: não há orçamento por processo nem evidência de paginação."
+    };
+
+    private static string FormatMemoryPressureAssessment(MemoryPressureAssessment assessment) => assessment.State switch
+    {
+        MemoryPressureSignalState.InsufficientEvidence => $"Evidência insuficiente: {assessment.ValidSamples} amostra(s) válida(s) em {assessment.Window.TotalSeconds:0.#} s; exigidos {MemoryPressureAnalyzer.MinimumSamples} amostras e pelo menos {MemoryPressureAnalyzer.MinimumWindow.TotalSeconds:0} s.",
+        MemoryPressureSignalState.SustainedLowMemoryWithPageReads => $"Memória disponível ≤{MemoryPressureAnalyzer.LowAvailableThresholdPercent:0}% em {assessment.LowAvailableSamples}/{assessment.ValidSamples} amostras e Page Reads/sec > 0 em {assessment.PageReadSamples}/{assessment.ValidSamples}; sinal para revisar a tarefa. Isso não prova falta de RAM; hard faults podem ler executáveis, DLLs e arquivos mapeados.",
+        _ => $"Sem sinal combinado sustentado nesta janela: pouca memória disponível em {assessment.LowAvailableSamples}/{assessment.ValidSamples} amostras e leituras de páginas em {assessment.PageReadSamples}/{assessment.ValidSamples}."
     };
 
     private async void SetPerformanceBaseline_Click(object sender, RoutedEventArgs e)

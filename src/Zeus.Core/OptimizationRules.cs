@@ -49,7 +49,10 @@ public sealed record OptimizationWorkloadEvidence(
     bool? ObsProcessDetected,
     bool? SustainedHighGpuMemoryOccupancy = null,
     int? GpuMemoryOccupancyValidSamples = null,
-    double? GpuMemoryOccupancyWindowSeconds = null);
+    double? GpuMemoryOccupancyWindowSeconds = null,
+    bool? SustainedLowMemoryWithPageReads = null,
+    int? MemoryPressureValidSamples = null,
+    double? MemoryPressureWindowSeconds = null);
 
 /// <summary>
 /// Formal metadata and evaluation for evidence-based review rules. The plan intentionally
@@ -64,8 +67,8 @@ public sealed class OptimizationRuleEngine
     private static readonly OptimizationRuleDefinition[] DefaultDefinitions =
     [
         new("memory.pressure", "Observar pressão de memória", OptimizationBenefit.MemoryPressure, RuleConfidence.Medium, AllProfiles,
-            "TotalBytes e AvailableBytes válidos; leitura pontual não comprova pressão durante uma tarefa.",
-            "Repetir a observação durante a tarefa habitual e conferir uso de memória e paginação.", [], true),
+            "Pelo menos cinco amostras em dez segundos com RAM disponível e Page Reads/sec válidos.",
+            "Repetir durante a tarefa real e revisar o uso dos aplicativos; Page Reads/sec pode incluir executáveis, DLLs e arquivos mapeados e não prova falha de RAM.", [], true),
         new("memory.capacity", "Avaliar capacidade de RAM para o seu uso", OptimizationBenefit.MemoryCapacity, RuleConfidence.Low, AllProfiles,
             "Capacidade total de memória válida e tarefa representativa.",
             "Confirmar requisitos do aplicativo, uso durante a tarefa e compatibilidade do equipamento.", [], true),
@@ -126,6 +129,24 @@ public sealed class OptimizationRuleEngine
         var results = new List<OptimizationRuleResult>(definitions.Length);
         foreach (var definition in definitions)
         {
+            if (definition.Id == "memory.pressure")
+            {
+                var samples = workload?.MemoryPressureValidSamples;
+                var window = workload?.MemoryPressureWindowSeconds;
+                var sufficientWindow = samples >= 5 && window >= 10;
+                var pressureEvidenceAvailable = sufficientWindow && workload?.SustainedLowMemoryWithPageReads is not null;
+                var pressureTriggered = pressureEvidenceAvailable && workload!.SustainedLowMemoryWithPageReads == true;
+                var evidence = samples is { } count && window is { } seconds
+                    ? $" Evidência: {count} amostras válidas em {seconds:0.#} s."
+                    : string.Empty;
+                var pressureReason = pressureTriggered
+                    ? "A janela manteve memória disponível baixa junto com leituras de páginas do disco. É um sinal para investigar a tarefa, não um diagnóstico de falta de RAM." + evidence
+                    : pressureEvidenceAvailable
+                        ? "A janela não mostrou memória disponível baixa junto com leituras de páginas sustentadas." + evidence
+                        : "Ainda não há cinco amostras válidas ao longo de dez segundos com leitura de memória e Page Reads/sec; uma leitura isolada não comprova pressão.";
+                results.Add(new(definition, pressureReason, pressureEvidenceAvailable, pressureTriggered, null));
+                continue;
+            }
             if (definition.Id == "gaming.cpu-load")
             {
                 var workloadEvidenceAvailable = workload is { CpuPercent: not null, KnownGameProcessDetected: true };
@@ -148,12 +169,19 @@ public sealed class OptimizationRuleEngine
             }
             if (definition.Id == "gaming.memory-pressure")
             {
-                var workloadEvidenceAvailable = workload is { AvailableMemoryPercent: not null, KnownGameProcessDetected: true };
-                var triggered = workloadEvidenceAvailable && workload!.AvailableMemoryPercent <= 10;
+                var samples = workload?.MemoryPressureValidSamples;
+                var window = workload?.MemoryPressureWindowSeconds;
+                var sufficientWindow = samples >= 5 && window >= 10;
+                var workloadEvidenceAvailable = sufficientWindow && workload?.SustainedLowMemoryWithPageReads is not null &&
+                    workload?.KnownGameProcessDetected == true;
+                var triggered = workloadEvidenceAvailable && workload!.SustainedLowMemoryWithPageReads == true;
+                var evidence = samples is { } count && window is { } seconds
+                    ? $" Evidência: {count} amostras válidas em {seconds:0.#} s."
+                    : string.Empty;
                 results.Add(new(definition,
-                    triggered ? $"Há {workload!.AvailableMemoryPercent:0.#}% de memória disponível durante a amostra com processo de jogo conhecido. Repita a medição e verifique paginação; isso não comprova gargalo." :
-                    workloadEvidenceAvailable ? $"Há {workload!.AvailableMemoryPercent:0.#}% de memória disponível nesta amostra; o limiar de revisão de 10% não foi atingido." :
-                    "Amostra válida de memória e processo de jogo conhecido não estão disponíveis em conjunto; ausência na lista observada não prova que o jogo esteja fechado.",
+                    triggered ? "Durante a janela com processo de jogo conhecido houve pouca RAM disponível junto a leituras de páginas. Revise o uso da tarefa; isso não comprova gargalo nem identifica qual aplicativo causou a condição." + evidence :
+                    workloadEvidenceAvailable ? "A janela não mostrou pouca RAM disponível junto a leituras de páginas sustentadas durante o processo de jogo observado." + evidence :
+                    "Não há janela válida de RAM/paginação junto a um processo de jogo conhecido; ausência na lista observada não prova que o jogo esteja fechado.",
                     workloadEvidenceAvailable, triggered, null));
                 continue;
             }

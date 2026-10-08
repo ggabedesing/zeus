@@ -550,12 +550,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             : gpuAssessments.ToArray();
         int? validGpuSamples = evidenceAssessments.Length > 0 ? evidenceAssessments.Min(assessment => assessment.ValidSamples) : null;
         double? gpuWindowSeconds = evidenceAssessments.Length > 0 ? evidenceAssessments.Min(assessment => assessment.Window.TotalSeconds) : null;
+        var memoryAssessment = MemoryPressureAnalyzer.Assess(currentSession);
+        bool? sustainedMemorySignal = memoryAssessment.State switch
+        {
+            MemoryPressureSignalState.SustainedLowMemoryWithPageReads => true,
+            MemoryPressureSignalState.NoSustainedCombinedSignal => false,
+            _ => null
+        };
         return new(sample.CpuPercent, availableMemoryPercent,
             sample.ActivityContext?.KnownGameProcessDetected,
             sample.ActivityContext?.ObsProcessDetected,
             sustainedGpuOccupancy,
             validGpuSamples,
-            gpuWindowSeconds);
+            gpuWindowSeconds,
+            sustainedMemorySignal,
+            memoryAssessment.ValidSamples,
+            memoryAssessment.Window.TotalSeconds);
     }
 
     private void ShowPendingHardware()
