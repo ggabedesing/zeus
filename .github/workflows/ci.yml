@@ -32,6 +32,7 @@ jobs:
               exit_code=$?
               cat "$result_dir/console.log"
               echo "Portable test project $project failed with exit code $exit_code." >&2
+              python scripts/summarize-portable-tests.py "$result_dir" "$project" "$GITHUB_STEP_SUMMARY"
               failed=1
             fi
           done
