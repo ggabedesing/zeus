@@ -18,6 +18,12 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 
 O relatório de `.validation/status.json` relaciona o commit, execução do Actions, contagens de testes, resultados por etapa e capturas. `accepted=true` refere-se **somente a esta aceitação automatizada**. As limitações de hardware e operações não executadas também constam nesse relatório.
 
+### Execução local recebida
+
+Em 8 de outubro de 2026, o usuário enviou o relatório da suíte executada no seu PC principal para o commit `c9404f0d473e34ef5a7b6a9e62d04fb9ecfc2b2a`: **203 testes aprovados, zero falhas e zero testes ignorados**, nos seis projetos. O relatório registra compilação Release concluída, execução com administrador e download local do SDK oficial com SHA-512 conferido. As somas por projeto e os resultados das etapas foram conferidos.
+
+O [resumo da evidência](evidencias/pc-local-2026-10-08.json) preserva o commit e os resultados, sem caminhos pessoais. O relatório lista 12 capturas; os arquivos dessas capturas locais não foram recebidos para revisão. A versão do Windows e a configuração física não constam no relatório. Esse resultado confirma a suíte automatizada nessa execução local e mantém pendentes os cenários administrativos abaixo.
+
 ## Aceitação administrativa em máquinas de teste
 
 Use Windows 11 suportado, snapshots quando disponíveis e backups independentes. Guarde a versão/commit, ação, relatório e resultado após reiniciar. Execute cada cenário separadamente.
@@ -37,7 +43,7 @@ Use Windows 11 suportado, snapshots quando disponíveis e backups independentes.
 | Oferta de driver desaparece ou muda | Identidade reconsultada; instalação bloqueada sem correspondência | Pendente com oferta real |
 | Licença de driver e backup | Aceite por candidato; exportação confirmada antes de instalar; falha bloqueia | Pendente com oferta real |
 | Atualização de driver e reversão | Instalação oficial registrada; dispositivo validado após reinício e recuperação ensaiada | Pendente |
-| Falha de gravação / interrupção | Estado incompleto indicado; relatórios parciais recuperados sem repetir ações | Parte portável testada; auxiliar pendente |
+| Falha de gravação / interrupção | Estado incompleto indicado; relatórios parciais recuperados sem repetir ações | Fixtures de journal e armazenamento aprovadas em Windows; interrupção real do auxiliar pendente |
 | PC com pouca RAM e armazenamento limitado | Medir consumo do ZEUS e comparar tarefa equivalente antes/depois | Pendente em equipamento físico |
 | Assinatura e distribuição | Authenticode, hash e entrega do pacote verificados | Hash implementado; assinatura de produção pendente |
 
@@ -55,7 +61,7 @@ O pacote `zeus-testes-windows.zip` permite executar a suíte automatizada no pr�
 
 Para conferir também o uso normal da interface:
 
-1. Extraia a pasta inteira do pacote e abra `Zeus.Desktop.exe` com seu usuário comum.
+1. Extraia a pasta inteira do pacote do aplicativo `zeus-win-x64.zip` e abra `Zeus.Desktop.exe` com seu usuário comum. A pasta `tests` do pacote de testes contém os projetos, não a distribuição autocontida do aplicativo.
 2. Aguarde “Diagnóstico concluído”. Confira CPU, memória, GPU e volumes; leituras ausentes devem trazer avisos.
 3. Em Hardware e carga, use “Medir carga por 5 segundos” durante a tarefa que está lenta.
 4. Em Inicialização, use “Atualizar inicialização” para ler as entradas. Em Limpeza, “Analisar temporários” apenas lista candidatos.

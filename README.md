@@ -71,6 +71,8 @@ O setup da nuvem baixa o SDK oficial e verifica SHA-512 pelos metadados da Micro
 
 O [workflow de aceitação](.github/workflows/ci.yml) executa testes reais em Windows, abre a interface WPF, coleta inventário/carga e captura as oito áreas e três temas. Também testa aplicar/restaurar preferências e entradas de inicialização isoladas. Os pacotes e a evidência ficam no [GitHub Actions](https://github.com/ggabedesing/zeus/actions). Uma branch `validation/zeus-<commit>/run-<id>-<tentativa>` registra resultados do commit exato; ela contém evidência, não código de produto.
 
+O relatório local enviado em 8 de outubro de 2026 registra **203/203 testes aprovados no PC do usuário**, sem falhas ou testes ignorados, para o commit `c9404f0`. O [registro de validação](docs/validacao-windows.md#execução-local-recebida) identifica a evidência e seus limites; essa aceitação não confirma reparos, instalação de drivers ou reinícios reais.
+
 Reparos, instalação de drivers, criação de pontos de restauração e reinícios não são executados automaticamente pelo CI. Os cenários necessários antes de uma distribuição de produção estão em [docs/validacao-windows.md](docs/validacao-windows.md).
 
 ## Estrutura
