@@ -15,7 +15,8 @@ public sealed record PerformanceComparison(
     PerformanceMetricComparison? DiskActivityPeak = null,
     IReadOnlyList<PerformanceGpuMemoryComparison>? GpuMemoryUsage = null,
     PerformanceMetricComparison? CpuUsage = null,
-    PerformanceMetricComparison? MemoryUsage = null);
+    PerformanceMetricComparison? MemoryUsage = null,
+    IReadOnlyList<PerformanceNetworkComparison>? NetworkTraffic = null);
 
 public sealed record PerformanceMetricComparison(
     double? ReferencePercent,
@@ -31,6 +32,13 @@ public sealed record PerformanceGpuMemoryComparison(
     int LaterAvailableSamples,
     double? ReferenceOccupancyPercent = null,
     double? LaterOccupancyPercent = null);
+
+public sealed record PerformanceNetworkComparison(
+    string Adapter,
+    double? ReferenceBytesPerSecond,
+    double? LaterBytesPerSecond,
+    int ReferenceAvailableSamples,
+    int LaterAvailableSamples);
 
 /// <summary>A process-local, bounded history that preserves observations until exported.</summary>
 public sealed class PerformanceHistoryBuffer
@@ -173,10 +181,29 @@ public static class PerformanceComparisonBuilder
         var cpuUsage = ComparePercentages(reference, later, sample => sample.CpuPercent);
         var memoryUsage = ComparePercentages(reference, later, UsedMemoryPercent);
 
+        var networkAdapters = reference.Concat(later).SelectMany(sample => sample.Networks ?? [])
+            .Select(network => network.Adapter).Where(adapter => !string.IsNullOrWhiteSpace(adapter))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var networkTraffic = networkAdapters.Select(adapter =>
+        {
+            static (double? Average, int Count) Summarize(IReadOnlyList<PerformanceObservation> samples, string adapterName)
+            {
+                var values = samples.SelectMany(sample => sample.Networks ?? [])
+                    .Where(network => string.Equals(network.Adapter, adapterName, StringComparison.OrdinalIgnoreCase))
+                    .Select(network => network.BytesPerSecond).Where(value => value.HasValue)
+                    .Select(value => (double)value!.Value).ToArray();
+                return (values.Length == 0 ? null : values.Average(), values.Length);
+            }
+
+            var left = Summarize(reference, adapter);
+            var right = Summarize(later, adapter);
+            return new PerformanceNetworkComparison(adapter, left.Average, right.Average, left.Count, right.Count);
+        }).ToArray();
+
         return new(reference.Count, later.Count,
             cpuUsage.ReferencePercent, cpuUsage.LaterPercent,
             memoryUsage.ReferencePercent, memoryUsage.LaterPercent,
             reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk, gpuMemory,
-            cpuUsage, memoryUsage);
+            cpuUsage, memoryUsage, networkTraffic);
     }
 }

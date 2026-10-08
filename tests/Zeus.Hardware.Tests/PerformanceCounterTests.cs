@@ -237,6 +237,33 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void ComparisonAveragesNetworkTrafficPerAdapterAndReportsCoverage()
+    {
+        var reference = new[]
+        {
+            Sample(20) with { Networks = [new("Ethernet", 100, null, null, null)] },
+            Sample(30) with { Networks = [new("Ethernet", 300, null, null, null), new("Wi-Fi", null, null, null, null)] }
+        };
+        var later = new[]
+        {
+            Sample(40) with { Networks = [new("Ethernet", 500, null, null, null)] },
+            Sample(50) with { Networks = [] }
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+
+        var ethernet = Assert.Single(comparison.NetworkTraffic!, item => item.Adapter == "Ethernet");
+        Assert.Equal(200, ethernet.ReferenceBytesPerSecond);
+        Assert.Equal(500, ethernet.LaterBytesPerSecond);
+        Assert.Equal(2, ethernet.ReferenceAvailableSamples);
+        Assert.Equal(1, ethernet.LaterAvailableSamples);
+        var wifi = Assert.Single(comparison.NetworkTraffic!, item => item.Adapter == "Wi-Fi");
+        Assert.Null(wifi.ReferenceBytesPerSecond);
+        Assert.Null(wifi.LaterBytesPerSecond);
+        Assert.Equal(0, wifi.ReferenceAvailableSamples);
+    }
+
+    [Fact]
     public void ComparisonKeepsUnavailableCountersUnknown()
     {
         var unavailable = Sample(null) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 };
@@ -262,6 +289,7 @@ public sealed class PerformanceCounterTests
         Assert.Null(comparison.DiskActivityPeak);
         Assert.Null(comparison.CpuUsage);
         Assert.Null(comparison.MemoryUsage);
+        Assert.Null(comparison.NetworkTraffic);
     }
 
     [Fact]

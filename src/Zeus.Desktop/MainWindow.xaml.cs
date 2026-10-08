@@ -111,9 +111,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 ? " · uso dedicado por adaptador: " + string.Join("; ", memory.Select(item =>
                     $"{item.AdapterInstance} {FormatGpuMemory(item.ReferenceDedicatedBytes)} / {FormatMetric(item.ReferenceOccupancyPercent)} ({item.ReferenceAvailableSamples}) → {FormatGpuMemory(item.LaterDedicatedBytes)} / {FormatMetric(item.LaterOccupancyPercent)} ({item.LaterAvailableSamples})"))
                 : " · uso de memória GPU: indisponível";
-            return $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}{gpuMemory}. Cobertura mostra amostras válidas sobre o total; engines individuais não são uso total da GPU, e ocupação não comprova um gargalo sozinha. Comparação descritiva, sem atribuir causa ou ganho.";
+            var network = comparison.NetworkTraffic is { Count: > 0 } adapters
+                ? " · rede por adaptador: " + string.Join("; ", adapters.Select(item =>
+                    $"{item.Adapter} {FormatNetworkRate(item.ReferenceBytesPerSecond)} ({item.ReferenceAvailableSamples}/{comparison.ReferenceSampleCount}) → {FormatNetworkRate(item.LaterBytesPerSecond)} ({item.LaterAvailableSamples}/{comparison.LaterSampleCount})"))
+                : " · tráfego de rede: indisponível";
+            return $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}{gpuMemory}{network}. Cobertura mostra amostras válidas sobre o total; engines individuais não são uso total da GPU, e ocupação não comprova um gargalo sozinha. Comparação descritiva, sem atribuir causa ou ganho.";
         }
     }
+
+    private static string FormatNetworkRate(double? bytesPerSecond) => bytesPerSecond is { } value && double.IsFinite(value) && value >= 0
+        ? FormatBytesPerSecond(value >= ulong.MaxValue ? ulong.MaxValue : (ulong)Math.Round(value))
+        : "indisponível";
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
     public ObservableCollection<DeviceRow> GraphicsRows { get; } = [];
