@@ -20,6 +20,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly IHardwareDiagnostics _diagnostics = new WindowsHardwareDiagnostics();
     private readonly ElevatedMaintenanceExecutor _executor = new();
     private readonly WindowsPerformanceProbe _performanceProbe = new();
+    private readonly NetworkLatencyProbe _networkLatencyProbe = new();
     private readonly PerformanceHistoryBuffer _performanceHistory = new();
     private Guid _performanceSessionId = Guid.NewGuid();
     private readonly WindowsUpdateService _windowsUpdate = new();
@@ -65,6 +66,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _driverSummary = "Consulte os drivers oferecidos oficialmente pelo Windows Update para este computador.";
     private string _wingetSummary = "Consulte atualizações de programas identificadas pela fonte winget. A consulta não instala nada.";
     private string _performanceSummary = "Meça por cinco segundos durante a tarefa lenta para observar a carga real.";
+    private string _networkProbeTarget = string.Empty;
+    private string _networkProbeSummary = "A medição só começa quando você informa um IP ou host e solicita o teste.";
 
     public MainWindow() : this(null) { }
 
@@ -143,6 +146,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _windowsUpdateSummary = "A busca online só começa quando você solicitar. Não baixa nem instala atualizações.";
     public string WindowsUpdateSummary { get => _windowsUpdateSummary; private set => Set(ref _windowsUpdateSummary, value); }
     public string PerformanceSummary { get => _performanceSummary; private set => Set(ref _performanceSummary, value); }
+    public string NetworkProbeTarget { get => _networkProbeTarget; set => Set(ref _networkProbeTarget, value); }
+    public string NetworkProbeSummary { get => _networkProbeSummary; private set => Set(ref _networkProbeSummary, value); }
     public string CollectionDate => _snapshot is null ? "Leitura pendente" : _snapshot.CollectedAt.ToLocalTime().ToString("dd/MM HH:mm:ss");
     public string SystemDescription => _snapshot is null ? "Inventário local do Windows" : $"{_snapshot.ComputerName} · {_snapshot.OperatingSystem}";
     public string RecommendationEmptyText => _snapshot is null ? "As recomendações aparecem depois do diagnóstico." : Recommendations.Count == 0 ? "Nenhum alerta pelos critérios desta leitura. Meça a tarefa lenta para investigar." : string.Empty;
