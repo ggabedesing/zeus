@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "3c0011048698fc51a24b4fba3e47d31f83664b2a",
+  "sourceBranch": "feat/zeus-windows-mvp",
+  "runId": "37860054057",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37860054057",
+  "recordedAtUtc": "2026-10-08T23:37:25.1165286+00:00",
+  "runner": "windows-latest",
+  "accepted": false,
+  "outcomes": {
+    "build": "success",
+    "windowsTests": "failure",
+    "smoke": "success",
+    "publish": "success",
+    "installerTest": "success"
+  },
+  "testCounts": {
+    "failed": 1,
+    "total": 413,
+    "passed": 412,
+    "skipped": 0
+  },
+  "testProjects": [
+    {
+      "project": "Zeus.Cleanup.Tests",
+      "total": 42,
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Core.Tests",
+      "total": 87,
+      "passed": 87,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Hardware.Tests",
+      "total": 122,
+      "passed": 122,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Maintenance.Protocol.Tests",
+      "total": 72,
+      "passed": 72,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Storage.Tests",
+      "total": 17,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.UserOptimization.Tests",
+      "total": 28,
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Windows.Acceptance.Tests",
+      "total": 45,
+      "passed": 44,
+      "failed": 1,
+      "skipped": 0
+    }
+  ],
+  "localRunner": {
+    "accepted": false,
+    "sourceCommit": "3c0011048698fc51a24b4fba3e47d31f83664b2a",
+    "stages": [
+      {
+        "name": "sdk",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-08T23:33:55.1007926+00:00",
+        "durationSeconds": 0.36,
+        "message": "SDK 10.0.401 confirmado."
+      },
+      {
+        "name": "build",
+        "outcome": "skipped",
+        "startedAtUtc": "2026-10-08T23:33:55.4746187+00:00",
+        "durationSeconds": 0.004,
+        "message": "Build prévio será utilizado por solicitação explícita."
+      },
+      {
+        "name": "test:Zeus.Cleanup.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-08T23:33:55.5302592+00:00",
+        "durationSeconds": 6.986,
+        "message": "42 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Core.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-08T23:34:02.5160379+00:00",
+        "durationSeconds": 2.594,
+        "message": "87 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Hardware.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-08T23:34:05.1103643+00:00",
+        "durationSeconds": 2.596,
+        "message": "122 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Maintenance.Protocol.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-08T23:34:07.7068205+00:00",
+        "durationSeconds": 2.425,
+        "message": "72 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Storage.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-08T23:34:10.1317727+00:00",
+        "durationSeconds": 5.453,
+        "message": "17 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.UserOptimization.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-08T23:34:15.5842942+00:00",
+        "durationSeconds": 3.033,
+        "message": "28 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Windows.Acceptance.Tests",
+        "outcome": "failed",
+        "startedAtUtc": "2026-10-08T23:34:18.61695+00:00",
+        "durationSeconds": 44.5,
+        "message": "O projeto tem falhas, testes ignorados, nenhum teste executado ou código de saída diferente de zero."
+      }
+    ],
+    "failures": [
+      {
+        "project": "Zeus.Windows.Acceptance.Tests",
+        "test": "Zeus.Windows.Acceptance.Tests.WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+        "message": "Assert.Contains() Failure: Sub-string not found\r\nString:    \"Nenhuma configuração de interface foi ret\"···\r\nNot found: \"IP:\"",
+        "stackTrace": "   at Zeus.Windows.Acceptance.Tests.WpfExperienceTests.VerifyExperienceAsync(MainWindow window, String fixture) in D:\\a\\zeus\\zeus\\tests\\Zeus.Windows.Acceptance.Tests\\WpfExperienceTests.cs:line 118\r\n   at Zeus.Windows.Acceptance.Tests.WpfExperienceTests.<>c__DisplayClass0_1.<<ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme>b__2>d.MoveNext() in D:\\a\\zeus\\zeus\\tests\\Zeus.Windows.Acceptance.Tests\\WpfExperienceTests.cs:line 49\r\n--- End of stack trace from previous location ---\r\n   at Zeus.Windows.Acceptance.Tests.WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme() in D:\\a\\zeus\\zeus\\tests\\Zeus.Windows.Acceptance.Tests\\WpfExperienceTests.cs:line 68\r\n--- End of stack trace from previous location ---"
+      },
+      {
+        "project": "Zeus.Windows.Acceptance.Tests",
+        "test": null,
+        "message": "O projeto tem falhas, testes ignorados, nenhum teste executado ou código de saída diferente de zero.",
+        "stackTrace": null
+      },
+      {
+        "project": "WPF",
+        "test": null,
+        "message": "Não foram produzidas as 11 capturas previstas da interface.",
+        "stackTrace": null
+      }
+    ]
+  },
+  "failures": [
+    {
+      "test": "Zeus.Windows.Acceptance.Tests.WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+      "message": "Assert.Contains() Failure: Sub-string not found\r\nString:    \"Nenhuma configuração de interface foi ret\"···\r\nNot found: \"IP:\"",
+      "stackTrace": "   at Zeus.Windows.Acceptance.Tests.WpfExperienceTests.VerifyExperienceAsync(MainWindow window, String fixture) in D:\\a\\zeus\\zeus\\tests\\Zeus.Windows.Acceptance.Tests\\WpfExperienceTests.cs:line 118\r\n   at Zeus.Windows.Acceptance.Tests.WpfExperienceTests.<>c__DisplayClass0_1.<<ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme>b__2>d.MoveNext() in D:\\a\\zeus\\zeus\\tests\\Zeus.Windows.Acceptance.Tests\\WpfExperienceTests.cs:line 49\r\n--- End of stack trace from previous location ---\r\n   at Zeus.Windows.Acceptance.Tests.WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme() in D:\\a\\zeus\\zeus\\tests\\Zeus.Windows.Acceptance.Tests\\WpfExperienceTests.cs:line 68\r\n--- End of stack trace from previous location ---"
+    }
+  ],
+  "screenshots": [],
+  "limitations": [
+    "Acceptance runs on a Windows CI virtual machine, not on every physical hardware configuration.",
+    "Repair, restore-point creation, driver installation, offline scan and reboot are not executed by CI.",
+    "CI does not establish measured performance gains or production code-signing status."
+  ]
+}
