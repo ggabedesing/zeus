@@ -57,7 +57,8 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         var startupTask = Read<IReadOnlyList<StartupInfo>>("Inicialização", ReadStartup, []);
         var boardTask = Read<BoardInfo?>("Placa-mãe", ReadBoard, null);
         var biosTask = Read<BiosInfo?>("BIOS", ReadBios, null);
-        var modulesTask = Read<IReadOnlyList<MemoryModuleInfo>>("Módulos de memória", token => ReadMemoryModules(token, warnings), []);
+        var modulesTask = Read<IReadOnlyList<MemoryModuleInfo>?>("Módulos de memória", token => ReadMemoryModules(token, warnings), null);
+        var memorySlotsTask = Read<int?>("Slots de memória", ReadMemoryArraySlots, null);
         var batteriesTask = Read<IReadOnlyList<BatteryInfo>>("Baterias", ReadBatteries, []);
         var networkTask = Read<IReadOnlyList<NetworkAdapterInfo>>("Adaptadores de rede", ReadNetworkAdapters, []);
         var securityTask = ReadAsync<SecurityInfo?>("Defender (outro antivírus pode estar ativo)", ReadSecurityAsync, null);
@@ -74,7 +75,7 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         var inventoryTask = ReadAsync<WindowsInventoryInfo?>("Inventário detalhado do Windows", ReadWindowsInventoryAsync, null);
 
         await Task.WhenAll(cpuTask, memoryTask, graphicsTask, disksTask, startupTask, boardTask,
-            biosTask, modulesTask, batteriesTask, networkTask, securityTask, physicalTask, inventoryTask);
+            biosTask, modulesTask, memorySlotsTask, batteriesTask, networkTask, securityTask, physicalTask, inventoryTask);
         cancellationToken.ThrowIfCancellationRequested();
         var physical = await physicalTask;
         var inventory = await inventoryTask;
@@ -87,7 +88,7 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         return new HardwareSnapshot(DateTimeOffset.UtcNow, Environment.OSVersion.VersionString,
             Environment.MachineName, await cpuTask, await memoryTask, await graphicsTask, await disksTask,
             await startupTask, await securityTask, warnings.ToArray(), await boardTask, await biosTask,
-            await modulesTask, physical, await batteriesTask, await networkTask, inventory);
+            await modulesTask, physical, await batteriesTask, await networkTask, inventory, await memorySlotsTask);
     }
 
     private sealed record WindowsInventoryPayload(WindowsInventoryInfo? Inventory, string[]? Warnings);
@@ -290,6 +291,25 @@ $inventory = [pscustomobject]@{
             }
         }
         return result;
+    }
+
+    private static int? ReadMemoryArraySlots(CancellationToken token)
+    {
+        using var rows = Query("SELECT MemoryDevices FROM Win32_PhysicalMemoryArray");
+        var total = 0;
+        var found = false;
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+            {
+                token.ThrowIfCancellationRequested();
+                var devices = UnsignedValue(row, "MemoryDevices");
+                if (devices is null or 0 or > 4096) continue;
+                total = checked(total + (int)devices.Value);
+                found = true;
+            }
+        }
+        return found ? total : null;
     }
 
     private static IReadOnlyList<BatteryInfo> ReadBatteries(CancellationToken token)

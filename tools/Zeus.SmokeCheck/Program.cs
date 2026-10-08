@@ -27,6 +27,7 @@ try
         throw new InvalidOperationException("No real Windows process observation was collected.");
     Console.WriteLine("PASS: real operating system, CPU, memory, volume and native performance data collected.");
     Console.WriteLine($"Optional inventory: board={snapshot.Board is not null}; BIOS={snapshot.Bios is not null}; physicalDisks={snapshot.PhysicalDisks?.Count ?? 0}.");
+    Console.WriteLine($"Memory inventory: modules={snapshot.MemoryModules?.Count.ToString() ?? "unavailable"}; firmware-declared slots={snapshot.MemoryArraySlotsReported?.ToString() ?? "unavailable"}; channels=not inferred.");
     Console.WriteLine($"Optional warnings: {snapshot.Warnings.Count}. No repair or restore operation executed.");
     return 0;
 }

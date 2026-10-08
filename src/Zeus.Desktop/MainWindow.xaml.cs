@@ -244,6 +244,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ExtendedHardwareRows.Clear();
         if (snapshot.Board is { } board) ExtendedHardwareRows.Add(new("Placa-mãe", $"{Available(board.Manufacturer)} · {Available(board.Product)}"));
         if (snapshot.Bios is { } bios) ExtendedHardwareRows.Add(new("BIOS / UEFI", $"{Available(bios.Manufacturer)} · {Available(bios.Version)} · {Available(bios.ReleaseDate)}"));
+        var memoryModules = snapshot.MemoryModules;
+        if (memoryModules is not null || snapshot.MemoryArraySlotsReported is not null)
+        {
+            var moduleCount = memoryModules?.Count.ToString() ?? "indisponível";
+            var slots = snapshot.MemoryArraySlotsReported?.ToString() ?? "não informado pelo firmware";
+            ExtendedHardwareRows.Add(new("RAM · Slots e canais", $"{moduleCount} módulo(s) reportado(s) · {slots} slot(s) declarados · canais: não informados pelo provedor; não inferidos pela velocidade."));
+        }
         foreach (var module in snapshot.MemoryModules ?? []) ExtendedHardwareRows.Add(new($"RAM · {Available(module.Location)}", $"{ByteFormatting.Format(module.CapacityBytes)} · {module.SpeedMHz?.ToString() ?? "Indisponível"} MHz · {Available(module.Manufacturer)}"));
         foreach (var disk in snapshot.PhysicalDisks ?? []) ExtendedHardwareRows.Add(new(Available(disk.Name), $"{disk.MediaType} · {disk.BusType} · {ByteFormatting.Format(disk.SizeBytes)} · Estado informado: {Available(disk.HealthStatus)}\nTemperatura: {(disk.TemperatureCelsius.HasValue ? $"{disk.TemperatureCelsius.Value:0.#} °C" : "indisponível")} · Desgaste informado: {disk.Wear?.ToString() ?? "indisponível"}"));
         foreach (var battery in snapshot.Batteries ?? []) ExtendedHardwareRows.Add(new(Available(battery.Name), $"Carga: {battery.ChargePercent?.ToString() ?? "indisponível"}% · {Available(battery.Status)}"));

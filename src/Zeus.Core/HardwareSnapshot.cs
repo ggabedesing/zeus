@@ -42,7 +42,8 @@ public sealed record HardwareSnapshot(
     IReadOnlyList<PhysicalDiskInfo>? PhysicalDisks = null,
     IReadOnlyList<BatteryInfo>? Batteries = null,
     IReadOnlyList<NetworkAdapterInfo>? NetworkAdapters = null,
-    WindowsInventoryInfo? WindowsInventory = null);
+    WindowsInventoryInfo? WindowsInventory = null,
+    int? MemoryArraySlotsReported = null);
 
 public interface IHardwareDiagnostics
 {

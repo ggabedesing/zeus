@@ -8,7 +8,7 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 
 | Área | O que o aplicativo faz |
 | --- | --- |
-| Hardware | Lê CPU, RAM, GPU e drivers, placa-mãe, BIOS, módulos RAM, volumes, discos físicos, bateria e rede. Sensores aparecem somente quando o Windows fornece a leitura. |
+| Hardware | Lê CPU, RAM, GPU e drivers, placa-mãe, BIOS, módulos RAM e slots declarados pelo firmware, volumes, discos físicos, bateria e rede. Canais de memória não são deduzidos; sensores aparecem somente quando o Windows fornece a leitura. |
 | Inventário do Windows | Consulta configuração de rede, drivers, PnP, processos, serviços, tarefas agendadas, programas instalados e eventos recentes; tenta ler Secure Boot e TPM. Endereços e nomes locais podem constar no relatório. Atualizações pendentes e saúde da imagem não são medidos durante a coleta. |
 | Carga real | Observa CPU, RAM e processos, além de engines de GPU e tráfego/atividade local de disco e rede quando disponíveis. A amostragem adapta o intervalo, guarda sessões e referência no SQLite, conserva um buffer recente, compara médias de CPU/RAM e identifica heurísticas de processos de jogos/OBS. A presença de OBS não comprova transmissão ao vivo. |
 | Limpeza | Analisa temporários do usuário com mais de sete dias; permite selecionar, guardar em recuperação, restaurar e excluir definitivamente em operações separadas. |
@@ -17,6 +17,7 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 | Manutenção | DISM e SFC para verificar/reparar o Windows; análise e otimização do volume pelo mecanismo nativo, conforme o tipo de mídia. |
 | Proteção | Atualização de assinaturas e verificações rápida, completa e offline do Microsoft Defender ativo. O Windows mantém suas políticas de remediação. |
 | Drivers | Consulta candidatos oficiais do Windows Update, mostra licenças e instala as identidades selecionadas após proteção de recuperação e exportação dos drivers existentes. |
+| Atualizações de programas | Consulta a fonte `winget` sob demanda e mostra versão instalada/disponível. A busca é somente leitura; Microsoft Store e pacotes não correspondidos não são incluídos, e o ZEUS não instala atualizações WinGet nesta etapa. |
 | Plano geral | Reúne preferências visuais explicitamente incluídas e as seleções de limpeza, inicialização e manutenção. Exibe o plano antes de executar sequencialmente. |
 | Aparência | Temas Completo, Mínimo e Aurora, inspirado no macOS, para a interface do ZEUS. |
 | Histórico | Resultados, logs, estados anteriores e recuperação de sessões interrompidas; exportação de relatório JSON. |

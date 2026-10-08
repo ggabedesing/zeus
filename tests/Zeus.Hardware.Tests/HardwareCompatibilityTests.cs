@@ -22,6 +22,7 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(snapshot.PhysicalDisks);
         Assert.Null(snapshot.Batteries);
         Assert.Null(snapshot.NetworkAdapters);
+        Assert.Null(snapshot.MemoryArraySlotsReported);
     }
 
     [Fact]
@@ -33,7 +34,7 @@ public sealed class HardwareCompatibilityTests
             [new PhysicalDiskInfo("NVMe", "SSD", "NVMe", 512UL * 1024 * 1024 * 1024, "Healthy", null, null),
              new PhysicalDiskInfo("SATA", "HDD", "SATA", 1024UL * 1024 * 1024 * 1024, "Warning", 42, 12)],
             [new BatteryInfo("Bateria", null, "Desconhecido")],
-            [new NetworkAdapterInfo("Ethernet", "Conectado", 1_000_000_000)]);
+            [new NetworkAdapterInfo("Ethernet", "Conectado", 1_000_000_000)], null, 4);
         var restored = JsonSerializer.Deserialize<HardwareSnapshot>(JsonSerializer.Serialize(snapshot))!;
         Assert.Null(restored.PhysicalDisks![0].TemperatureCelsius);
         Assert.Null(restored.PhysicalDisks[0].Wear);
@@ -43,5 +44,6 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(restored.Batteries![0].ChargePercent);
         Assert.Equal(1_000_000_000UL, restored.NetworkAdapters![0].SpeedBitsPerSecond);
         Assert.Null(restored.Bios!.ReleaseDate);
+        Assert.Equal(4, restored.MemoryArraySlotsReported);
     }
 }
