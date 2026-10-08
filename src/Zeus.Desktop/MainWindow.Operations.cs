@@ -690,8 +690,9 @@ public partial class MainWindow
     {
         if (!CanInstallDriver) return;
         var selected = DriverCandidates.Where(d => d.IsSelected).ToArray();
-        if (!Confirm($"Instalar os candidatos selecionados?\n\n{string.Join("\n\n", selected.Select(d => $"• {d.Title}\nDispositivo: {Available(d.DeviceName)} · Fabricante: {Available(d.Manufacturer)}\nFornecedor declarado: {d.DriverProvider} · Categoria inferida: {d.ProviderCategory}\nClasse: {d.DriverClass} · Data do driver: {d.DriverDate}\nVersão: {Available(d.DriverVersion)}\nOrigem: {d.DriverSource}\nIdentidade: {d.Id}"))}\n\nConfirme a indicação para cada atualização. A versão numérica e a assinatura/hash do arquivo não são confirmados nesta busca. Pode haver reinicialização e incompatibilidade; o auxiliar exigirá proteção e exportará os drivers atuais antes do lote.", "Revisar candidatos de drivers")) return;
-        await ReviewAndExecuteAsync(selected.Select(d => new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, d.Id, d.RequiresEula && d.EulaAccepted)).ToArray());
+        var candidate = selected[0];
+        if (!Confirm($"Instalar este candidato de driver?\n\n{candidate.Title}\nDispositivo: {Available(candidate.DeviceName)} · Fabricante: {Available(candidate.Manufacturer)}\nFornecedor declarado: {candidate.DriverProvider} · Categoria inferida: {candidate.ProviderCategory}\nClasse: {candidate.DriverClass} · Data do driver: {candidate.DriverDate}\nVersão: {Available(candidate.DriverVersion)}\nOrigem: {candidate.DriverSource}\nIdentidade: {candidate.Id}\n\nA versão numérica e a assinatura/hash do arquivo não são confirmados nesta busca. Pode haver reinicialização e incompatibilidade; o auxiliar exigirá proteção e exportará os drivers atuais antes desta instalação.", "Revisar candidato de driver")) return;
+        await ReviewAndExecuteAsync([new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, candidate.Id, candidate.RequiresEula && candidate.EulaAccepted)]);
     }
 
     private async void RollbackDriver_Click(object sender, RoutedEventArgs e)

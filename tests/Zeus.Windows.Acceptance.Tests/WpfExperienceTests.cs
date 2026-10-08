@@ -159,7 +159,7 @@ public sealed class WpfExperienceTests
         Assert.True(window.CanGeneralOptimize);
         selectedMaintenance.IsSelected = false;
         Assert.False(window.CanGeneralOptimize);
-        // A missing license on any selected driver must block the entire batch.
+        // Driver installation is individual; multiple candidates and missing consent both block it.
         var licensed = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":1", "Acceptance fixture", "Fixture", "Fixture", null, true, "Fixture terms",
             DriverProvider: "NVIDIA", DriverClass: "Display", DriverDate: new DateOnly(2025, 11, 4)));
         var unlicensed = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":2", "Acceptance fixture", "Fixture", "Fixture", null, false));
@@ -179,6 +179,8 @@ public sealed class WpfExperienceTests
         Assert.Contains("resultado confirmado", pendingUpdate.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
 
         licensed.EulaAccepted = true;
+        Assert.False(window.CanInstallDriver, "More than one selected candidate must never enter an install transaction.");
+        unlicensed.IsSelected = false;
         Assert.True(window.CanInstallDriver);
         window.DriverCandidates.Clear();
         Assert.False(window.CanInstallDriver);

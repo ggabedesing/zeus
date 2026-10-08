@@ -189,7 +189,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanDisableStartup => !_isBusy && StartupChoices.Any(f => f.IsSelected && f.CanSelect);
     public bool CanSetPowerPlan => !_isBusy && SelectedPowerPlan is { IsActive: false };
     public bool CanApplyWallpaper => !_isBusy && !string.IsNullOrWhiteSpace(SelectedWallpaperPath);
-    public bool CanInstallDriver => !_isBusy && DriverCandidates.Any(d => d.IsSelected) && DriverCandidates.Where(d => d.IsSelected).All(d => d.LicenseReady);
+    public bool CanInstallDriver => !_isBusy && DriverCandidates.Count(d => d.IsSelected) == 1 && DriverCandidates.Where(d => d.IsSelected).All(d => d.LicenseReady);
     private DriverRollbackChoice? _selectedRollbackDriver;
     public DriverRollbackChoice? SelectedRollbackDriver { get => _selectedRollbackDriver; set { if (Set(ref _selectedRollbackDriver, value)) NotifyActionState(); } }
     public bool CanRollbackDriver => !_isBusy && SelectedRollbackDriver is not null && MaintenanceRequestProtocol.TryParsePnpInstanceId(SelectedRollbackDriver.InstanceId);
