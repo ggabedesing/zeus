@@ -37,6 +37,8 @@ public sealed class NetworkLatencyProbeTests
 
         Assert.Equal(2, result.Replies);
         Assert.Equal(1, result.NoReplies);
+        Assert.Equal(4, result.AttemptCount);
+        Assert.Equal(25d, result.TimeoutPercent);
         Assert.Equal(12, result.MinimumMilliseconds);
         Assert.Equal(15, result.AverageMilliseconds);
         Assert.Equal(18, result.MaximumMilliseconds);
@@ -51,5 +53,14 @@ public sealed class NetworkLatencyProbeTests
         Assert.Null(result.MinimumMilliseconds);
         Assert.Null(result.AverageMilliseconds);
         Assert.Null(result.MaximumMilliseconds);
+    }
+
+    [Fact]
+    public void ResultKeepsTimeoutRateUnavailableWhenNoAttemptsWereRecorded()
+    {
+        var result = new NetworkLatencyResult("router.local", "192.0.2.1", DateTimeOffset.UtcNow, []);
+
+        Assert.Equal(0, result.AttemptCount);
+        Assert.Null(result.TimeoutPercent);
     }
 }

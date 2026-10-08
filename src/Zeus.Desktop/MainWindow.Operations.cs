@@ -171,11 +171,13 @@ public partial class MainWindow
             var max = result.MaximumMilliseconds is { } maximum ? $"{maximum} ms" : "indisponível";
             var statuses = result.Samples.Where(sample => sample.Status != "Success" && sample.Status != "TimedOut")
                 .Select(sample => sample.Status).Distinct().ToArray();
-            NetworkProbeSummary = $"{result.Target} → {result.Address} · respostas: {result.Replies}/5 · sem resposta no limite: {result.NoReplies}/5 · latência ICMP mín/média/máx: {min}/{average}/{max}" +
+            var attempts = result.AttemptCount;
+            var timeoutRate = result.TimeoutPercent is { } percent ? $" ({percent:0.#}%)" : string.Empty;
+            NetworkProbeSummary = $"{result.Target} → {result.Address} · respostas: {result.Replies}/{attempts} · timeouts observados: {result.NoReplies}/{attempts}{timeoutRate} · latência ICMP mín/média/máx: {min}/{average}/{max}" +
                 (statuses.Length == 0 ? string.Empty : $" · outros resultados: {string.Join(", ", statuses)}") +
                 $" · {result.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}";
             var correlation = Guid.NewGuid().ToString("N");
-            var details = JsonSerializer.Serialize(new { result.Target, result.Address, result.CheckedAt, result.Samples, result.Replies, result.NoReplies, result.MinimumMilliseconds, result.AverageMilliseconds, result.MaximumMilliseconds });
+            var details = JsonSerializer.Serialize(new { result.Target, result.Address, result.CheckedAt, result.Samples, result.AttemptCount, result.Replies, result.NoReplies, result.TimeoutPercent, result.MinimumMilliseconds, result.AverageMilliseconds, result.MaximumMilliseconds });
             QueueActivity(new ActivityEntry(result.CheckedAt, "network-diagnostic", "icmp-measurement-completed",
                 result.Replies == 0 ? "warning" : "info", NetworkProbeSummary, details, correlation));
             StatusTitle = "Medição ICMP concluída";
