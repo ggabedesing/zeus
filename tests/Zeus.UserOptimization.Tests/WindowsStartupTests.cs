@@ -3,14 +3,6 @@ using Zeus.Windows;
 
 namespace Zeus.UserOptimization.Tests;
 
-public sealed class WindowsFactAttribute : FactAttribute
-{
-    public WindowsFactAttribute()
-    {
-        if (!OperatingSystem.IsWindows()) Skip = "Validação real HKCU executada somente no runner Windows.";
-    }
-}
-
 /// <summary>Fixtures touch only their own Zeus.Test.GUID value and delete it even on failure.</summary>
 public sealed class WindowsStartupTests
 {

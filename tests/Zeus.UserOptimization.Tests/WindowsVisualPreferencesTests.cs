@@ -102,10 +102,9 @@ public sealed class WindowsVisualPreferencesTests
 
 public sealed class WallpaperChangeTests
 {
-    [Fact]
+    [WindowsFact]
     public void WindowsWallpaperStatusCanBeReadWithoutChangingTheDesktop()
     {
-        if (!OperatingSystem.IsWindows()) throw Xunit.Sdk.SkipException.ForSkip("A leitura do papel de parede requer Windows.");
         var platform = new WindowsWallpaperPlatform();
 
         _ = platform.IsSlideshowConfigured();
@@ -113,10 +112,9 @@ public sealed class WallpaperChangeTests
             Assert.True(Path.IsPathFullyQualified(platform.GetWallpaperPath()));
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task WallpaperChangeSavesPreviousImageAndRestoresItFromHistory()
     {
-        if (!OperatingSystem.IsWindows()) throw Xunit.Sdk.SkipException.ForSkip("A fixture de papel de parede requer Windows.");
         var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         var previous = Path.Combine(root, "previous.bmp");
@@ -143,10 +141,9 @@ public sealed class WallpaperChangeTests
         finally { Directory.Delete(root, recursive: true); }
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task WallpaperRestorePreservesAnImageChangedOutsideTheZeusSession()
     {
-        if (!OperatingSystem.IsWindows()) throw Xunit.Sdk.SkipException.ForSkip("A fixture de papel de parede requer Windows.");
         var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         var previous = Path.Combine(root, "previous.bmp");
@@ -173,10 +170,9 @@ public sealed class WallpaperChangeTests
         finally { Directory.Delete(root, recursive: true); }
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task WallpaperChangeRejectsMisleadingExtensionBeforeCallingWindows()
     {
-        if (!OperatingSystem.IsWindows()) throw Xunit.Sdk.SkipException.ForSkip("A fixture de papel de parede requer Windows.");
         var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         var previous = Path.Combine(root, "previous.bmp");
@@ -195,12 +191,11 @@ public sealed class WallpaperChangeTests
         finally { Directory.Delete(root, recursive: true); }
     }
 
-    [Theory]
+    [WindowsTheory]
     [InlineData(true, true)]
     [InlineData(false, false)]
     public async Task WallpaperChangeRefusesSlideshowsAndPerMonitorConfigurations(bool slideshow, bool uniform)
     {
-        if (!OperatingSystem.IsWindows()) throw Xunit.Sdk.SkipException.ForSkip("A fixture de papel de parede requer Windows.");
         var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         var previous = Path.Combine(root, "previous.bmp");
