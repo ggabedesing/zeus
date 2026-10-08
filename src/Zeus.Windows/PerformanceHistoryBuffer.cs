@@ -19,7 +19,8 @@ public sealed record PerformanceComparison(
     IReadOnlyList<PerformanceNetworkComparison>? NetworkTraffic = null,
     IReadOnlyList<PerformanceDiskComparison>? DiskIo = null,
     PerformanceActivityContextComparison? ActivityContext = null,
-    IReadOnlyList<PerformanceProcessComparison>? ProcessUsage = null);
+    IReadOnlyList<PerformanceProcessComparison>? ProcessUsage = null,
+    IReadOnlyList<PerformanceGpuProcessMemoryComparison>? GpuProcessMemoryUsage = null);
 
 public sealed record PerformanceMetricComparison(
     double? ReferencePercent,
@@ -35,6 +36,16 @@ public sealed record PerformanceGpuMemoryComparison(
     int LaterAvailableSamples,
     double? ReferenceOccupancyPercent = null,
     double? LaterOccupancyPercent = null);
+
+public sealed record PerformanceGpuProcessMemoryComparison(
+    int ProcessId,
+    string ProcessName,
+    long ProcessStartTimeUtcTicks,
+    string AdapterInstance,
+    double? ReferenceDedicatedBytes,
+    double? LaterDedicatedBytes,
+    int ReferenceAvailableSamples,
+    int LaterAvailableSamples);
 
 public sealed record PerformanceNetworkComparison(
     string Adapter,
@@ -330,10 +341,37 @@ public static class PerformanceComparisonBuilder
                 left.WorkingSet, right.WorkingSet, left.WorkingSetCount, right.WorkingSetCount);
         }).ToArray();
 
+        var gpuProcessKeys = reference.Concat(later).SelectMany(sample => sample.GpuProcessMemory ?? [])
+            .Where(memory => memory.ProcessStartTimeUtcTicks is > 0 && !string.IsNullOrWhiteSpace(memory.AdapterInstance))
+            .Select(memory => (memory.ProcessId, ProcessStart: memory.ProcessStartTimeUtcTicks!.Value, memory.AdapterInstance))
+            .Distinct().ToArray();
+        var gpuProcessMemoryUsage = gpuProcessKeys.Select(key =>
+        {
+            static (double? Average, int Count, string? Name) Summarize(
+                IReadOnlyList<PerformanceObservation> samples, (int ProcessId, long ProcessStart, string AdapterInstance) identity)
+            {
+                var values = samples.SelectMany(sample => sample.GpuProcessMemory ?? [])
+                    .Where(memory => memory.ProcessId == identity.ProcessId &&
+                        memory.ProcessStartTimeUtcTicks == identity.ProcessStart &&
+                        string.Equals(memory.AdapterInstance, identity.AdapterInstance, StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                var dedicated = values.Select(memory => memory.DedicatedUsageBytes)
+                    .Where(value => value.HasValue).Select(value => (double)value!.Value).ToArray();
+                return (dedicated.Length == 0 ? null : dedicated.Average(), dedicated.Length,
+                    values.LastOrDefault()?.ProcessName);
+            }
+
+            var left = Summarize(reference, key);
+            var right = Summarize(later, key);
+            return new PerformanceGpuProcessMemoryComparison(key.ProcessId,
+                right.Name ?? left.Name ?? "processo desconhecido", key.ProcessStart, key.AdapterInstance,
+                left.Average, right.Average, left.Count, right.Count);
+        }).ToArray();
+
         return new(reference.Count, later.Count,
             cpuUsage.ReferencePercent, cpuUsage.LaterPercent,
             memoryUsage.ReferencePercent, memoryUsage.LaterPercent,
             reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk, gpuMemory,
-            cpuUsage, memoryUsage, networkTraffic, diskIo, activityContext, processUsage);
+            cpuUsage, memoryUsage, networkTraffic, diskIo, activityContext, processUsage, gpuProcessMemoryUsage);
     }
 }

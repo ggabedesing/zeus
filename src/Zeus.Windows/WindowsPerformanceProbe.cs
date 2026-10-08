@@ -20,6 +20,7 @@ public sealed record GpuMemoryObservation(string AdapterInstance, ulong? Dedicat
         ? usage / (double)capacity * 100 : null;
 }
 public sealed record GpuProcessMemoryObservation(string InstanceName, string AdapterInstance, int ProcessId, string? ProcessName,
+    long? ProcessStartTimeUtcTicks,
     ulong? DedicatedUsageBytes, ulong? SharedUsageBytes, ulong? NonLocalUsageBytes,
     ulong? LocalUsageBytes, ulong? TotalCommittedBytes);
 
@@ -167,15 +168,16 @@ public sealed class WindowsPerformanceProbe
 
     internal static GpuProcessMemoryObservation? ParseGpuProcessMemoryCounter(string? instanceName,
         ulong? dedicatedUsage, ulong? sharedUsage, ulong? nonLocalUsage, ulong? localUsage, ulong? totalCommitted,
-        IReadOnlyDictionary<int, string> processNames)
+        IReadOnlyDictionary<int, ProcessObservation> processes)
     {
-        ArgumentNullException.ThrowIfNull(processNames);
+        ArgumentNullException.ThrowIfNull(processes);
         if (string.IsNullOrWhiteSpace(instanceName)) return null;
         var match = Regex.Match(instanceName, @"^pid_(?<pid>\d+)_(?<adapter>luid_.+)$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
         if (!match.Success || !int.TryParse(match.Groups["pid"].Value, System.Globalization.NumberStyles.None,
                 System.Globalization.CultureInfo.InvariantCulture, out var processId)) return null;
-        processNames.TryGetValue(processId, out var processName);
-        return new GpuProcessMemoryObservation(instanceName, match.Groups["adapter"].Value, processId, processName,
+        processes.TryGetValue(processId, out var process);
+        return new GpuProcessMemoryObservation(instanceName, match.Groups["adapter"].Value, processId, process?.Name,
+            process?.StartTimeUtcTicks,
             dedicatedUsage, sharedUsage, nonLocalUsage, localUsage, totalCommitted);
     }
 
@@ -229,13 +231,13 @@ public sealed class WindowsPerformanceProbe
     private static IReadOnlyList<GpuProcessMemoryObservation> ReadGpuProcessMemoryCounters(CancellationToken token,
         List<string> warnings, IReadOnlyList<ProcessObservation> processes)
     {
-        var processNames = processes.GroupBy(process => process.Id).ToDictionary(group => group.Key, group => group.First().Name);
+        var processesById = processes.GroupBy(process => process.Id).ToDictionary(group => group.Key, group => group.First());
         return ReadCounterRows("Memória GPU por processo", "Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory",
             "SELECT Name,DedicatedUsage,SharedUsage,NonLocalUsage,LocalUsage,TotalCommitted FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory",
             512, token, warnings, row => ParseGpuProcessMemoryCounter(
                 Convert.ToString(row["Name"], System.Globalization.CultureInfo.InvariantCulture),
                 CounterUInt64(row, "DedicatedUsage"), CounterUInt64(row, "SharedUsage"),
-                CounterUInt64(row, "NonLocalUsage"), CounterUInt64(row, "LocalUsage"), CounterUInt64(row, "TotalCommitted"), processNames));
+                CounterUInt64(row, "NonLocalUsage"), CounterUInt64(row, "LocalUsage"), CounterUInt64(row, "TotalCommitted"), processesById));
     }
 
     private static IReadOnlyList<DiskPerformanceObservation> ReadDiskCounters(CancellationToken token, List<string> warnings) =>

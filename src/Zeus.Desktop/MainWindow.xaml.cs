@@ -131,10 +131,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     .Take(5).Select(item =>
                         $"{item.Name} · PID {item.ProcessId}: CPU {FormatMetric(item.ReferenceCpuPercent)} ({item.ReferenceCpuSamples}/{comparison.ReferenceSampleCount}) → {FormatMetric(item.LaterCpuPercent)} ({item.LaterCpuSamples}/{comparison.LaterSampleCount}); memória {FormatByteQuantity(item.ReferenceWorkingSetBytes)} ({item.ReferenceWorkingSetSamples}/{comparison.ReferenceSampleCount}) → {FormatByteQuantity(item.LaterWorkingSetBytes)} ({item.LaterWorkingSetSamples}/{comparison.LaterSampleCount})"))
                 : "Comparação por processo: indisponível (identidade do processo não confirmada nos períodos)";
+            var gpuProcesses = comparison.GpuProcessMemoryUsage is { Count: > 0 } gpuProcessUsage
+                ? "Memória GPU dedicada por processo (PID/início/adaptador confirmados): " + string.Join("; ", gpuProcessUsage
+                    .OrderByDescending(item => Math.Max(item.LaterDedicatedBytes ?? -1, item.ReferenceDedicatedBytes ?? -1))
+                    .Take(5).Select(item => $"{item.ProcessName} · PID {item.ProcessId} · {item.AdapterInstance}: {FormatByteQuantity(item.ReferenceDedicatedBytes)} ({item.ReferenceAvailableSamples}/{comparison.ReferenceSampleCount}) → {FormatByteQuantity(item.LaterDedicatedBytes)} ({item.LaterAvailableSamples}/{comparison.LaterSampleCount})"))
+                : "Memória GPU dedicada por processo: indisponível (PID, horário de início e adaptador não confirmados nos períodos)";
             return string.Join(Environment.NewLine,
                 $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}",
                 diskIo,
                 gpuMemory,
+                gpuProcesses,
                 network,
                 context,
                 processes,

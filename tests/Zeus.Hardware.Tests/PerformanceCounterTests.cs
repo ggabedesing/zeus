@@ -27,23 +27,68 @@ public sealed class PerformanceCounterTests
     [Fact]
     public void ParsesPerProcessGpuMemoryAndKeepsUnknownProcessNameExplicit()
     {
-        var processNames = new Dictionary<int, string> { [42] = "game" };
+        var processes = new Dictionary<int, ProcessObservation> { [42] = new(42, "game", 10, 1024, 1_234) };
         var known = WindowsPerformanceProbe.ParseGpuProcessMemoryCounter(
-            "pid_42_luid_0x00000000_0x0001057F_phys_0", 100, 20, 15, 80, 120, processNames);
+            "pid_42_luid_0x00000000_0x0001057F_phys_0", 100, 20, 15, 80, 120, processes);
         var unknown = WindowsPerformanceProbe.ParseGpuProcessMemoryCounter(
-            "pid_99_luid_0x00000000_0x0001057F_phys_0", 50, 10, 8, 40, 60, processNames);
+            "pid_99_luid_0x00000000_0x0001057F_phys_0", 50, 10, 8, 40, 60, processes);
 
         Assert.NotNull(known);
         Assert.Equal("luid_0x00000000_0x0001057F_phys_0", known.AdapterInstance);
         Assert.Equal(42, known.ProcessId);
         Assert.Equal("game", known.ProcessName);
+        Assert.Equal(1_234, known.ProcessStartTimeUtcTicks);
         Assert.Equal((ulong)100, known.DedicatedUsageBytes);
         Assert.Equal((ulong)120, known.TotalCommittedBytes);
         Assert.NotNull(unknown);
         Assert.Equal(99, unknown.ProcessId);
         Assert.Null(unknown.ProcessName);
         Assert.Null(WindowsPerformanceProbe.ParseGpuProcessMemoryCounter(
-            "invalid-instance", 10, 0, 0, 10, 10, processNames));
+            "invalid-instance", 10, 0, 0, 10, 10, processes));
+    }
+
+    [Fact]
+    public void GpuProcessMemoryComparisonMatchesPidStartTimeAndAdapterAndReportsCoverage()
+    {
+        const string adapter = "luid_0x00000000_0x0001057F_phys_0";
+        var reference = new[]
+        {
+            Sample(20) with
+            {
+                Processes = [new(42, "old-game", 10, 1024, 100), new(7, "editor", 10, 1024, 300)],
+                GpuProcessMemory = [new("old", adapter, 42, "old-game", 100, 1000, 0, 0, 1000, 1000),
+                    new("editor", adapter, 7, "editor", 300, 2000, 0, 0, 2000, 2000)]
+            },
+            Sample(30) with
+            {
+                Processes = [new(7, "editor", 10, 1024, 300)],
+                GpuProcessMemory = [new("editor", adapter, 7, "editor", 300, 4000, 0, 0, 4000, 4000)]
+            }
+        };
+        var later = new[]
+        {
+            Sample(40) with
+            {
+                Processes = [new(42, "new-game", 10, 1024, 200), new(7, "editor", 10, 1024, 300)],
+                GpuProcessMemory = [new("new", adapter, 42, "new-game", 200, 9000, 0, 0, 9000, 9000),
+                    new("editor", adapter, 7, "editor", 300, 6000, 0, 0, 6000, 6000)]
+            }
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+        var editor = Assert.Single(comparison.GpuProcessMemoryUsage!, item => item.ProcessId == 7);
+        Assert.Equal(2, comparison.GpuProcessMemoryUsage!.Count(item => item.ProcessId == 42));
+        var oldGame = Assert.Single(comparison.GpuProcessMemoryUsage!, item => item.ProcessId == 42 && item.ProcessStartTimeUtcTicks == 100);
+        var newGame = Assert.Single(comparison.GpuProcessMemoryUsage!, item => item.ProcessId == 42 && item.ProcessStartTimeUtcTicks == 200);
+
+        Assert.Equal(3000, editor.ReferenceDedicatedBytes);
+        Assert.Equal(6000, editor.LaterDedicatedBytes);
+        Assert.Equal(2, editor.ReferenceAvailableSamples);
+        Assert.Equal(1, editor.LaterAvailableSamples);
+        Assert.Equal(1000, oldGame.ReferenceDedicatedBytes);
+        Assert.Null(oldGame.LaterDedicatedBytes);
+        Assert.Null(newGame.ReferenceDedicatedBytes);
+        Assert.Equal(9000, newGame.LaterDedicatedBytes);
     }
 
     [Fact]
