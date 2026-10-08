@@ -24,7 +24,8 @@ public sealed record PerformanceObservation(
     IReadOnlyList<string> Warnings,
     IReadOnlyList<GpuEngineObservation>? GpuEngines = null,
     IReadOnlyList<DiskPerformanceObservation>? Disks = null,
-    IReadOnlyList<NetworkPerformanceObservation>? Networks = null);
+    IReadOnlyList<NetworkPerformanceObservation>? Networks = null,
+    ActivityContextInfo? ActivityContext = null);
 
 /// <summary>
 /// A bounded, read-only observation, not a benchmark or prediction of performance
@@ -86,7 +87,7 @@ public sealed class WindowsPerformanceProbe
         }
         var top = observations.OrderByDescending(process => process.CpuPercent.HasValue)
             .ThenByDescending(process => process.CpuPercent)
-            .ThenByDescending(process => process.WorkingSetBytes).ThenBy(process => process.Id).Take(10).ToArray();
+            .ThenByDescending(process => process.WorkingSetBytes).ThenBy(process => process.Id).Take(50).ToArray();
 
         ulong total = 0;
         ulong available = 0;
@@ -100,11 +101,13 @@ public sealed class WindowsPerformanceProbe
         var gpuEngines = ReadGpuCounters(token, warnings);
         var disks = ReadDiskCounters(token, warnings);
         var networks = ReadNetworkCounters(token, warnings);
+        var activityContext = ActivityContextDetector.Detect(top);
         warnings.Add("GPU: utilização por instância/engine não é uso total nem VRAM; sensores ausentes permanecem desconhecidos.");
         warnings.Add("Disco e rede: contadores são taxas locais; tráfego não mede latência ou qualidade da Internet e erros são contagens reportadas pelo adaptador.");
+        warnings.Add("Detecção de jogos/OBS usa somente os 50 processos com maior CPU/RAM observados; ausência nessa lista não confirma que o programa esteja fechado.");
         warnings.Add("A amostra reflete a carga atual. Compare tarefas e condições equivalentes; CPU/RAM livres não medem FPS ou garantem melhorias.");
         return new PerformanceObservation(DateTimeOffset.UtcNow, Stopwatch.GetElapsedTime(start, cpuEnd),
-            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks);
+            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks, activityContext);
     }
 
     internal readonly record struct SystemCpuTimes(ulong Idle, ulong Kernel, ulong User);

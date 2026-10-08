@@ -10,7 +10,7 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 | --- | --- |
 | Hardware | Lê CPU, RAM, GPU e drivers, placa-mãe, BIOS, módulos RAM, volumes, discos físicos, bateria e rede. Sensores aparecem somente quando o Windows fornece a leitura. |
 | Inventário do Windows | Consulta configuração de rede, drivers, PnP, processos, serviços, tarefas agendadas, programas instalados e eventos recentes; tenta ler Secure Boot e TPM. Endereços e nomes locais podem constar no relatório. Atualizações pendentes e saúde da imagem não são medidos durante a coleta. |
-| Carga real | Observa CPU, RAM e processos, além de engines de GPU e tráfego/atividade local de disco e rede quando os contadores do Windows estão disponíveis. A amostragem adapta o intervalo, guarda sessões e referência no SQLite, conserva um buffer recente e permite comparar médias de CPU/RAM. Não encerra processos nem esvazia a RAM. |
+| Carga real | Observa CPU, RAM e processos, além de engines de GPU e tráfego/atividade local de disco e rede quando disponíveis. A amostragem adapta o intervalo, guarda sessões e referência no SQLite, conserva um buffer recente, compara médias de CPU/RAM e identifica heurísticas de processos de jogos/OBS. A presença de OBS não comprova transmissão ao vivo. |
 | Limpeza | Analisa temporários do usuário com mais de sete dias; permite selecionar, guardar em recuperação, restaurar e excluir definitivamente em operações separadas. |
 | Inicialização | Desativa entradas selecionadas de HKCU Run, preserva comando/tipo anteriores e permite desfazer. Heurísticas protegem entradas de segurança, backup e sincronização. |
 | Perfil | Perguntas de uso orientam recomendações; efeitos visuais e planos de energia existentes têm revisão e recuperação próprias. |

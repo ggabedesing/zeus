@@ -15,10 +15,11 @@ public sealed class WindowsInventoryTests
         Assert.True(observation.TotalMemoryBytes > 0);
         Assert.InRange(observation.AvailableMemoryBytes, 0UL, observation.TotalMemoryBytes);
         Assert.True(observation.SamplingDuration >= TimeSpan.FromSeconds(2));
-        Assert.InRange(observation.Processes.Count, 1, 10);
+        Assert.InRange(observation.Processes.Count, 1, 50);
         Assert.NotNull(observation.GpuEngines);
         Assert.NotNull(observation.Disks);
         Assert.NotNull(observation.Networks);
+        Assert.NotNull(observation.ActivityContext);
         Assert.All(observation.GpuEngines, engine =>
         {
             Assert.False(string.IsNullOrWhiteSpace(engine.EngineType));

@@ -260,7 +260,7 @@ public partial class MainWindow
         if (_performanceBaseline.Length > 0 && observation.CollectedAt > _performanceBaseline[^1].CollectedAt)
             _performanceComparison = null;
         var memory = observation.TotalMemoryBytes == 0 ? "indisponível" : $"{ByteFormatting.Format(observation.AvailableMemoryBytes)} de {ByteFormatting.Format(observation.TotalMemoryBytes)}";
-        PerformanceSummary = $"CPU: {(observation.CpuPercent.HasValue ? $"{observation.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · Amostra de {observation.SamplingDuration.TotalSeconds:0.#} s em {observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
+        PerformanceSummary = $"CPU: {(observation.CpuPercent.HasValue ? $"{observation.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · {observation.ActivityContext?.Summary ?? "Contexto de jogo/OBS indisponível."} · Amostra de {observation.SamplingDuration.TotalSeconds:0.#} s em {observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
         ProcessRows.Clear();
         foreach (var process in observation.Processes)
             ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · Memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}"));

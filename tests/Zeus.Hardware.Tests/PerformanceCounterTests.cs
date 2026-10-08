@@ -62,6 +62,23 @@ public sealed class PerformanceCounterTests
         Assert.Null(comparison.LaterUsedMemoryPercent);
     }
 
+    [Fact]
+    public void ActivityContextDistinguishesProcessPresenceFromLiveGameOrStream()
+    {
+        var obsAndGame = ActivityContextDetector.Detect([
+            new(100, "obs64", null, 10), new(200, "FortniteClient-Win64-Shipping", null, 20)
+        ]);
+        Assert.True(obsAndGame.ObsProcessDetected);
+        Assert.True(obsAndGame.KnownGameProcessDetected);
+        Assert.Equal(DetectionConfidence.Medium, obsAndGame.Confidence);
+        Assert.Contains("não confirmados", obsAndGame.Summary);
+
+        var java = ActivityContextDetector.Detect([new(300, "javaw", null, 30)]);
+        Assert.False(java.KnownGameProcessDetected);
+        Assert.False(java.ObsProcessDetected);
+        Assert.Equal(DetectionConfidence.Low, java.Confidence);
+    }
+
     private static PerformanceObservation Sample(double? cpu) =>
         new(DateTimeOffset.UnixEpoch, TimeSpan.FromSeconds(2), cpu, 1024, 512, [], []);
 
