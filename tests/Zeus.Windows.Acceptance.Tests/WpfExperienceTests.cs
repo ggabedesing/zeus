@@ -29,9 +29,8 @@ public sealed class WpfExperienceTests
             var fixture = Path.Combine(Path.GetTempPath(), "Zeus.Acceptance." + Guid.NewGuid().ToString("N"));
             try
             {
-                app = new App();
+                app = new App(startMainWindow: false);
                 app.InitializeComponent();
-                app.StartupUri = null;
                 app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 app.DispatcherUnhandledException += (_, args) =>
                 {

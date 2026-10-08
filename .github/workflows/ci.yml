@@ -82,7 +82,7 @@ jobs:
             if (!(Test-Path $resultFile)) { $failed = $true; continue }
             [xml]$trx = Get-Content $resultFile
             $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
-            if ($null -eq $counters -or [int]$counters.total -le 0 -or [int]$counters.passed -le 0 -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0) { $failed = $true }
+            if ($null -eq $counters -or [int]$counters.total -le 0 -or [int]$counters.passed -ne [int]$counters.total -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0) { $failed = $true }
           }
           if ($failed) { exit 1 }
       - name: Exercise read-only Windows diagnostic
@@ -126,7 +126,7 @@ jobs:
                 total = [int]$c.total
                 passed = [int]$c.passed
                 failed = [int]$c.failed
-                skipped = [int]$c.notExecuted
+                skipped = [Math]::Max([int]$c.notExecuted, [int]$c.total - [int]$c.executed)
               }
               $projects += $counts
               foreach ($key in @('total', 'passed', 'failed', 'skipped')) { $totals[$key] += $counts[$key] }
@@ -167,7 +167,12 @@ jobs:
                   [xml]$trx = Get-Content $file.FullName
                   foreach ($test in @($trx.SelectNodes("//*[local-name()='UnitTestResult' and @outcome='Failed']"))) {
                     $message = $test.SelectSingleNode(".//*[local-name()='Message']")
-                    [ordered]@{ test = $test.testName; message = if ($message) { $message.InnerText.Substring(0, [Math]::Min($message.InnerText.Length, 2000)) } else { 'No failure message provided.' } }
+                    $stack = $test.SelectSingleNode(".//*[local-name()='StackTrace']")
+                    [ordered]@{
+                      test = $test.testName
+                      message = if ($message) { $message.InnerText.Substring(0, [Math]::Min($message.InnerText.Length, 2000)) } else { 'No failure message provided.' }
+                      stackTrace = if ($stack) { $stack.InnerText.Substring(0, [Math]::Min($stack.InnerText.Length, 5000)) } else { '' }
+                    }
                   }
                 }
               }

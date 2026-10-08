@@ -106,7 +106,8 @@ public partial class MainWindow
         await RunOperationAsync("Medindo carga real", "Amostrando CPU, memória e processos por cinco segundos.", async token =>
         {
             _performance = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(5), token);
-            PerformanceSummary = $"CPU: {(_performance.CpuPercent.HasValue ? $"{_performance.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {ByteFormatting.Format(_performance.AvailableMemoryBytes)} de {ByteFormatting.Format(_performance.TotalMemoryBytes)} · Amostra de {_performance.SamplingDuration.TotalSeconds:0.#} s em {_performance.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
+            var memory = _performance.TotalMemoryBytes == 0 ? "indisponível" : $"{ByteFormatting.Format(_performance.AvailableMemoryBytes)} de {ByteFormatting.Format(_performance.TotalMemoryBytes)}";
+            PerformanceSummary = $"CPU: {(_performance.CpuPercent.HasValue ? $"{_performance.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · Amostra de {_performance.SamplingDuration.TotalSeconds:0.#} s em {_performance.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
             ProcessRows.Clear();
             foreach (var p in _performance.Processes) ProcessRows.Add(new($"{p.Name} · PID {p.Id}", $"CPU: {(p.CpuPercent.HasValue ? $"{p.CpuPercent:0.#}%" : "indisponível")} · Memória residente: {ByteFormatting.Format(p.WorkingSetBytes)}"));
             foreach (var w in _performance.Warnings) Warnings.Add(w);

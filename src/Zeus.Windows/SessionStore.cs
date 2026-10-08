@@ -50,7 +50,8 @@ public static class SessionStore
     {
         var reportPath = Path.Combine(GetSessionDirectory(sessionId), "report.json");
         ValidateFile(reportPath);
-        await using var stream = new FileStream(reportPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        // Readers retain a consistent old version while the helper atomically replaces it.
+        await using var stream = new FileStream(reportPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         var report = await JsonSerializer.DeserializeAsync<MaintenanceReport>(stream)
             ?? throw new InvalidDataException("O relatório está vazio.");
         if (report.SessionId != sessionId) throw new InvalidDataException("O relatório não pertence a esta sessão.");
@@ -96,6 +97,7 @@ public static class SessionStore
             {
                 await JsonSerializer.SerializeAsync(stream, report, new JsonSerializerOptions { WriteIndented = true });
                 await stream.FlushAsync();
+                stream.Flush(flushToDisk: true);
             }
             if (File.Exists(destination)) ValidateFile(destination);
             File.Move(temporary, destination, overwrite: replaceExisting);

@@ -73,6 +73,19 @@ public sealed class MaintenanceRequestProtocolTests
     }
 
     [Theory]
+    [InlineData("[{\"Action\":\"\\uD800\"}]")]
+    [InlineData("[{\"Action\":\"\\uDC00\"}]")]
+    [InlineData("[{\"\\uD800\":\"DefenderQuickScan\"}]")]
+    [InlineData("[{\"\\uDC00\":\"DefenderQuickScan\"}]")]
+    [InlineData("[{\"Action\":\"InstallDriverUpdate\",\"TargetId\":\"\\uD800\"}]")]
+    [InlineData("[{\"Action\":\"InstallDriverUpdate\",\"TargetId\":\"\\uDC00\"}]")]
+    public void InvalidUnicodeEscapesAreRejectedWithoutThrowing(string payload)
+    {
+        Assert.False(Read(payload, out var requests));
+        Assert.Empty(requests);
+    }
+
+    [Theory]
     [InlineData("12345678-1234-1234-1234-123456789abc:1", true)]
     [InlineData("12345678-1234-1234-1234-123456789abc:2147483647", true)]
     [InlineData("12345678-1234-1234-1234-123456789abc:0", false)]

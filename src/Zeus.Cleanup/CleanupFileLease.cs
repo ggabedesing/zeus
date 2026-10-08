@@ -13,6 +13,7 @@ namespace Zeus.Cleanup;
 internal sealed class CleanupFileLease : IDisposable
 {
     private const uint GenericRead = 0x80000000;
+    private const uint GenericWrite = 0x40000000;
     private const uint DeleteAccess = 0x00010000;
     private const uint ReadAttributes = 0x80;
     private const uint OpenExisting = 3;
@@ -54,7 +55,46 @@ internal sealed class CleanupFileLease : IDisposable
     }
 
     public long Length => _stream.Length;
+    public Stream ReadStream => _stream;
     public static CleanupFileLease Open(string path) => new(path);
+
+    public static FileStream OpenOwnedMetadataStream(string path, bool createNew = false)
+    {
+        if (!OperatingSystem.IsWindows())
+            return new FileStream(path, createNew ? FileMode.CreateNew : FileMode.OpenOrCreate,
+                FileAccess.ReadWrite, FileShare.None, 8192, FileOptions.Asynchronous | FileOptions.WriteThrough);
+        var handle = OpenWindows(path, GenericRead | GenericWrite | DeleteAccess, 0,
+            OpenReparsePoint | Overlapped | 0x80000000, createNew ? 1U : 4U);
+        try
+        {
+            RequireNormalHandle(handle, directory: false);
+            return new FileStream(handle, FileAccess.ReadWrite, 8192, isAsync: true);
+        }
+        catch { handle.Dispose(); throw; }
+    }
+
+    public static IDisposable PinExistingParents(string path)
+    {
+        var handles = new List<SafeFileHandle>();
+        if (!OperatingSystem.IsWindows()) return new ParentScope(handles);
+        try
+        {
+            var pending = new Stack<string>();
+            for (var directory = Path.GetDirectoryName(Path.GetFullPath(path)); directory is not null;
+                 directory = Path.GetDirectoryName(directory))
+                pending.Push(directory);
+            while (pending.Count > 0)
+            {
+                var directory = pending.Pop();
+                if (!Directory.Exists(directory)) break;
+                var handle = OpenWindows(directory, ReadAttributes, 3, BackupSemantics | OpenReparsePoint);
+                try { RequireNormalHandle(handle, directory: true); handles.Add(handle); }
+                catch { handle.Dispose(); throw; }
+            }
+            return new ParentScope(handles);
+        }
+        catch { foreach (var handle in handles) handle.Dispose(); throw; }
+    }
 
     public async Task<string> HashAsync(CancellationToken cancellationToken)
     {
@@ -65,9 +105,14 @@ internal sealed class CleanupFileLease : IDisposable
     public void MoveTo(string destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        MoveStreamTo(_stream, _path, destination);
+    }
+
+    public static void MoveStreamTo(FileStream stream, string source, string destination)
+    {
         if (!OperatingSystem.IsWindows())
         {
-            File.Move(_path, destination, overwrite: false);
+            File.Move(source, destination, overwrite: false);
             return;
         }
         var destinationParents = new List<SafeFileHandle>();
@@ -86,7 +131,7 @@ internal sealed class CleanupFileLease : IDisposable
                 Marshal.WriteIntPtr(buffer, rootOffset, IntPtr.Zero);
                 Marshal.WriteInt32(buffer, lengthOffset, name.Length);
                 Marshal.Copy(name, 0, buffer + nameOffset, name.Length);
-                if (!SetFileInformationByHandle(_stream.SafeFileHandle, 3, buffer, (uint)(nameOffset + name.Length)))
+                if (!SetFileInformationByHandle(stream.SafeFileHandle, 3, buffer, (uint)(nameOffset + name.Length)))
                     ThrowWindowsError("Não foi possível mover o arquivo validado.");
             }
             finally { Marshal.FreeHGlobal(buffer); }
@@ -174,9 +219,10 @@ internal sealed class CleanupFileLease : IDisposable
         }
     }
 
-    private static SafeFileHandle OpenWindows(string path, uint access, uint sharing, uint flags)
+    private static SafeFileHandle OpenWindows(string path, uint access, uint sharing, uint flags,
+        uint disposition = OpenExisting)
     {
-        var handle = CreateFileW(path, access, sharing, IntPtr.Zero, OpenExisting, flags, IntPtr.Zero);
+        var handle = CreateFileW(path, access, sharing, IntPtr.Zero, disposition, flags, IntPtr.Zero);
         if (!handle.IsInvalid) return handle;
         var error = Marshal.GetLastPInvokeError();
         handle.Dispose();
@@ -190,6 +236,13 @@ internal sealed class CleanupFileLease : IDisposable
         if ((info.Attributes & (uint)FileAttributes.ReparsePoint) != 0 ||
             ((info.Attributes & (uint)FileAttributes.Directory) != 0) != directory)
             throw new InvalidDataException("O objeto é um link, redirecionamento ou tipo de arquivo incompatível.");
+        if (!directory)
+        {
+            if (!GetFileInformationByHandleEx(handle, 1, out StandardInfo standard, (uint)Marshal.SizeOf<StandardInfo>()))
+                ThrowWindowsError("Não foi possível verificar a propriedade do arquivo.");
+            if (standard.NumberOfLinks != 1)
+                throw new InvalidDataException("Arquivos com múltiplos hard links são preservados.");
+        }
     }
 
     private static void ThrowWindowsError(string message) =>
@@ -205,8 +258,18 @@ internal sealed class CleanupFileLease : IDisposable
 
     [StructLayout(LayoutKind.Sequential)]
     private struct AttributeTagInfo { public uint Attributes; public uint ReparseTag; }
+    [StructLayout(LayoutKind.Explicit, Size = 24)]
+    private struct StandardInfo
+    {
+        [FieldOffset(16)] public uint NumberOfLinks;
+    }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private sealed class ParentScope(List<SafeFileHandle> handles) : IDisposable
+    {
+        public void Dispose() { foreach (var handle in handles) handle.Dispose(); }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
     private static extern SafeFileHandle CreateFileW(string fileName, uint desiredAccess, uint shareMode,
         IntPtr securityAttributes, uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -215,7 +278,11 @@ internal sealed class CleanupFileLease : IDisposable
         out AttributeTagInfo info, uint bufferSize);
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandleEx(SafeFileHandle handle, int infoClass,
+        out StandardInfo info, uint bufferSize);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetFileInformationByHandle(SafeFileHandle handle, int infoClass, IntPtr info, uint bufferSize);
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
     private static extern uint GetFinalPathNameByHandleW(SafeFileHandle handle, StringBuilder path, uint size, uint flags);
 }

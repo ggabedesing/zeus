@@ -36,6 +36,7 @@ public sealed class PendingMaintenanceSessions
                 await JsonSerializer.SerializeAsync(stream,
                     new LaunchReceipt(sessionId, startedAt, requests.ToArray()), Options, cancellationToken);
                 await stream.FlushAsync(cancellationToken);
+                stream.Flush(flushToDisk: true);
             }
             File.Move(temporary, destination, overwrite: false);
         }

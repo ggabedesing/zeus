@@ -84,6 +84,7 @@ internal sealed class DesktopStorage
             {
                 await JsonSerializer.SerializeAsync(stream, value, JsonOptions);
                 await stream.FlushAsync();
+                stream.Flush(flushToDisk: true);
             }
             File.Move(temporary, path, overwrite: true);
         }

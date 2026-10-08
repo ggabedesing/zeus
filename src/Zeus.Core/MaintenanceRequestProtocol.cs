@@ -74,7 +74,7 @@ public static class MaintenanceRequestProtocol
             requests = MaintenancePolicy.ValidateRequests(selected);
             return true;
         }
-        catch (Exception exception) when (exception is FormatException or JsonException or ArgumentException)
+        catch (Exception exception) when (exception is FormatException or JsonException or ArgumentException or InvalidOperationException)
         {
             return false;
         }

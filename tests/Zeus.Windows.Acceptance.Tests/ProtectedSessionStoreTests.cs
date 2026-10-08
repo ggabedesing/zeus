@@ -31,7 +31,14 @@ public sealed class ProtectedSessionStoreTests
                 AssertProtectedAcl(new FileInfo(Path.Combine(directory, "report.json")).GetAccessControl());
 
                 var completed = progress with { FinishedAt = DateTimeOffset.UtcNow, IsComplete = true };
-                await SessionStore.WriteReportAsync(id, completed);
+                await using (var concurrentReader = new FileStream(Path.Combine(directory, "report.json"),
+                    FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
+                {
+                    await SessionStore.WriteReportAsync(id, completed);
+                    var earlier = await System.Text.Json.JsonSerializer.DeserializeAsync<MaintenanceReport>(concurrentReader);
+                    Assert.NotNull(earlier);
+                    Assert.False(earlier.IsComplete);
+                }
                 var actual = await SessionStore.ReadReportAsync(id);
                 Assert.Equal(id, actual.SessionId);
                 Assert.True(actual.IsComplete);

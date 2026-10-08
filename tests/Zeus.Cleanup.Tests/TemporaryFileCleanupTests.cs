@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Runtime.InteropServices;
 using Zeus.Cleanup;
 
 namespace Zeus.Cleanup.Tests;
@@ -420,6 +421,149 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Empty(Directory.EnumerateFileSystemEntries(outside));
     }
 
+    [Fact]
+    public async Task LockedInterruptedEntryDoesNotHideOrBlockOtherRecoverableFiles()
+    {
+        var blockedOriginal = WriteOld("blocked.tmp", "blocked");
+        var availableOriginal = WriteOld("available.tmp", "available");
+        var result = await QuarantineEverything(Create());
+        await EditManifest(result.SessionId, manifest => EntryByPath(manifest, "blocked.tmp")["State"] = "Restoring");
+        var storedBlocked = await StoredFileFor(result.SessionId, "blocked.tmp");
+        using (var locked = new FileStream(storedBlocked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            var cleanup = Create();
+            var session = Assert.Single(await cleanup.ListSessionsAsync());
+            Assert.Equal(1, session.FileCount);
+            Assert.Equal(9UL, session.TotalBytes);
+
+            var restored = await cleanup.RestoreAsync(result.SessionId);
+
+            Assert.Equal(1, restored.RestoredFiles);
+            Assert.Equal(1, restored.SkippedFiles);
+            Assert.NotEmpty(restored.Warnings);
+            Assert.Equal("available", await File.ReadAllTextAsync(availableOriginal));
+            Assert.False(File.Exists(blockedOriginal));
+            Assert.True(File.Exists(storedBlocked));
+        }
+        Assert.Equal(1, (await Create().RestoreAsync(result.SessionId)).RestoredFiles);
+        Assert.Equal("blocked", await File.ReadAllTextAsync(blockedOriginal));
+    }
+
+    [Fact]
+    public async Task CorruptInterruptedEntryDoesNotBlockOtherRecoverableFiles()
+    {
+        var brokenOriginal = WriteOld("broken.tmp", "original");
+        var availableOriginal = WriteOld("available.tmp", "available");
+        var result = await QuarantineEverything(Create());
+        await EditManifest(result.SessionId, manifest => EntryByPath(manifest, "broken.tmp")["State"] = "Planned");
+        var corruptFile = await StoredFileFor(result.SessionId, "broken.tmp");
+        await File.WriteAllTextAsync(corruptFile, "tampered");
+
+        var cleanup = Create();
+        Assert.Equal(1, Assert.Single(await cleanup.ListSessionsAsync()).FileCount);
+        var restored = await cleanup.RestoreAsync(result.SessionId);
+
+        Assert.Equal(1, restored.RestoredFiles);
+        Assert.Equal(1, restored.SkippedFiles);
+        Assert.NotEmpty(restored.Warnings);
+        Assert.False(File.Exists(brokenOriginal));
+        Assert.Equal("available", await File.ReadAllTextAsync(availableOriginal));
+        Assert.Equal("tampered", await File.ReadAllTextAsync(corruptFile));
+        Assert.Equal("Incomplete", Assert.Single(await cleanup.ListSessionsAsync()).Status);
+    }
+
+    [Fact]
+    public async Task ExclusiveLeasePreventsConcurrentContentReplacementDuringChecksumAndMove()
+    {
+        var original = WriteOld("exclusive.tmp", "must remain unchanged");
+        var destination = Path.Combine(TemporaryRoot, "moved.tmp");
+        using (var lease = CleanupFileLease.Open(original))
+        {
+            var expectedHash = await lease.HashAsync(CancellationToken.None);
+            await Assert.ThrowsAsync<IOException>(() => File.WriteAllTextAsync(original, "replacement"));
+            Assert.Equal(expectedHash, await lease.HashAsync(CancellationToken.None));
+            lease.MoveTo(destination);
+        }
+
+        Assert.False(File.Exists(original));
+        Assert.Equal("must remain unchanged", await File.ReadAllTextAsync(destination));
+    }
+
+    [Fact]
+    public async Task ExclusiveLeaseDeletesTheSameFileThatWasChecksummed()
+    {
+        var original = WriteOld("exclusive.tmp", "must remain unchanged");
+        using var lease = CleanupFileLease.Open(original);
+        Assert.Equal(21, lease.Length);
+        Assert.NotEmpty(await lease.HashAsync(CancellationToken.None));
+        await Assert.ThrowsAsync<IOException>(() => File.WriteAllTextAsync(original, "replacement"));
+
+        lease.Delete();
+
+        Assert.False(File.Exists(original));
+    }
+
+    [WindowsFact]
+    public void WindowsExtendedPathAliasesCannotHideRootOverlap()
+    {
+        var extendedTemporary = @"\\?\" + TemporaryRoot;
+        var nestedStorage = Path.Combine(TemporaryRoot, "recovery");
+        Assert.Throws<ArgumentException>(() => new TemporaryFileCleanup(TemporaryRoot, @"\\?\" + nestedStorage));
+        Assert.Throws<ArgumentException>(() => new TemporaryFileCleanup(extendedTemporary, nestedStorage));
+        Assert.Throws<ArgumentException>(() => new TemporaryFileCleanup(extendedTemporary, TemporaryRoot));
+    }
+
+    [WindowsFact]
+    public async Task WindowsFileAndParentDirectoryCannotBeReplacedWhileLeaseIsHeld()
+    {
+        var original = WriteOld("pinned/original.tmp", "pinned");
+        var parent = Path.GetDirectoryName(original)!;
+        var replacementParent = Path.Combine(TemporaryRoot, "renamed-parent");
+        using (var lease = CleanupFileLease.Open(original))
+        {
+            Assert.Throws<IOException>(() => File.Move(original, original + ".other"));
+            Assert.Throws<IOException>(() => File.Delete(original));
+            Assert.Throws<IOException>(() => Directory.Move(parent, replacementParent));
+            Assert.NotEmpty(await lease.HashAsync(CancellationToken.None));
+        }
+        Assert.Equal("pinned", await File.ReadAllTextAsync(original));
+        Directory.Move(parent, replacementParent);
+        Assert.True(Directory.Exists(replacementParent));
+    }
+
+    [WindowsFact]
+    public async Task WindowsHardLinkedSourceIsPreserved()
+    {
+        var original = WriteOld("linked.tmp", "original document");
+        var outside = Path.Combine(_fixture, "document.txt");
+        Assert.True(CreateHardLinkW(outside, original, IntPtr.Zero));
+
+        var cleanup = Create();
+        var scan = await cleanup.ScanAsync();
+        var result = await cleanup.QuarantineAsync(scan, [Assert.Single(scan.Files).Id]);
+
+        Assert.Equal(0, result.MovedFiles);
+        Assert.Equal(1, result.SkippedFiles);
+        Assert.Equal("original document", await File.ReadAllTextAsync(original));
+        Assert.Equal("original document", await File.ReadAllTextAsync(outside));
+    }
+
+    [WindowsFact]
+    public async Task WindowsMetadataLinksCannotModifyExternalFiles()
+    {
+        var outside = Path.Combine(_fixture, "document.txt");
+        await File.WriteAllTextAsync(outside, "original document");
+        var symbolic = Path.Combine(TemporaryRoot, "metadata-link.json");
+        var hard = Path.Combine(TemporaryRoot, "metadata-hard.json");
+        File.CreateSymbolicLink(symbolic, outside);
+        Assert.True(CreateHardLinkW(hard, outside, IntPtr.Zero));
+
+        Assert.Throws<InvalidDataException>(() => CleanupFileLease.OpenOwnedMetadataStream(symbolic));
+        Assert.Throws<InvalidDataException>(() => CleanupFileLease.OpenOwnedMetadataStream(hard));
+
+        Assert.Equal("original document", await File.ReadAllTextAsync(outside));
+    }
+
     private TemporaryFileCleanup Create() => new(TemporaryRoot, StorageRoot);
 
     private string WriteOld(string relativePath, string contents)
@@ -452,8 +596,23 @@ public sealed class TemporaryFileCleanupTests : IDisposable
 
     private static JsonObject Entry(JsonObject manifest) => manifest["Entries"]![0]!.AsObject();
 
+    private static JsonObject EntryByPath(JsonObject manifest, string relative) =>
+        manifest["Entries"]!.AsArray().Select(node => node!.AsObject())
+            .Single(entry => entry["RelativePath"]!.GetValue<string>() == relative);
+
+    private async Task<string> StoredFileFor(Guid sessionId, string relative)
+    {
+        var manifestPath = Path.Combine(SessionPath(sessionId), "manifest.json");
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!.AsObject();
+        return Path.Combine(SessionPath(sessionId), EntryByPath(manifest, relative)["Id"]!.GetValue<string>() + ".bin");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_fixture)) Directory.Delete(_fixture, recursive: true);
     }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CreateHardLinkW(string newFileName, string existingFileName, IntPtr securityAttributes);
 }

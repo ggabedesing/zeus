@@ -35,8 +35,12 @@ public sealed class TemporaryFileCleanup
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(temporaryRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(storageRoot);
-        _temporaryRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(temporaryRoot));
-        _storageRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(storageRoot));
+        // Reject redirections before canonicalization; normalize physical Windows aliases
+        // afterwards so device prefixes, 8.3 paths and mapped drives cannot hide overlap.
+        CheckAncestors(temporaryRoot);
+        CheckAncestors(storageRoot);
+        _temporaryRoot = CleanupFileLease.CanonicalizeRoot(temporaryRoot);
+        _storageRoot = CleanupFileLease.CanonicalizeRoot(storageRoot);
         if (PathComparer.Equals(_temporaryRoot, Path.GetPathRoot(_temporaryRoot)) ||
             PathComparer.Equals(_storageRoot, Path.GetPathRoot(_storageRoot)))
             throw new ArgumentException("A limpeza não pode usar a raiz de um volume.");
@@ -175,6 +179,7 @@ public sealed class TemporaryFileCleanup
             }
             var sessionPath = SessionPath(manifest.Id);
             EnsureDirectory(sessionPath);
+            using var sessionScope = CleanupFileLease.PinExistingParents(Path.Combine(sessionPath, "entry"));
             await SaveAsync(manifest, cancellationToken).ConfigureAwait(false);
             var warnings = new List<string>();
             var skipped = 0;
@@ -191,8 +196,10 @@ public sealed class TemporaryFileCleanup
                 try
                 {
                     CheckAncestors(sourcePath);
-                    if (!File.Exists(sourcePath) || Capture(new FileInfo(sourcePath)) != fingerprint.Metadata ||
-                        await HashAsync(sourcePath, cancellationToken).ConfigureAwait(false) != fingerprint.Hash)
+                    using var fileLease = CleanupFileLease.Open(sourcePath);
+                    if (Capture(new FileInfo(sourcePath)) != fingerprint.Metadata ||
+                        fileLease.Length != (long)candidate.SizeBytes ||
+                        await fileLease.HashAsync(cancellationToken).ConfigureAwait(false) != fingerprint.Hash)
                     {
                         skipped++;
                         entry.State = "Skipped";
@@ -211,7 +218,7 @@ public sealed class TemporaryFileCleanup
                     }
                     else
                     {
-                        File.Move(sourcePath, QuarantinedPath(manifest.Id, entry), overwrite: false);
+                        fileLease.MoveTo(QuarantinedPath(manifest.Id, entry));
                         entry.State = "Moved";
                         moved++;
                         bytes += entry.SizeBytes;
@@ -248,11 +255,13 @@ public sealed class TemporaryFileCleanup
                 if (!Guid.TryParseExact(Path.GetFileName(directory), "N", out var id)) continue;
                 try
                 {
+                    using var sessionScope = CleanupFileLease.PinExistingParents(Path.Combine(directory, "entry"));
                     var manifest = await LoadAsync(id, cancellationToken).ConfigureAwait(false);
-                    await ReconcileAsync(manifest, [], cancellationToken).ConfigureAwait(false);
-                    var moved = manifest.Entries.Where(entry => entry.State == "Moved").ToArray();
+                    var failedRecovery = await ReconcileAsync(manifest, [], cancellationToken).ConfigureAwait(false);
+                    var moved = manifest.Entries.Where(entry => entry.State == "Moved" &&
+                        !manifest.FailedEntries.Contains(entry.Id)).ToArray();
                     var status = moved.Length > 0 ? "Quarantined" :
-                        manifest.Entries.Any(entry => entry.State == "Missing") ? "Incomplete" :
+                        failedRecovery > 0 || manifest.Entries.Any(entry => entry.State is "Missing" or "Planned" or "Restoring" or "Purging") ? "Incomplete" :
                         manifest.Entries.Any(entry => entry.State == "Purged") ? "Deleted" : "Restored";
                     sessions.Add(new QuarantineSession(id, manifest.CreatedAt, moved.Length,
                         SumBytes(moved), status));
@@ -273,17 +282,20 @@ public sealed class TemporaryFileCleanup
         try
         {
             using var storageLock = await LockStorageAsync(cancellationToken).ConfigureAwait(false);
+            using var sessionScope = CleanupFileLease.PinExistingParents(Path.Combine(SessionPath(sessionId), "entry"));
             var manifest = await LoadAsync(sessionId, cancellationToken).ConfigureAwait(false);
             var warnings = new List<string>();
-            await ReconcileAsync(manifest, warnings, cancellationToken).ConfigureAwait(false);
+            var failedRecovery = await ReconcileAsync(manifest, warnings, cancellationToken).ConfigureAwait(false);
             var restored = 0;
-            var skipped = 0;
-            foreach (var entry in manifest.Entries.Where(entry => entry.State == "Moved").ToArray())
+            var skipped = failedRecovery;
+            foreach (var entry in manifest.Entries.Where(entry => entry.State == "Moved" &&
+                         !manifest.FailedEntries.Contains(entry.Id)).ToArray())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     var destination = SourcePath(entry.RelativePath);
+                    using var destinationScope = CleanupFileLease.PinExistingParents(destination);
                     CheckAncestors(destination);
                     if (PathExists(destination))
                     {
@@ -292,13 +304,13 @@ public sealed class TemporaryFileCleanup
                         continue;
                     }
                     var quarantined = QuarantinedPath(sessionId, entry);
-                    await ValidateContentsAsync(quarantined, entry, cancellationToken).ConfigureAwait(false);
+                    using var fileLease = await OpenValidatedContentsAsync(quarantined, entry, cancellationToken).ConfigureAwait(false);
                     EnsureDirectory(Path.GetDirectoryName(destination)!);
                     entry.State = "Restoring";
                     await SaveAsync(manifest, cancellationToken, entry).ConfigureAwait(false);
                     CheckAncestors(destination);
                     CheckAncestors(quarantined);
-                    File.Move(quarantined, destination, overwrite: false);
+                    fileLease.MoveTo(destination);
                     entry.State = "Restored";
                     restored++;
                     await SaveAsync(manifest, CancellationToken.None, entry).ConfigureAwait(false);
@@ -322,6 +334,7 @@ public sealed class TemporaryFileCleanup
         try
         {
             using var storageLock = await LockStorageAsync(cancellationToken).ConfigureAwait(false);
+            using var sessionScope = CleanupFileLease.PinExistingParents(Path.Combine(SessionPath(sessionId), "entry"));
             var manifest = await LoadAsync(sessionId, cancellationToken).ConfigureAwait(false);
             await ReconcileAsync(manifest, [], cancellationToken).ConfigureAwait(false);
             ulong deletedBytes = 0;
@@ -330,12 +343,12 @@ public sealed class TemporaryFileCleanup
                 cancellationToken.ThrowIfCancellationRequested();
                 var quarantined = QuarantinedPath(sessionId, entry);
                 // A replaced, corrupt or linked object is never deleted as part of this session.
-                await ValidateContentsAsync(quarantined, entry, cancellationToken).ConfigureAwait(false);
+                using var fileLease = await OpenValidatedContentsAsync(quarantined, entry, cancellationToken).ConfigureAwait(false);
                 entry.State = "Purging";
                 await SaveAsync(manifest, cancellationToken, entry).ConfigureAwait(false);
                 CheckAncestors(quarantined);
-                var actualLength = new FileInfo(quarantined).Length;
-                File.Delete(quarantined);
+                var actualLength = fileLease.Length;
+                fileLease.Delete();
                 entry.State = "Purged";
                 deletedBytes += (ulong)actualLength;
                 await SaveAsync(manifest, CancellationToken.None, entry).ConfigureAwait(false);
@@ -345,20 +358,34 @@ public sealed class TemporaryFileCleanup
         finally { _gate.Release(); }
     }
 
-    private async Task<FileStream> LockStorageAsync(CancellationToken cancellationToken)
+    private async Task<StorageLease> LockStorageAsync(CancellationToken cancellationToken)
     {
-        EnsureDirectory(_storageRoot);
         var lockPath = Path.Combine(_storageRoot, "storage.lock");
-        for (var attempt = 0; ; attempt++)
+        var parentScope = CleanupFileLease.PinExistingParents(lockPath);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            CheckAncestors(lockPath);
-            try { return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
-            catch (IOException) when (attempt < 100)
+            EnsureDirectory(_storageRoot);
+            var fullScope = CleanupFileLease.PinExistingParents(lockPath);
+            try
             {
-                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                for (var attempt = 0; ; attempt++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    CheckAncestors(lockPath);
+                    try
+                    {
+                        var stream = CleanupFileLease.OpenOwnedMetadataStream(lockPath);
+                        return new StorageLease(stream, parentScope, fullScope);
+                    }
+                    catch (IOException) when (attempt < 100)
+                    {
+                        await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                    }
+                }
             }
+            catch { fullScope.Dispose(); throw; }
         }
+        catch { parentScope.Dispose(); throw; }
     }
 
     private async Task<Manifest> LoadAsync(Guid sessionId, CancellationToken cancellationToken)
@@ -366,12 +393,10 @@ public sealed class TemporaryFileCleanup
         if (sessionId == Guid.Empty) throw new ArgumentException("Sessão inválida.", nameof(sessionId));
         var path = Path.Combine(SessionPath(sessionId), "manifest.json");
         CheckAncestors(path);
-        var info = new FileInfo(path);
-        if (!info.Exists || info.Length > MaximumManifestBytes)
+        using var manifestLease = CleanupFileLease.Open(path);
+        if (manifestLease.Length > MaximumManifestBytes)
             throw new InvalidDataException("Registro de recuperação ausente ou inválido.");
-        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
-            8192, FileOptions.Asynchronous);
-        var manifest = await JsonSerializer.DeserializeAsync<Manifest>(stream, JsonOptions, cancellationToken)
+        var manifest = await JsonSerializer.DeserializeAsync<Manifest>(manifestLease.ReadStream, JsonOptions, cancellationToken)
             .ConfigureAwait(false) ?? throw new InvalidDataException("Registro de recuperação inválido.");
         ValidateManifest(manifest, sessionId);
         await ReadJournalAsync(manifest, cancellationToken).ConfigureAwait(false);
@@ -393,8 +418,7 @@ public sealed class TemporaryFileCleanup
             if (changes.Length == 0) return;
             var journalPath = Path.Combine(directory, "journal.jsonl");
             CheckAncestors(journalPath);
-            await using var journal = new FileStream(journalPath, FileMode.OpenOrCreate, FileAccess.Write,
-                FileShare.None, 8192, FileOptions.Asynchronous | FileOptions.WriteThrough);
+            await using var journal = CleanupFileLease.OpenOwnedMetadataStream(journalPath);
             if (manifest.ValidJournalLength is { } length)
             {
                 // A killed process may have left an incomplete final record. Only the incomplete
@@ -421,20 +445,18 @@ public sealed class TemporaryFileCleanup
             return;
         }
         ValidateManifest(manifest, manifest.Id);
-        var temporary = Path.Combine(directory, "manifest.tmp");
+        var temporary = Path.Combine(directory, "manifest." + Guid.NewGuid().ToString("N") + ".tmp");
         var destination = Path.Combine(directory, "manifest.json");
         CheckAncestors(temporary);
         CheckAncestors(destination);
-        await using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write,
-                         FileShare.None, 8192, FileOptions.Asynchronous | FileOptions.WriteThrough))
+        await using (var stream = CleanupFileLease.OpenOwnedMetadataStream(temporary, createNew: true))
         {
             await JsonSerializer.SerializeAsync(stream, manifest, JsonOptions, cancellationToken).ConfigureAwait(false);
             await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
             stream.Flush(flushToDisk: true);
+            CheckAncestors(destination);
+            CleanupFileLease.MoveStreamTo(stream, temporary, destination);
         }
-        CheckAncestors(temporary);
-        CheckAncestors(destination);
-        File.Move(temporary, destination, overwrite: true);
         manifest.PersistedStates = manifest.Entries.ToDictionary(entry => entry.Id, entry => entry.State, StringComparer.Ordinal);
         manifest.ValidJournalLength = 0;
     }
@@ -444,9 +466,11 @@ public sealed class TemporaryFileCleanup
         var path = Path.Combine(SessionPath(manifest.Id), "journal.jsonl");
         CheckAncestors(path);
         if (!File.Exists(path)) { manifest.ValidJournalLength = 0; return; }
-        if (new FileInfo(path).Length > MaximumManifestBytes)
+        using var journalLease = CleanupFileLease.Open(path);
+        if (journalLease.Length > MaximumManifestBytes)
             throw new InvalidDataException("O journal de recuperação excedeu seu limite de segurança.");
-        var bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+        var bytes = new byte[(int)journalLease.Length];
+        await journalLease.ReadStream.ReadExactlyAsync(bytes, cancellationToken).ConfigureAwait(false);
         var completeLength = Array.LastIndexOf(bytes, (byte)'\n') + 1;
         var entries = manifest.Entries.ToDictionary(entry => entry.Id, StringComparer.Ordinal);
         var start = 0;
@@ -466,47 +490,61 @@ public sealed class TemporaryFileCleanup
         manifest.ValidJournalLength = completeLength;
     }
 
-    private async Task ReconcileAsync(Manifest manifest, List<string> warnings, CancellationToken cancellationToken,
+    private async Task<int> ReconcileAsync(Manifest manifest, List<string> warnings, CancellationToken cancellationToken,
         ManifestEntry? onlyEntry = null)
     {
         var changed = false;
+        var failed = 0;
         var inspected = onlyEntry is null ? manifest.Entries : [onlyEntry];
         foreach (var entry in inspected)
         {
             if (entry.State is not ("Planned" or "Restoring" or "Purging" or "Moved")) continue;
-            var quarantined = QuarantinedPath(manifest.Id, entry);
-            CheckAncestors(quarantined);
-            var exists = File.Exists(quarantined);
-            if (exists && entry.State != "Moved")
+            try
             {
-                await ValidateContentsAsync(quarantined, entry, cancellationToken).ConfigureAwait(false);
-                entry.State = "Moved";
-                changed = true;
-            }
-            else if (!exists)
-            {
-                var prior = entry.State;
-                if (prior == "Purging") entry.State = "Purged";
-                else if (prior == "Planned") entry.State = "Skipped";
-                else
+                var quarantined = QuarantinedPath(manifest.Id, entry);
+                CheckAncestors(quarantined);
+                var exists = File.Exists(quarantined);
+                if (exists && entry.State != "Moved")
                 {
-                    var original = SourcePath(entry.RelativePath);
-                    CheckAncestors(original);
-                    if (prior == "Restoring" && File.Exists(original))
-                    {
-                        await ValidateContentsAsync(original, entry, cancellationToken).ConfigureAwait(false);
-                        entry.State = "Restored";
-                    }
+                    await ValidateContentsAsync(quarantined, entry, cancellationToken).ConfigureAwait(false);
+                    entry.State = "Moved";
+                    changed = true;
+                }
+                else if (!exists)
+                {
+                    var prior = entry.State;
+                    if (prior == "Purging") entry.State = "Purged";
+                    else if (prior == "Planned") entry.State = "Skipped";
                     else
                     {
-                        entry.State = "Missing";
-                        warnings.Add($"O arquivo de recuperação está ausente: {entry.RelativePath}");
+                        var original = SourcePath(entry.RelativePath);
+                        CheckAncestors(original);
+                        if (prior == "Restoring" && File.Exists(original))
+                        {
+                            await ValidateContentsAsync(original, entry, cancellationToken).ConfigureAwait(false);
+                            entry.State = "Restored";
+                        }
+                        else
+                        {
+                            entry.State = "Missing";
+                            warnings.Add($"O arquivo de recuperação está ausente: {entry.RelativePath}");
+                        }
                     }
+                    changed = true;
                 }
-                changed = true;
+                manifest.FailedEntries.Remove(entry.Id);
+            }
+            catch (Exception exception) when (IsFileFailure(exception))
+            {
+                // A damaged/locked entry must not hide other files from the same recovery
+                // session. Keep its durable state intact so unlocking/repairing can be retried.
+                failed++;
+                manifest.FailedEntries.Add(entry.Id);
+                warnings.Add($"Recuperação pendente para {entry.RelativePath}: {exception.Message}");
             }
         }
         if (changed) await SaveAsync(manifest, cancellationToken, onlyEntry).ConfigureAwait(false);
+        return failed;
     }
 
     private void ValidateManifest(Manifest manifest, Guid expectedId)
@@ -543,12 +581,22 @@ public sealed class TemporaryFileCleanup
 
     private static async Task ValidateContentsAsync(string path, ManifestEntry entry, CancellationToken cancellationToken)
     {
+        using var lease = await OpenValidatedContentsAsync(path, entry, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<CleanupFileLease> OpenValidatedContentsAsync(string path, ManifestEntry entry,
+        CancellationToken cancellationToken)
+    {
         CheckAncestors(path);
-        var info = new FileInfo(path);
-        if (!info.Exists || (info.Attributes & FileAttributes.Directory) != 0 ||
-            (ulong)info.Length != entry.SizeBytes ||
-            !string.Equals(await HashAsync(path, cancellationToken).ConfigureAwait(false), entry.Hash, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("O arquivo não corresponde ao registro de recuperação; nenhuma alteração foi feita nele.");
+        var lease = CleanupFileLease.Open(path);
+        try
+        {
+            if ((ulong)lease.Length != entry.SizeBytes ||
+                !string.Equals(await lease.HashAsync(cancellationToken).ConfigureAwait(false), entry.Hash, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("O arquivo não corresponde ao registro de recuperação; nenhuma alteração foi feita nele.");
+            return lease;
+        }
+        catch { lease.Dispose(); throw; }
     }
 
     private string SessionPath(Guid sessionId) => Path.Combine(_storageRoot, sessionId.ToString("N"));
@@ -651,6 +699,7 @@ public sealed class TemporaryFileCleanup
         public List<ManifestEntry> Entries { get; set; } = [];
         [JsonIgnore] public Dictionary<string, string>? PersistedStates { get; set; }
         [JsonIgnore] public long? ValidJournalLength { get; set; }
+        [JsonIgnore] public HashSet<string> FailedEntries { get; set; } = new(StringComparer.Ordinal);
     }
 
     private sealed class ManifestEntry
@@ -668,5 +717,15 @@ public sealed class TemporaryFileCleanup
         public JournalRecord() { }
         public string Id { get; set; } = "";
         public string State { get; set; } = "";
+    }
+
+    private sealed class StorageLease(FileStream stream, IDisposable parentScope, IDisposable fullScope) : IDisposable
+    {
+        public void Dispose()
+        {
+            stream.Dispose();
+            fullScope.Dispose();
+            parentScope.Dispose();
+        }
     }
 }

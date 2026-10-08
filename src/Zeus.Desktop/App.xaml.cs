@@ -4,6 +4,10 @@ namespace Zeus.Desktop;
 
 public partial class App : Application
 {
+    private readonly bool _startMainWindow;
+    public App() : this(true) { }
+    public App(bool startMainWindow) => _startMainWindow = startMainWindow;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         if (SystemParameters.HighContrast)
@@ -27,5 +31,10 @@ public partial class App : Application
             Resources["LogTextBrush"] = SystemColors.WindowTextBrush;
         }
         base.OnStartup(e);
+        if (_startMainWindow)
+        {
+            MainWindow = new MainWindow();
+            MainWindow.Show();
+        }
     }
 }
