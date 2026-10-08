@@ -182,7 +182,7 @@ public sealed record HistoryRow(Guid SessionId, string Title, string Summary, st
     private static string VerificationTitle(MaintenanceVerificationStatus status) => status switch
     {
         MaintenanceVerificationStatus.NotStarted => "não iniciada",
-        MaintenanceVerificationStatus.Pending => "em andamento, sem verificação",
+        MaintenanceVerificationStatus.Pending => "verificação pendente",
         MaintenanceVerificationStatus.CommandCompleted => "comando concluído; confira a saída",
         MaintenanceVerificationStatus.ProviderConfirmed => "resultado confirmado pelo provedor",
         MaintenanceVerificationStatus.ManualReviewRequired => "revisão manual necessária",

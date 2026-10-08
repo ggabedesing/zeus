@@ -4,7 +4,7 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 
 ### Confirmação da instalação de driver
 
-Depois da instalação, o auxiliar consulta novamente o Windows Update pela identidade e revisão exatas e só trata o pacote como confirmado se a fonte o marcar como instalado. Se houver pedido de reinicialização e a consulta ainda não confirmar o registro, o resultado fica pendente e orienta a não repetir a instalação. Sem confirmação nem reinicialização pendente, exige revisão manual. Isso valida o registro do pacote pelo provedor; não prova que o dispositivo esteja usando o driver ativo, o que ainda precisa ser verificado após reiniciar. A política tem testes automatizados; nenhuma instalação real foi executada nesta revisão.
+Depois da instalação, o auxiliar consulta novamente o Windows Update pela identidade e revisão exatas e só trata o pacote como confirmado se a fonte o marcar como instalado. Se houver pedido de reinicialização e a consulta ainda não confirmar o registro, o resultado fica pendente e orienta a não repetir a instalação. Sem confirmação nem reinicialização pendente, exige revisão manual. A tela de instalação descreve esses estados e o histórico chama esse caso de verificação pendente, sem sugerir que o comando continue em execução. Isso valida o registro do pacote pelo provedor; não prova que o dispositivo esteja usando o driver ativo, o que ainda precisa ser verificado após reiniciar. Nesta revisão, a compilação Release passou sem avisos/erros e a aceitação Windows passou com 43 aprovados e 1 teste administrativo ignorado. Nenhuma instalação real foi executada.
 
 ## Instalador MSI por máquina
 
