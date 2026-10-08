@@ -9,7 +9,12 @@ $repository = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repository 'artifacts'
 }
-$destination = Join-Path $OutputRoot "zeus-$Runtime"
+$OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
+$sourceCommit = (git -C $repository rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') { throw 'Source commit could not be identified.' }
+$sourceDirty = @(git -C $repository status --porcelain).Count -gt 0
+$buildId = [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssfffZ') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$destination = Join-Path $OutputRoot "zeus-$Runtime-$($sourceCommit.Substring(0, 12))-$buildId"
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
 
 Push-Location $repository
@@ -20,15 +25,17 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Maintenance helper publication failed.' }
     Copy-Item README.md, SECURITY.md -Destination $destination
     Copy-Item docs/validacao-windows.md -Destination $destination
-    $sourceCommit = (git rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') { throw 'Source commit could not be identified.' }
-    $sourceDirty = @(git status --porcelain).Count -gt 0
     $files = @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Core.dll', 'Zeus.Windows.dll', 'Zeus.Cleanup.dll')
     $hashes = [ordered]@{}
     foreach ($file in $files) {
         $path = Join-Path $destination $file
         if (!(Test-Path $path -PathType Leaf)) { throw "Required package file missing: $file" }
         $hashes[$file] = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    $packageFiles = [ordered]@{}
+    foreach ($file in Get-ChildItem -LiteralPath $destination -File -Recurse | Sort-Object FullName) {
+        $relativePath = $file.FullName.Substring($destination.TrimEnd('\').Length + 1).Replace('\', '/')
+        $packageFiles[$relativePath] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     [ordered]@{
         sourceCommit = $sourceCommit
@@ -37,12 +44,37 @@ try {
         createdAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
         developmentBuild = $true
         sha256 = $hashes
+        packageFilesSha256 = $packageFiles
     } | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $destination 'build-info.json') -Encoding utf8
     $archive = Join-Path $OutputRoot "zeus-$Runtime.zip"
     Compress-Archive -Path (Join-Path $destination '*') -DestinationPath $archive -Force
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
+    try {
+        foreach ($entry in $zip.Entries) {
+            if ($entry.FullName -eq 'build-info.json' -or $entry.FullName.EndsWith('/')) { continue }
+            if (!$packageFiles.Contains($entry.FullName)) { throw "Unexpected file in package archive: $($entry.FullName)" }
+        }
+        foreach ($relativePath in $packageFiles.Keys) {
+            $entry = $zip.GetEntry($relativePath)
+            if ($null -eq $entry) { throw "Package archive is missing: $relativePath" }
+            $stream = $entry.Open()
+            $sha256 = [System.Security.Cryptography.SHA256]::Create()
+            try {
+                $actualHash = [BitConverter]::ToString($sha256.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+            } finally {
+                $sha256.Dispose()
+                $stream.Dispose()
+            }
+            if ($actualHash -ne $packageFiles[$relativePath]) { throw "Package archive hash mismatch: $relativePath" }
+        }
+    } finally {
+        $zip.Dispose()
+    }
     $archiveHash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
     "$archiveHash  $(Split-Path -Leaf $archive)" | Set-Content "$archive.sha256" -Encoding ascii
     Write-Output "Portable development build: $archive"
+    Write-Output "Unpacked files with provenance: $destination"
 } finally {
     Pop-Location
 }

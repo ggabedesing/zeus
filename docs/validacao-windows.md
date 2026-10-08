@@ -24,7 +24,7 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 | Auxiliar | Argumentos inválidos rejeitados antes de operação e armazenamento administrativo protegido |
 | Persistência SQLite | Migrações transacionais v1→v2→v3, integridade, sessões/etapas de manutenção e desempenho, amostras/referência, preferências, eventos, importação idempotente sem remover JSON de origem, backup verificado e restauração confirmada com cópia de segurança do banco ativo e recuperação automática em falha |
 | Interface | Aplicação WPF real com inventário, oito áreas e três temas capturados em PNG |
-| Publicação | Pacote autocontido com interface, auxiliar e dependências |
+| Publicação | Pacote autocontido com interface, auxiliar e dependências, proveniência por commit, manifesto SHA-256 por arquivo, conferência dos hashes dentro do ZIP e hash do arquivo final; assinatura Authenticode de produção continua pendente |
 
 O relatório de `.validation/status.json` relaciona o commit, execução do Actions, contagens de testes, resultados por etapa e capturas. `accepted=true` refere-se **somente a esta aceitação automatizada**. As limitações de hardware e operações não executadas também constam nesse relatório.
 
@@ -61,6 +61,8 @@ A política de amostragem adaptativa agora usa a maior carga percentual válida 
 Uma revisão adicional cobriu a taxa agregada de rede acima da velocidade nominal do enlace, possível quando o contador soma envio e recebimento em full-duplex. A taxa agora satura em 100% para fins de escolha do intervalo. Nesta revisão, os 81 testes de hardware passaram e a compilação Release passou sem avisos ou erros; fixture com tráfego acima da velocidade reportada confirma amostragem rápida. A frequência ainda precisa ser observada por período prolongado em hardware sob carga real.
 
 A comparação também resume a presença observada de processo de jogo conhecido, OBS e atividade `VideoEncode` associada ao PID do OBS em cada período, com coberturas separadas para contexto disponível e encoder conhecido. A leitura continua heurística: não prova partida ou transmissão ao vivo, e diferenças de contexto devem ser consideradas na interpretação. Nesta revisão, 79 testes de hardware passaram, a compilação Release terminou sem avisos ou erros e a aceitação WPF passou em 39 testes, com um teste administrativo ignorado. Os casos de contexto foram sintéticos; falta validar a apresentação durante uma tarefa real.
+
+O empacotador Windows agora publica cada pasta descompactada em diretório exclusivo com runtime, commit e identificador da execução, registra SHA-256 de cada arquivo e dos binários obrigatórios, reabre o ZIP, rejeita arquivos inesperados ou ausentes e recalcula os hashes de todas as entradas antes de gravar o checksum final. Duas publicações no mesmo diretório temporário foram verificadas; um arquivo-sentinela deixado na pasta da execução anterior não entrou no ZIP seguinte. Isso valida a embalagem de desenvolvimento `win-x64`, não substitui assinatura Authenticode nem valida instalação/atualização do produto.
 
 O resumo de comparação do Observador agora separa CPU/RAM, disco, memória GPU, rede, contexto e processos em linhas legíveis, mantendo as mesmas médias, coberturas e ressalvas. A compilação Release passou sem avisos ou erros e a aceitação WPF passou em 40 testes, com um teste administrativo ignorado. A comparação real continua sem captura para confirmar sua legibilidade com nomes e múltiplos dispositivos neste PC.
 
