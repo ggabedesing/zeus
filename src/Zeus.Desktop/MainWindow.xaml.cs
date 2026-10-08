@@ -3,10 +3,11 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Media;
 using Microsoft.Win32;
+using Zeus.Cleanup;
 using Zeus.Core;
 using Zeus.Windows;
 
@@ -15,26 +16,49 @@ namespace Zeus.Desktop;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly IHardwareDiagnostics _diagnostics = new WindowsHardwareDiagnostics();
-    private readonly IMaintenanceExecutor _executor = new ElevatedMaintenanceExecutor();
+    private readonly ElevatedMaintenanceExecutor _executor = new();
+    private readonly WindowsPerformanceProbe _performanceProbe = new();
+    private readonly WindowsUpdateService _windowsUpdate = new();
+    private readonly PendingMaintenanceSessions _pendingSessions = new();
+    private readonly UserOptimizationService _userOptimization;
+    private readonly TemporaryFileCleanup _cleanup;
+    private readonly bool _isFixture;
     private readonly OptimizationPlanner _planner = new();
-    private readonly DesktopStorage _storage = new();
+    private readonly DesktopStorage _storage;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly SemaphoreSlim _preferenceLock = new(1, 1);
     private readonly List<MaintenanceReport> _reports = [];
     private readonly List<string> _startupWarnings = [];
+    private CancellationTokenSource? _readCancellation;
     private HardwareSnapshot? _snapshot;
-    private bool _isBusy;
-    private bool _isExecuting;
-    private bool _isMinimal;
-    private bool _loaded;
-    private string _statusTitle = "Preparando diagnóstico";
-    private string _statusDetail = "Nenhuma alteração foi solicitada.";
-    private string _executionLog = "Nenhuma manutenção executada nesta sessão.";
-    private string _maintenanceResultSummary = string.Empty;
+    private PerformanceObservation? _performance;
+    private CleanupScan? _cleanupScan;
+    private bool _isBusy, _isExecuting, _loaded, _historyReadable = true;
+    private DesktopTheme _selectedTheme = DesktopTheme.Complete;
+    private UsageProfile _selectedProfile = UsageProfile.Balanced;
+    private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
+    private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
+    private PowerPlanInfo? _selectedPowerPlan;
+    private string _statusTitle = "Preparando diagnóstico", _statusDetail = "As informações serão lidas diretamente neste computador.";
+    private string _executionLog = "Nenhuma manutenção executada nesta sessão.", _maintenanceResultSummary = string.Empty;
+    private string _cleanupSummary = "Analise temporários com mais de sete dias. Nenhum arquivo será selecionado automaticamente.";
+    private string _startupSummary = "Leia os programas do seu usuário para escolher o que precisa iniciar com o Windows.";
+    private string _profileSummary = "O perfil orienta o plano. Ajustes do Windows são separados e reversíveis.";
+    private string _driverSummary = "Consulte os drivers oferecidos oficialmente pelo Windows Update para este computador.";
+    private string _performanceSummary = "Meça por cinco segundos durante a tarefa lenta para observar a carga real.";
 
-    public MainWindow()
+    public MainWindow() : this(null) { }
+
+    public MainWindow(string? storageRoot)
     {
+        _isFixture = storageRoot is not null;
+        _storage = new(storageRoot);
+        _userOptimization = new(storageRoot is null ? null : Path.Combine(storageRoot, "Changes"));
+        _cleanup = new(storageRoot is null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp") : Path.Combine(storageRoot, "Temporary"),
+            Path.Combine(storageRoot ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zeus"), "Cleanup"));
         InitializeComponent();
-        foreach (var definition in MaintenanceCatalog.All)
+        MaxWidth = SystemParameters.WorkArea.Width; MaxHeight = SystemParameters.WorkArea.Height;
+        foreach (var definition in MaintenanceCatalog.All.Where(d => d.Id is not MaintenanceActionId.InstallDriverUpdate and not MaintenanceActionId.DefenderOfflineScan))
         {
             var choice = new MaintenanceChoice(definition);
             choice.PropertyChanged += (_, _) => NotifyActionState();
@@ -44,46 +68,77 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         DataContext = this;
     }
 
+    public HardwareSnapshot? Snapshot => _snapshot;
+    public PerformanceObservation? Performance => _performance;
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
     public ObservableCollection<DeviceRow> GraphicsRows { get; } = [];
     public ObservableCollection<DeviceRow> DiskRows { get; } = [];
+    public ObservableCollection<DeviceRow> ExtendedHardwareRows { get; } = [];
+    public ObservableCollection<DeviceRow> ProcessRows { get; } = [];
     public ObservableCollection<DeviceRow> StartupRows { get; } = [];
     public ObservableCollection<string> Warnings { get; } = [];
     public ObservableCollection<MaintenanceChoice> MaintenanceChoices { get; } = [];
     public ObservableCollection<HistoryRow> HistoryRows { get; } = [];
+    public ObservableCollection<CleanupFileChoice> CleanupFiles { get; } = [];
+    public ObservableCollection<CleanupSessionRow> CleanupSessions { get; } = [];
+    public ObservableCollection<StartupChoice> StartupChoices { get; } = [];
+    public ObservableCollection<ChangeRow> UserChanges { get; } = [];
+    public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
+    public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
+    public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Uso equilibrado"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Battery, "Autonomia no notebook")];
+    public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS")];
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public bool CanRefresh => !_isBusy;
     public bool CanChooseActions => !_isBusy;
-    public bool CanExecute => !_isBusy && MaintenanceChoices.Any(choice => choice.IsSelected);
+    public bool CanExecute => !_isBusy && MaintenanceChoices.Any(c => c.IsSelected);
     public bool CanExport => !_isBusy && (_snapshot is not null || _reports.Count > 0);
+    public bool CanCancel => _isBusy && _readCancellation is not null;
+    public bool CanQuarantine => !_isBusy && _cleanupScan is not null && CleanupFiles.Any(f => f.IsSelected);
+    public bool CanDisableStartup => !_isBusy && StartupChoices.Any(f => f.IsSelected && f.CanSelect);
+    public bool CanSetPowerPlan => !_isBusy && SelectedPowerPlan is { IsActive: false };
+    public bool CanInstallDriver => !_isBusy && DriverCandidates.Any(d => d.IsSelected) && DriverCandidates.Where(d => d.IsSelected).All(d => d.LicenseReady);
+    public bool CanOfflineScan => !_isBusy && OfflineRestartConfirmed && OfflineRecoveryConfirmed;
     public string StatusTitle { get => _statusTitle; private set => Set(ref _statusTitle, value); }
     public string StatusDetail { get => _statusDetail; private set => Set(ref _statusDetail, value); }
     public string ExecutionLog { get => _executionLog; private set => Set(ref _executionLog, value); }
     public string MaintenanceResultSummary { get => _maintenanceResultSummary; private set => Set(ref _maintenanceResultSummary, value); }
+    public string CleanupSummary { get => _cleanupSummary; private set => Set(ref _cleanupSummary, value); }
+    public string StartupSummary { get => _startupSummary; private set => Set(ref _startupSummary, value); }
+    public string ProfileSummary { get => _profileSummary; private set => Set(ref _profileSummary, value); }
+    public string DriverSummary { get => _driverSummary; private set => Set(ref _driverSummary, value); }
+    public string PerformanceSummary { get => _performanceSummary; private set => Set(ref _performanceSummary, value); }
     public string CollectionDate => _snapshot is null ? "Leitura pendente" : _snapshot.CollectedAt.ToLocalTime().ToString("dd/MM HH:mm:ss");
-    public string SystemDescription => _snapshot is null ? "Os componentes serão consultados diretamente no Windows." : $"{_snapshot.ComputerName} · {_snapshot.OperatingSystem}";
-    public string RecommendationEmptyText => _snapshot is null ? "As recomendações aparecem depois do diagnóstico." : Recommendations.Count == 0 ? "Nenhuma recomendação pelos critérios desta leitura. Isso não substitui testes durante a tarefa que apresenta lentidão." : string.Empty;
-    public string DevicesEmptyText => _snapshot is null ? "Atualize o diagnóstico para carregar o inventário." : "Leitura local do Windows. Campos ausentes são apresentados como indisponíveis.";
-    public string StartupEmptyText => _snapshot is null ? "Inventário ainda não carregado." : StartupRows.Count == 0 ? "Nenhuma entrada foi retornada; confira os avisos do diagnóstico." : string.Empty;
-    public string HistoryEmptyText => !_historyReadable
-        ? "O histórico anterior não pôde ser lido e foi preservado. Exporte o relatório para guardar novas sessões."
-        : HistoryRows.Count == 0 ? "Ainda não há relatórios de manutenção salvos neste usuário." : string.Empty;
-    public string SelectedActionsText => $"{MaintenanceChoices.Count(choice => choice.IsSelected)} ação(ões) selecionada(s)";
+    public string SystemDescription => _snapshot is null ? "Inventário local do Windows" : $"{_snapshot.ComputerName} · {_snapshot.OperatingSystem}";
+    public string RecommendationEmptyText => _snapshot is null ? "As recomendações aparecem depois do diagnóstico." : Recommendations.Count == 0 ? "Nenhum alerta pelos critérios desta leitura. Meça a tarefa lenta para investigar." : string.Empty;
+    public string DevicesEmptyText => _snapshot is null ? "Inventário ainda não carregado." : "Leituras fornecidas pelo Windows. Sensores ausentes permanecem indisponíveis.";
+    public string StartupEmptyText => StartupChoices.Count == 0 ? "Nenhuma entrada editável foi carregada. Atualize a lista e consulte o resultado." : string.Empty;
+    public string HistoryEmptyText => !_historyReadable ? "O histórico anterior foi preservado porque não pôde ser lido. Exporte os novos resultados." : HistoryRows.Count == 0 ? "Ainda não há sessões de manutenção neste usuário." : string.Empty;
+    public string SelectedActionsText => $"{MaintenanceChoices.Count(c => c.IsSelected)} ação(ões) selecionada(s)";
+    public string CleanupSelectedText => $"{CleanupFiles.Count(f => f.IsSelected)} arquivo(s) · {ByteFormatting.Format(CleanupFiles.Where(f => f.IsSelected).Aggregate(0UL, (sum, f) => sum + f.SizeBytes))} selecionados";
     public Visibility DetailedVisibility => IsMinimal ? Visibility.Collapsed : Visibility.Visible;
-    public string LayoutDescription => IsMinimal ? "Layout mínimo" : "Layout completo";
-    public bool IsMinimal
+    public string LayoutDescription => ThemeOptions.First(t => t.Value == SelectedTheme).Name;
+    public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
+    public DesktopTheme SelectedTheme
     {
-        get => _isMinimal;
+        get => _selectedTheme;
         set
         {
-            if (!Set(ref _isMinimal, value)) return;
-            Notify(nameof(DetailedVisibility));
-            Notify(nameof(LayoutDescription));
-            if (_loaded) _ = SavePreferencesAsync();
+            if (!Enum.IsDefined(value) || !Set(ref _selectedTheme, value)) return;
+            ApplyTheme(); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); QueuePreferencesSave();
         }
     }
+    public UsageProfile SelectedProfile { get => _selectedProfile; set { if (Enum.IsDefined(value) && Set(ref _selectedProfile, value)) ProfileChanged(); } }
+    public bool ReduceAnimations { get => _reduceAnimations; set { if (Set(ref _reduceAnimations, value)) ProfileChanged(); } }
+    public bool ReduceTransparency { get => _reduceTransparency; set { if (Set(ref _reduceTransparency, value)) ProfileChanged(); } }
+    public bool NeedsBluetooth { get => _needsBluetooth; set { if (Set(ref _needsBluetooth, value)) ProfileChanged(); } }
+    public bool NeedsPrinting { get => _needsPrinting; set { if (Set(ref _needsPrinting, value)) ProfileChanged(); } }
+    public bool NeedsCloudSync { get => _needsCloudSync; set { if (Set(ref _needsCloudSync, value)) ProfileChanged(); } }
+    public bool NeedsVirtualization { get => _needsVirtualization; set { if (Set(ref _needsVirtualization, value)) ProfileChanged(); } }
+    public bool OfflineRestartConfirmed { get => _offlineRestartConfirmed; set { if (Set(ref _offlineRestartConfirmed, value)) Notify(nameof(CanOfflineScan)); } }
+    public bool OfflineRecoveryConfirmed { get => _offlineRecoveryConfirmed; set { if (Set(ref _offlineRecoveryConfirmed, value)) Notify(nameof(CanOfflineScan)); } }
+    public PowerPlanInfo? SelectedPowerPlan { get => _selectedPowerPlan; set { if (Set(ref _selectedPowerPlan, value)) Notify(nameof(CanSetPowerPlan)); } }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
@@ -91,55 +146,34 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SetBusy(true);
         try
         {
-            try { IsMinimal = (await _storage.ReadPreferencesAsync()).IsMinimal; }
-            catch (Exception error) when (IsStorageError(error))
-            {
-                _startupWarnings.Add("O layout salvo não pôde ser carregado. O layout completo será usado.");
-            }
             try
             {
-                _reports.AddRange(await _storage.ReadHistoryAsync());
-                RebuildHistory();
+                var p = await _storage.ReadPreferencesAsync();
+                SelectedTheme = p.IsMinimal ? DesktopTheme.Minimal : p.Theme;
+                SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency;
+                NeedsBluetooth = p.NeedsBluetooth; NeedsPrinting = p.NeedsPrinting; NeedsCloudSync = p.NeedsCloudSync; NeedsVirtualization = p.NeedsVirtualization;
             }
-            catch (Exception error) when (IsStorageError(error))
-            {
-                _startupWarnings.Add("O histórico local não pôde ser lido. Ele não será sobrescrito durante esta sessão sem uma nova exportação.");
-                _historyReadable = false;
-                Notify(nameof(HistoryEmptyText));
-            }
-            foreach (var warning in _startupWarnings) Warnings.Add(warning);
+            catch (Exception error) when (IsStorageError(error)) { _startupWarnings.Add("As preferências salvas não puderam ser lidas; os valores padrão serão usados."); }
+            try { _reports.AddRange(await _storage.ReadHistoryAsync()); RebuildHistory(); }
+            catch (Exception error) when (IsStorageError(error)) { _historyReadable = false; _startupWarnings.Add("O histórico não pôde ser lido e foi preservado. Exporte as novas sessões."); }
+            await LoadLocalSessionsAsync();
+            ApplyTheme();
             _loaded = true;
         }
         finally { SetBusy(false); }
         await RefreshDiagnosticsAsync();
     }
 
-    private bool _historyReadable = true;
-
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshDiagnosticsAsync();
-
     private async Task RefreshDiagnosticsAsync()
     {
-        if (_isBusy) return;
-        SetBusy(true);
-        StatusTitle = "Consultando o computador";
-        StatusDetail = "Lendo componentes, volumes, inicialização e estado do Defender. Nenhuma configuração é alterada.";
-        try
+        await RunOperationAsync("Consultando o computador", "Lendo componentes e proteção do Windows.", async token =>
         {
-            var snapshot = await _diagnostics.CollectAsync(_lifetime.Token);
-            _snapshot = snapshot;
-            DisplaySnapshot(snapshot);
+            _snapshot = await _diagnostics.CollectAsync(token);
+            DisplaySnapshot(_snapshot);
             StatusTitle = "Diagnóstico concluído";
-            StatusDetail = snapshot.Warnings.Count == 0 ? "Inventário atualizado. Revise as recomendações e escolha as ações desejadas." : "Inventário atualizado com leituras limitadas. Consulte as recomendações e os avisos.";
-        }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
-        catch (Exception error)
-        {
-            StatusTitle = "Não foi possível concluir o diagnóstico";
-            StatusDetail = $"{error.Message} Você pode tentar novamente em Atualizar diagnóstico.";
-            if (_snapshot is not null) StatusDetail += " Os dados exibidos pertencem à leitura anterior.";
-        }
-        finally { SetBusy(false); }
+            StatusDetail = _snapshot.Warnings.Count == 0 ? "Inventário atualizado. Complete seu perfil e revise o plano individual." : "Inventário atualizado com leituras limitadas. Consulte os avisos abaixo.";
+        }, cancellable: true);
     }
 
     private void DisplaySnapshot(HardwareSnapshot snapshot)
@@ -148,213 +182,109 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var cpu = snapshot.Cpu;
         HardwareCards.Add(new("Processador", cpu?.Name ?? "Indisponível", cpu is null ? "O Windows não retornou esta leitura." : $"{cpu.PhysicalCores} núcleos · {cpu.LogicalProcessors} processadores lógicos"));
         var memory = snapshot.Memory;
-        HardwareCards.Add(new("Memória RAM", memory is null ? "Indisponível" : ByteFormatting.Format(memory.TotalBytes), memory is null ? "O Windows não retornou esta leitura." : $"{ByteFormatting.Format(memory.AvailableBytes)} disponíveis neste instante"));
+        HardwareCards.Add(new("Memória RAM", memory is null ? "Indisponível" : ByteFormatting.Format(memory.TotalBytes), memory is null ? "Leitura indisponível." : $"{ByteFormatting.Format(memory.AvailableBytes)} disponíveis nesta leitura"));
         var gpu = snapshot.Graphics.FirstOrDefault();
-        HardwareCards.Add(new("Placas de vídeo", gpu?.Name ?? "Indisponível", gpu is null ? "Nenhuma placa retornada nesta coleta." : $"{snapshot.Graphics.Count} dispositivo(s) · Driver {Available(gpu.DriverVersion)}"));
-        HardwareCards.Add(new("Armazenamento", $"{snapshot.Disks.Count} volume(s)", snapshot.Disks.Count == 0 ? "Nenhum volume retornado nesta coleta." : "Capacidade e espaço livre em Dispositivos."));
-        var security = snapshot.Security;
-        HardwareCards.Add(new("Microsoft Defender", BooleanStatus(security?.DefenderEnabled), security?.Summary ?? "Consulte o provedor em Segurança do Windows."));
-        HardwareCards.Add(new("Inicialização", $"{snapshot.Startup.Count} entrada(s)", "Registros encontrados; a quantidade não mede o impacto."));
+        HardwareCards.Add(new("Placas de vídeo", gpu?.Name ?? "Indisponível", gpu is null ? "Nenhum dispositivo retornado." : $"{snapshot.Graphics.Count} dispositivo(s) · Driver {Available(gpu.DriverVersion)}"));
+        HardwareCards.Add(new("Armazenamento", $"{snapshot.Disks.Count} volume(s)", "Espaço livre e dispositivos físicos em Hardware."));
+        HardwareCards.Add(new("Microsoft Defender", BooleanStatus(snapshot.Security?.DefenderEnabled), snapshot.Security?.Summary ?? "Consulte Segurança do Windows."));
+        HardwareCards.Add(new("Placa-mãe", snapshot.Board?.Product ?? "Indisponível", snapshot.Board?.Manufacturer ?? "A placa não foi identificada nesta coleta."));
+        GraphicsRows.Clear(); foreach (var item in snapshot.Graphics) GraphicsRows.Add(new(Available(item.Name), $"Driver {Available(item.DriverVersion)}"));
+        DiskRows.Clear(); foreach (var disk in snapshot.Disks) DiskRows.Add(new($"{disk.DriveLetter} · {Available(disk.Name)}", $"{ByteFormatting.Format(disk.FreeBytes)} livres de {ByteFormatting.Format(disk.TotalBytes)} · {Available(disk.FileSystem)}"));
+        StartupRows.Clear(); foreach (var entry in snapshot.Startup) StartupRows.Add(new(Available(entry.Name), $"Origem: {Available(entry.Location)} · Usuário: {Available(entry.User)}"));
+        ExtendedHardwareRows.Clear();
+        if (snapshot.Board is { } board) ExtendedHardwareRows.Add(new("Placa-mãe", $"{Available(board.Manufacturer)} · {Available(board.Product)}"));
+        if (snapshot.Bios is { } bios) ExtendedHardwareRows.Add(new("BIOS / UEFI", $"{Available(bios.Manufacturer)} · {Available(bios.Version)} · {Available(bios.ReleaseDate)}"));
+        foreach (var module in snapshot.MemoryModules ?? []) ExtendedHardwareRows.Add(new($"RAM · {Available(module.Location)}", $"{ByteFormatting.Format(module.CapacityBytes)} · {module.SpeedMHz?.ToString() ?? "Indisponível"} MHz · {Available(module.Manufacturer)}"));
+        foreach (var disk in snapshot.PhysicalDisks ?? []) ExtendedHardwareRows.Add(new(Available(disk.Name), $"{disk.MediaType} · {disk.BusType} · {ByteFormatting.Format(disk.SizeBytes)} · Estado informado: {Available(disk.HealthStatus)}\nTemperatura: {(disk.TemperatureCelsius.HasValue ? $"{disk.TemperatureCelsius.Value:0.#} °C" : "indisponível")} · Desgaste informado: {disk.Wear?.ToString() ?? "indisponível"}"));
+        foreach (var battery in snapshot.Batteries ?? []) ExtendedHardwareRows.Add(new(Available(battery.Name), $"Carga: {battery.ChargePercent?.ToString() ?? "indisponível"}% · {Available(battery.Status)}"));
+        foreach (var network in snapshot.NetworkAdapters ?? []) ExtendedHardwareRows.Add(new(Available(network.Name), $"{Available(network.Status)} · Velocidade de enlace: {(network.SpeedBitsPerSecond.HasValue ? $"{network.SpeedBitsPerSecond.Value / 1_000_000d:0.#} Mbps" : "indisponível")}"));
+        Warnings.Clear(); foreach (var warning in _startupWarnings.Concat(snapshot.Warnings)) Warnings.Add(warning);
+        BuildPersonalPlan();
+        foreach (var property in new[] { nameof(Snapshot), nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(DevicesEmptyText), nameof(CanExport) }) Notify(property);
+    }
+
+    private void BuildPersonalPlan()
+    {
         Recommendations.Clear();
-        foreach (var recommendation in _planner.Build(snapshot))
-            Recommendations.Add(new(recommendation.Title, recommendation.Reason,
-                recommendation.Action is { } action ? $"Disponível em Manutenção: {MaintenanceCatalog.Get(action).Title}" : string.Empty));
-        GraphicsRows.Clear();
-        foreach (var item in snapshot.Graphics)
-            GraphicsRows.Add(new(Available(item.Name), $"Driver informado pelo Windows: {Available(item.DriverVersion)}"));
-        DiskRows.Clear();
-        foreach (var disk in snapshot.Disks)
-            DiskRows.Add(new($"{disk.DriveLetter} · {Available(disk.Name)}", $"{ByteFormatting.Format(disk.FreeBytes)} livres de {ByteFormatting.Format(disk.TotalBytes)} · {Available(disk.FileSystem)}"));
-        StartupRows.Clear();
-        foreach (var entry in snapshot.Startup)
-            StartupRows.Add(new(Available(entry.Name), $"Origem: {Available(entry.Location)} · Usuário: {Available(entry.User)}"));
-        Warnings.Clear();
-        foreach (var warning in _startupWarnings.Concat(snapshot.Warnings)) Warnings.Add(warning);
-        foreach (var property in new[] { nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(DevicesEmptyText), nameof(StartupEmptyText), nameof(CanExport) }) Notify(property);
+        if (_snapshot is null) return;
+        foreach (var r in _planner.Build(_snapshot)) Recommendations.Add(new(r.Title, r.Reason, r.Action is { } a ? $"Revisar em Manutenção: {MaintenanceCatalog.Get(a).Title}" : ""));
+        var profile = SelectedProfile switch
+        {
+            UsageProfile.Gaming => ("Durante seus jogos", "Meça com o jogo aberto. Compare uso de CPU e RAM; quedas de FPS também podem depender da GPU, temperatura e configurações do jogo. Atualize drivers apenas quando houver compatibilidade e indicação."),
+            UsageProfile.Work => ("Durante o trabalho", "Meça com seus aplicativos e abas habituais. Revise inicialização preservando ferramentas de comunicação, segurança e sincronização necessárias."),
+            UsageProfile.Creative => ("Durante edição e criação", "Meça durante a tarefa de edição ou exportação. Preserve backups e espaço de trabalho; confirme memória e armazenamento exigidos pelo seu editor antes de comprar componentes."),
+            UsageProfile.Battery => ("Priorize autonomia", "Revise o plano de energia disponível em Perfil. Reduzir efeitos visuais pode ajudar a interface; autonomia também depende de brilho, aplicativos e condição da bateria."),
+            _ => ("Comece pela tarefa lenta", "Meça durante o uso que apresenta lentidão. Revise temporários e inicialização antes de escolher reparos ou alterações de energia.")
+        };
+        Recommendations.Add(new(profile.Item1, profile.Item2, "Perfil e medição de carga disponíveis neste aplicativo"));
+        if (ReduceAnimations || ReduceTransparency) Recommendations.Add(new("Preferências visuais escolhidas", $"Você escolheu {(ReduceAnimations ? "reduzir animações" : "preservar animações")} e {(ReduceTransparency ? "reduzir transparência" : "preservar transparência")}. Aplique em Perfil; o estado anterior será registrado.", "Aplicar preferências visuais"));
+        var required = new List<string>(); if (NeedsBluetooth) required.Add("Bluetooth"); if (NeedsPrinting) required.Add("impressão"); if (NeedsCloudSync) required.Add("sincronização"); if (NeedsVirtualization) required.Add("virtualização");
+        Recommendations.Add(new("Recursos necessários ao seu uso", required.Count > 0 ? $"Seu plano preserva {string.Join(", ", required)}. Revise programas relacionados antes de desativar sua inicialização." : "Você não marcou dependências adicionais. As alterações continuam seletivas; nenhum serviço é desativado automaticamente.", "Revise cada entrada em Inicialização"));
+        if (_performance is { } sample && sample.CpuPercent >= 85) Recommendations.Add(new("CPU muito ocupada nesta amostra", $"Uso observado de {sample.CpuPercent:0.#}% durante {sample.SamplingDuration.TotalSeconds:0.#} segundos. Consulte os processos em Hardware e repita durante a tarefa; uma amostra isolada não comprova um gargalo.", "Medição real de carga"));
+        Notify(nameof(RecommendationEmptyText));
     }
 
     private void ShowPendingHardware()
     {
-        foreach (var title in new[] { "Processador", "Memória RAM", "Placas de vídeo", "Armazenamento", "Microsoft Defender", "Inicialização" })
-            HardwareCards.Add(new(title, "Aguardando leitura", "Nenhum valor estimado."));
+        foreach (var title in new[] { "Processador", "Memória RAM", "Placas de vídeo", "Armazenamento", "Microsoft Defender", "Placa-mãe" }) HardwareCards.Add(new(title, "Aguardando leitura", "Dados locais do Windows"));
     }
-
-    private void OpenMaintenance_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 1;
-
-    private async void Execute_Click(object sender, RoutedEventArgs e)
-    {
-        if (!CanExecute) return;
-        var selected = MaintenancePolicy.ValidateAndOrder(MaintenanceChoices.Where(choice => choice.IsSelected).Select(choice => choice.Id));
-        var definitions = selected.Select(MaintenanceCatalog.Get).ToArray();
-        var confirmation = new StringBuilder("O ZEUS executará somente estas ações, nesta ordem:\n\n");
-        foreach (var definition in definitions) confirmation.AppendLine($"• {definition.Title}");
-        confirmation.Append("\nO Windows solicitará autorização de administrador. Aguarde a conclusão e mantenha o computador conectado à energia.\n\n");
-        if (selected.Contains(MaintenanceActionId.DefenderQuickScan))
-            confirmation.Append("A verificação do Defender segue as políticas de remediação de ameaças configuradas no Windows.\n\n");
-        if (definitions.Any(definition => definition.RequiresRestorePoint))
-            confirmation.Append("O auxiliar tentará criar e confirmar um ponto de restauração. Se não conseguir, os reparos serão bloqueados. O ponto de restauração não recupera documentos apagados. Reparos podem exigir reinicialização.\n\n");
-        else confirmation.Append("Estas ações verificam o sistema; concluir uma verificação não comprova que todos os problemas foram resolvidos.\n\n");
-        confirmation.Append("Deseja executar este plano?");
-        if (MessageBox.Show(this, confirmation.ToString(), "Revisar plano de manutenção", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-
-        _isExecuting = true;
-        SetBusy(true);
-        ExecutionLog = string.Empty;
-        MaintenanceResultSummary = string.Empty;
-        StatusTitle = "Manutenção solicitada";
-        StatusDetail = "Aguarde a autorização e a conclusão do auxiliar. O aplicativo não interromperá reparos em execução.";
-        try
-        {
-            var progress = new Progress<string>(message => AppendLog(message));
-            var report = await _executor.ExecuteAsync(selected, progress);
-            foreach (var step in report.Steps) AppendLog($"{MaintenanceCatalog.Get(step.Action).Title}: {step.Message}");
-            _reports.Insert(0, report);
-            RebuildHistory();
-            MaintenanceResultSummary = BuildResultSummary(report, definitions);
-            StatusTitle = report.Error is null && ReportCoversPlan(report, definitions) && report.Steps.All(step => step.Outcome == StepOutcome.Succeeded)
-                ? "Sessão concluída" : "Sessão encerrada com avisos";
-            StatusDetail = MaintenanceResultSummary + " Atualize o diagnóstico para obter uma nova leitura do computador.";
-            try
-            {
-                if (_historyReadable) await _storage.SaveHistoryAsync(_reports);
-                else AppendLog("Histórico anterior preservado por erro de leitura. Exporte o relatório para guardar esta sessão.");
-            }
-            catch (Exception error) when (IsStorageError(error))
-            {
-                AppendLog($"O resultado está disponível, mas não pôde ser salvo no histórico: {error.Message}");
-                StatusDetail += " Exporte o relatório para guardar esta sessão.";
-            }
-        }
-        catch (Exception error)
-        {
-            AppendLog($"Não foi possível obter o resultado: {error.Message}");
-            MaintenanceResultSummary = "A execução não foi confirmada. Consulte o registro; nenhum reparo será apresentado como concluído sem relatório.";
-            StatusTitle = "Falha ao obter o resultado";
-            StatusDetail = MaintenanceResultSummary;
-        }
-        finally
-        {
-            _isExecuting = false;
-            foreach (var choice in MaintenanceChoices) choice.IsSelected = false;
-            SetBusy(false);
-        }
-    }
-
-    private static string BuildResultSummary(MaintenanceReport report, IReadOnlyList<MaintenanceActionDefinition> definitions)
-    {
-        if (!string.IsNullOrWhiteSpace(report.Error)) return report.Error;
-        if (report.Steps.Count == 0) return "Nenhum resultado de ação foi recebido.";
-        if (!ReportCoversPlan(report, definitions)) return "O relatório não confirma todas as ações selecionadas. Consulte cada resultado recebido; não foi confirmada conclusão do plano completo.";
-        if (report.Steps.Any(step => step.Outcome != StepOutcome.Succeeded))
-            return "Consulte cada etapa no histórico: houve falha, cancelamento ou ação não executada. Nenhum ganho de desempenho foi medido.";
-        return definitions.Any(definition => definition.RequiresRestorePoint)
-            ? "Os comandos de reparo terminaram. Consulte os resultados e logs para saber o que foi identificado e corrigido; reinicie se o Windows solicitar."
-            : "As verificações terminaram. Consulte seus resultados e logs; esta sessão não solicitou reparos do Windows.";
-    }
-
-    private static bool ReportCoversPlan(MaintenanceReport report, IReadOnlyList<MaintenanceActionDefinition> definitions) =>
-        report.Steps.Count == definitions.Count &&
-        definitions.All(definition => report.Steps.Count(step => step.Action == definition.Id) == 1);
-
-    private async void Export_Click(object sender, RoutedEventArgs e)
-    {
-        if (!CanExport) return;
-        var dialog = new SaveFileDialog
-        {
-            Title = "Exportar diagnóstico e histórico do ZEUS",
-            Filter = "Relatório JSON (*.json)|*.json",
-            FileName = $"zeus-relatorio-{DateTime.Now:yyyyMMdd-HHmmss}.json",
-            DefaultExt = ".json",
-            AddExtension = true,
-            OverwritePrompt = true
-        };
-        if (dialog.ShowDialog(this) != true) return;
-        SetBusy(true);
-        try
-        {
-            await DesktopStorage.ExportAsync(dialog.FileName, _snapshot, _reports);
-            MessageBox.Show(this, "Relatório exportado. Ele contém o nome do computador, inventário, nomes de usuários da inicialização e resultados de manutenção. Revise essas informações antes de compartilhar.", "Exportação concluída", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        catch (Exception error) when (IsStorageError(error))
-        {
-            MessageBox.Show(this, $"O relatório não pôde ser exportado: {error.Message}\nEscolha outro destino e tente novamente.", "Exportação não concluída", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-        finally { SetBusy(false); }
-    }
-
+    private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
+    private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization);
+    private void QueuePreferencesSave() { if (_loaded) _ = SavePreferencesAsync(); }
     private async Task SavePreferencesAsync()
     {
-        try { await _storage.SavePreferencesAsync(IsMinimal); }
-        catch (Exception error) when (IsStorageError(error))
-        {
-            StatusDetail = "O layout mudou nesta sessão, mas a preferência não pôde ser salva.";
-        }
+        await _preferenceLock.WaitAsync();
+        try { await _storage.SavePreferencesAsync(CurrentPreferences()); }
+        catch (Exception error) when (IsStorageError(error)) { StatusDetail = $"As preferências desta sessão não foram salvas: {error.Message}"; }
+        finally { _preferenceLock.Release(); }
     }
 
-    private void OpenLogs_Click(object sender, RoutedEventArgs e)
+    private void ApplyTheme()
     {
-        if (sender is not System.Windows.Controls.Button { Tag: Guid sessionId }) return;
-        try
-        {
-            // Resolve only the protected, validated session directory; never open
-            // a path supplied by the user-editable desktop history or a step log.
-            var directory = SessionStore.GetSessionDirectory(sessionId);
-            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or Win32Exception or ArgumentException)
-        {
-            MessageBox.Show(this, $"A pasta de logs desta sessão não pôde ser aberta: {error.Message}", "Logs indisponíveis", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
+        if (SystemParameters.HighContrast) return;
+        var colors = SelectedTheme == DesktopTheme.MacInspired
+            ? new[] { "#151625", "#202235", "#3C3E58", "#F5F4FC", "#CBCBDF", "#C5B4FF", "#303248", "#37304F", "#0D0D18" }
+            : SelectedTheme == DesktopTheme.Minimal
+                ? new[] { "#101216", "#191D22", "#3B424A", "#F5F7FA", "#BEC6D1", "#BFE7D7", "#282F37", "#293C35", "#0D1013" }
+                : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
+        var keys = new[] { "BackgroundBrush", "PanelBrush", "BorderBrush", "TextBrush", "MutedBrush", "AccentBrush", "ButtonBrush", "SelectedTabBrush", "LogBackgroundBrush" };
+        for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[i]));
+        Application.Current.Resources["PrimaryButtonBrush"] = Application.Current.Resources["AccentBrush"];
+        Application.Current.Resources["SelectedTabTextBrush"] = Application.Current.Resources["AccentBrush"];
+        Application.Current.Resources["ButtonTextBrush"] = Application.Current.Resources["TextBrush"];
     }
 
-    private void RebuildHistory()
+    private async Task RunOperationAsync(string title, string detail, Func<CancellationToken, Task> operation, bool cancellable = false, bool mutation = false)
     {
-        HistoryRows.Clear();
-        foreach (var report in _reports) HistoryRows.Add(HistoryRow.From(report));
-        Notify(nameof(HistoryEmptyText));
-        Notify(nameof(CanExport));
+        if (_isBusy) return;
+        _isExecuting = mutation;
+        if (cancellable) _readCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        SetBusy(true); StatusTitle = title; StatusDetail = detail;
+        try { await operation(_readCancellation?.Token ?? _lifetime.Token); }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested || _readCancellation?.IsCancellationRequested == true) { StatusTitle = "Leitura cancelada"; StatusDetail = "Os últimos dados disponíveis foram preservados."; }
+        catch (Exception error) { StatusTitle = "Operação não concluída"; StatusDetail = error.Message; AppendLog($"{title}: {error.Message}"); }
+        finally { _readCancellation?.Dispose(); _readCancellation = null; _isExecuting = false; SetBusy(false); }
     }
-
+    private void Cancel_Click(object sender, RoutedEventArgs e) => _readCancellation?.Cancel();
+    private void OpenMaintenance_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 1;
+    private void OpenProfile_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 4;
+    private void RebuildHistory() { HistoryRows.Clear(); foreach (var report in _reports) HistoryRows.Add(HistoryRow.From(report)); Notify(nameof(HistoryEmptyText)); Notify(nameof(CanExport)); }
     private void AppendLog(string message) => ExecutionLog += $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
-
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (_isExecuting)
-        {
-            e.Cancel = true;
-            MessageBox.Show(this, "A manutenção ainda está em execução. Aguarde o relatório antes de fechar. O ZEUS não encerrará o auxiliar nem interromperá comandos de reparo.", "Manutenção em execução", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        if (_isExecuting) { e.Cancel = true; MessageBox.Show(this, "Uma alteração está em andamento. Aguarde o resultado antes de fechar o ZEUS.", "Aguarde a conclusão", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         _lifetime.Cancel();
     }
-
     private void SetBusy(bool busy)
     {
         _isBusy = busy;
-        Notify(nameof(CanRefresh));
-        Notify(nameof(CanChooseActions));
-        Notify(nameof(CanExport));
+        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan) }) Notify(p);
         NotifyActionState();
     }
-
-    private void NotifyActionState()
-    {
-        Notify(nameof(CanExecute));
-        Notify(nameof(SelectedActionsText));
-    }
-
+    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); }
     private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException;
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "Indisponível" : value;
     private static string BooleanStatus(bool? value) => value switch { true => "Ativo", false => "Desativado", null => "Indisponível" };
-
-    private bool Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        field = value;
-        Notify(propertyName);
-        return true;
-    }
-
-    private void Notify([CallerMemberName] string? propertyName = null) =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; Notify(name); return true; }
+    private void Notify([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
 }

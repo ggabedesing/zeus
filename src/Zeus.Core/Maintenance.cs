@@ -8,7 +8,12 @@ public enum MaintenanceActionId
     RepairWindowsImage,
     VerifySystemFiles,
     RepairSystemFiles,
-    AnalyzeSystemDrive
+    AnalyzeSystemDrive,
+    UpdateDefenderSignatures,
+    DefenderFullScan,
+    DefenderOfflineScan,
+    OptimizeSystemDrive,
+    InstallDriverUpdate
 }
 
 public enum StepOutcome
@@ -23,7 +28,8 @@ public sealed record MaintenanceStepResult(
     MaintenanceActionId Action,
     StepOutcome Outcome,
     string Message,
-    string? LogFile = null);
+    string? LogFile = null,
+    string? TargetId = null);
 
 public sealed record MaintenanceReport(
     Guid SessionId,
@@ -31,7 +37,8 @@ public sealed record MaintenanceReport(
     DateTimeOffset FinishedAt,
     bool RestorePointConfirmed,
     IReadOnlyList<MaintenanceStepResult> Steps,
-    string? Error = null);
+    string? Error = null,
+    bool IsComplete = true);
 
 public interface IMaintenanceExecutor
 {
@@ -51,3 +58,17 @@ public sealed record MaintenanceActionDefinition(
     string Description,
     bool RequiresRestorePoint,
     bool MayRequireRestart);
+
+/// <summary>A typed request; only a Windows Update identity may be supplied as a target.</summary>
+public sealed record MaintenanceRequest(
+    MaintenanceActionId Action,
+    string? TargetId = null,
+    bool EulaAccepted = false);
+
+public interface IAdvancedMaintenanceExecutor
+{
+    Task<MaintenanceReport> ExecuteRequestsAsync(
+        IReadOnlyCollection<MaintenanceRequest> requests,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default);
+}

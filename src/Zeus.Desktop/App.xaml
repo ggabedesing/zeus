@@ -84,13 +84,16 @@
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="0,22,0,0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value><ControlTemplate TargetType="TabControl"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="0,0,14,0"><TabPanel IsItemsHost="True" KeyboardNavigation.TabIndex="1"/></Border><ContentPresenter Grid.Column="1" ContentSource="SelectedContent"/></Grid></ControlTemplate></Setter.Value>
+            </Setter>
         </Style>
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Padding" Value="19,12" />
-            <Setter Property="Margin" Value="0,0,9,0" />
+            <Setter Property="Padding" Value="15,13" />
+            <Setter Property="Margin" Value="0,0,0,8" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -106,6 +109,9 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource LogBackgroundBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Padding" Value="12"/></Style>
+        <Style TargetType="ComboBox"><Setter Property="Padding" Value="10,8"/><Setter Property="Foreground" Value="#142136"/><Setter Property="Background" Value="#EDF1F7"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+        <Style TargetType="ListBox"><Setter Property="Background" Value="{DynamicResource PanelBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
         <Style TargetType="ScrollViewer"><Setter Property="VerticalScrollBarVisibility" Value="Auto" /><Setter Property="HorizontalScrollBarVisibility" Value="Disabled" /></Style>
     </Application.Resources>
 </Application>

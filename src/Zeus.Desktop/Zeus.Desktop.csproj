@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Zeus.Core/Zeus.Core.csproj" />
+    <ProjectReference Include="../Zeus.Cleanup/Zeus.Cleanup.csproj" />
     <ProjectReference Include="../Zeus.Windows/Zeus.Windows.csproj" />
     <ProjectReference Include="../Zeus.Maintenance/Zeus.Maintenance.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>

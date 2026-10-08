@@ -9,7 +9,7 @@ internal static class Program
     private static async Task<int> Main(string[] arguments)
     {
         if (!OperatingSystem.IsWindows()) return 2;
-        if (!TryReadArguments(arguments, out var sessionId, out var actions)) return 2;
+        if (!MaintenanceRequestProtocol.TryReadArguments(arguments, out var sessionId, out var requests)) return 2;
         using var identity = WindowsIdentity.GetCurrent();
         if (!new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator)) return 3;
 
@@ -23,7 +23,7 @@ internal static class Program
             SessionStore.CreateSession(sessionId);
             sessionCreated = true;
             using var maintenanceLock = SessionStore.AcquireMaintenanceLock(sessionId);
-            if (MaintenancePolicy.RequiresRestorePoint(actions))
+            if (MaintenancePolicy.RequiresRestorePoint(requests.Select(request => request.Action).Distinct()))
             {
                 var restore = await CommandRunner.CreateRestorePointAsync(sessionId);
                 restoreConfirmed = restore.ExitCode == 0 && restore.LogError is null &&
@@ -34,33 +34,45 @@ internal static class Program
                         : "Não foi possível confirmar um novo ponto de restauração. Reparos foram bloqueados; consulte restore-point.log. Proteção desativada ou o limite de 24 horas podem impedir a criação.";
             }
 
-            foreach (var action in actions)
+            foreach (var request in requests)
             {
+                var action = request.Action;
                 var definition = MaintenanceCatalog.Get(action);
                 if (definition.RequiresRestorePoint && !restoreConfirmed)
                 {
                     results.Add(new MaintenanceStepResult(action, StepOutcome.Skipped,
                         "Reparo não executado: nenhum novo ponto de restauração foi confirmado nesta sessão.",
-                        Path.Combine(SessionStore.GetSessionDirectory(sessionId), "restore-point.log")));
+                        Path.Combine(SessionStore.GetSessionDirectory(sessionId), "restore-point.log"), request.TargetId));
                     continue;
                 }
                 MaintenancePolicy.EnsureRestorePoint([action], restoreConfirmed);
                 try
                 {
-                    results.Add(await CommandRunner.ExecuteAsync(sessionId, action));
+                    // Persist the actual completed steps and an honest pending entry before any reboot-capable action.
+                    var pending = results.Concat([new MaintenanceStepResult(action, StepOutcome.Skipped,
+                        "Ação em andamento; ainda não existe confirmação de conclusão.", TargetId: request.TargetId)]).ToArray();
+                    await SessionStore.WriteProgressReportAsync(sessionId, new MaintenanceReport(sessionId, started,
+                        DateTimeOffset.UtcNow, restoreConfirmed, pending, IsComplete: false));
+                    results.Add(await CommandRunner.ExecuteAsync(sessionId, request));
+                    await SessionStore.WriteProgressReportAsync(sessionId, new MaintenanceReport(sessionId, started,
+                        DateTimeOffset.UtcNow, restoreConfirmed, results.ToArray(), error, IsComplete: false));
                 }
                 catch (Exception exception)
                 {
-                    results.Add(new MaintenanceStepResult(action, StepOutcome.Failed,
-                        $"Falha ao executar a ação: {exception.Message}"));
+                    if (results.All(result => result.Action != action || result.TargetId != request.TargetId))
+                        results.Add(new MaintenanceStepResult(action, StepOutcome.Failed,
+                            $"Falha ao executar a ação: {exception.Message}", TargetId: request.TargetId));
+                    else
+                        error = $"A ação terminou, mas o relatório de progresso não pôde ser preservado: {exception.Message}";
                 }
             }
         }
         catch (Exception exception)
         {
             error = $"A sessão foi interrompida: {exception.Message}";
-            foreach (var action in actions.Where(a => results.All(r => r.Action != a)))
-                results.Add(new MaintenanceStepResult(action, StepOutcome.Skipped, "Ação não iniciada devido a uma falha na preparação da sessão."));
+            foreach (var request in requests.Where(request => results.All(result => result.Action != request.Action || result.TargetId != request.TargetId)))
+                results.Add(new MaintenanceStepResult(request.Action, StepOutcome.Skipped,
+                    "Ação não iniciada devido a uma falha na preparação da sessão.", TargetId: request.TargetId));
         }
 
         if (!sessionCreated) return 4;
@@ -74,23 +86,4 @@ internal static class Program
         return error is null && results.All(result => result.Outcome == StepOutcome.Succeeded) ? 0 : 1;
     }
 
-    private static bool TryReadArguments(string[] arguments, out Guid sessionId, out IReadOnlyList<MaintenanceActionId> actions)
-    {
-        sessionId = Guid.Empty;
-        actions = [];
-        if (arguments.Length != 4 || arguments[0] != "--session" || arguments[2] != "--actions" ||
-            !Guid.TryParseExact(arguments[1], "D", out sessionId) || sessionId == Guid.Empty ||
-            arguments[3].Length > 256) return false;
-        var selected = new List<MaintenanceActionId>();
-        foreach (var name in arguments[3].Split(','))
-        {
-            // Canonical names only: Enum.TryParse alone also accepts arbitrary integers.
-            if (!Enum.TryParse<MaintenanceActionId>(name, ignoreCase: false, out var action) ||
-                !Enum.IsDefined(action) || Enum.GetName(action) != name || selected.Contains(action)) return false;
-            selected.Add(action);
-        }
-        if (selected.Count == 0) return false;
-        try { actions = MaintenancePolicy.ValidateAndOrder(selected); return true; }
-        catch (ArgumentException) { return false; }
-    }
 }

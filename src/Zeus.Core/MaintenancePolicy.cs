@@ -40,6 +40,38 @@ public static class MaintenancePolicy
         }
     }
 
+    public static IReadOnlyList<MaintenanceRequest> ValidateRequests(IEnumerable<MaintenanceRequest> requests)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        var supplied = requests.ToArray();
+        if (supplied.Any(request => request is null))
+            throw new ArgumentException("O plano contém uma solicitação vazia.", nameof(requests));
+        if (supplied.Length == 0)
+            throw new ArgumentException("Selecione pelo menos uma ação para iniciar a manutenção.", nameof(requests));
+        var selectedActions = new HashSet<MaintenanceActionId>();
+        var driverTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var request in supplied)
+        {
+            _ = MaintenanceCatalog.Get(request.Action);
+            if (request.Action == MaintenanceActionId.InstallDriverUpdate)
+            {
+                if (!MaintenanceRequestProtocol.TryParseDriverIdentity(request.TargetId, out var id, out var revision))
+                    throw new ArgumentException("Selecione a identidade exata do driver oferecido pelo Windows Update.", nameof(requests));
+                if (!driverTargets.Add(id.ToString("D") + ":" + revision))
+                    throw new ArgumentException("O plano contém a mesma identidade de driver mais de uma vez.", nameof(requests));
+            }
+            else
+            {
+                if (!selectedActions.Add(request.Action))
+                    throw new ArgumentException("O plano contém uma ação repetida.", nameof(requests));
+                if (request.TargetId is not null || request.EulaAccepted)
+                    throw new ArgumentException("Somente a instalação de driver permite identidade e aceite de licença.", nameof(requests));
+            }
+        }
+        // OrderBy is stable: drivers retain the explicit order selected by the user.
+        return Array.AsReadOnly(supplied.OrderBy(request => GetOrder(request.Action)).ToArray());
+    }
+
     private static int GetOrder(MaintenanceActionId action) => action switch
     {
         MaintenanceActionId.ScanWindowsImage => 0,
@@ -47,7 +79,12 @@ public static class MaintenancePolicy
         MaintenanceActionId.VerifySystemFiles => 2,
         MaintenanceActionId.RepairSystemFiles => 3,
         MaintenanceActionId.AnalyzeSystemDrive => 4,
-        MaintenanceActionId.DefenderQuickScan => 5,
+        MaintenanceActionId.OptimizeSystemDrive => 5,
+        MaintenanceActionId.InstallDriverUpdate => 6,
+        MaintenanceActionId.UpdateDefenderSignatures => 7,
+        MaintenanceActionId.DefenderQuickScan => 8,
+        MaintenanceActionId.DefenderFullScan => 9,
+        MaintenanceActionId.DefenderOfflineScan => 10,
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Ação desconhecida.")
     };
 }

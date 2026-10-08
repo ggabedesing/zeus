@@ -2,12 +2,15 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Zeus.Core;
+using Zeus.Windows;
 
 namespace Zeus.Desktop;
 
 internal sealed class DesktopStorage
 {
-    private readonly string _directory = Path.Combine(
+    private readonly string _directory;
+
+    public DesktopStorage(string? directory = null) => _directory = directory ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zeus");
 
     internal static readonly JsonSerializerOptions JsonOptions = new()
@@ -34,12 +37,14 @@ internal sealed class DesktopStorage
         {
             if (report is null || report.SessionId == Guid.Empty || !sessionIds.Add(report.SessionId) || report.Steps is null)
                 throw new InvalidDataException("O histórico contém uma sessão inválida ou repetida.");
-            var actions = new HashSet<MaintenanceActionId>();
+            var actions = new HashSet<(MaintenanceActionId Action, string? Target)>();
             foreach (var step in report.Steps)
             {
                 if (step is null || !Enum.IsDefined(step.Action) || !Enum.IsDefined(step.Outcome) ||
-                    !actions.Add(step.Action) || step.Message is null)
+                    !actions.Add((step.Action, step.Action == MaintenanceActionId.InstallDriverUpdate ? step.TargetId : null)) || step.Message is null)
                     throw new InvalidDataException("O histórico contém uma ação inválida ou repetida.");
+                if (step.Action == MaintenanceActionId.InstallDriverUpdate && !MaintenanceRequestProtocol.TryParseDriverIdentity(step.TargetId, out _, out _))
+                    throw new InvalidDataException("O histórico contém uma identidade de driver inválida.");
             }
         }
     }
@@ -53,11 +58,10 @@ internal sealed class DesktopStorage
         return File.Exists(path) ? await ReadAsync<DesktopPreferences>(path) ?? new(false) : new(false);
     }
 
-    public Task SavePreferencesAsync(bool isMinimal) =>
-        WriteAsync(Path.Combine(_directory, "preferences.json"), new DesktopPreferences(isMinimal));
+    public Task SavePreferencesAsync(DesktopPreferences preferences) =>
+        WriteAsync(Path.Combine(_directory, "preferences.json"), preferences);
 
-    public static Task ExportAsync(string path, HardwareSnapshot? snapshot, IReadOnlyList<MaintenanceReport> reports) =>
-        WriteAsync(path, new ExportDocument(1, DateTimeOffset.UtcNow, snapshot, reports));
+    public static Task ExportAsync(string path, ExportDocument document) => WriteAsync(path, document);
 
     private static async Task<T?> ReadAsync<T>(string path)
     {

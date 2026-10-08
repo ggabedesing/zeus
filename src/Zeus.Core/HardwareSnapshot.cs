@@ -35,7 +35,13 @@ public sealed record HardwareSnapshot(
     IReadOnlyList<DiskInfo> Disks,
     IReadOnlyList<StartupInfo> Startup,
     SecurityInfo? Security,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    BoardInfo? Board = null,
+    BiosInfo? Bios = null,
+    IReadOnlyList<MemoryModuleInfo>? MemoryModules = null,
+    IReadOnlyList<PhysicalDiskInfo>? PhysicalDisks = null,
+    IReadOnlyList<BatteryInfo>? Batteries = null,
+    IReadOnlyList<NetworkAdapterInfo>? NetworkAdapters = null);
 
 public interface IHardwareDiagnostics
 {

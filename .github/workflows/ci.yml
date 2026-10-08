@@ -11,40 +11,194 @@ permissions:
 
 jobs:
   core:
-    name: Shared rules
+    name: Portable rules and cleanup boundaries
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - name: Test core rules
-        run: dotnet test tests/Zeus.Core.Tests/Zeus.Core.Tests.csproj -c Release --logger 'trx;LogFileName=core.trx'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: core-test-results
-          path: tests/Zeus.Core.Tests/TestResults/*.trx
+      - name: Test rules that run without Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in Zeus.Core.Tests Zeus.Cleanup.Tests Zeus.Maintenance.Protocol.Tests Zeus.UserOptimization.Tests Zeus.Hardware.Tests; do
+            dotnet test "tests/$project/$project.csproj" -c Release -p:EnableWindowsTargeting=true --results-directory "$RUNNER_TEMP/zeus-test-results/$project" --logger 'trx;LogFileName=results.trx'
+          done
+      - name: Require executed portable tests
+        if: success()
+        shell: python
+        run: |
+          import os, pathlib, xml.etree.ElementTree as ET
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'zeus-test-results'
+          results = list(root.glob('*/results.trx'))
+          assert len(results) == 5, 'Each portable test project must produce fresh results.'
+          for result in results:
+              counters = ET.parse(result).find('.//{*}Counters')
+              assert counters is not None, f'Missing counters: {result.parent.name}'
+              assert int(counters.attrib.get('total', 0)) > 0, f'No tests executed: {result.parent.name}'
+              assert int(counters.attrib.get('passed', 0)) > 0, f'No tests passed: {result.parent.name}'
+              assert int(counters.attrib.get('failed', 0)) == 0, f'Tests failed: {result.parent.name}'
 
   windows:
-    name: Windows build and diagnostic
+    name: Actual Windows application acceptance
     runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      ZEUS_WINDOWS_ACCEPTANCE: '1'
+      ZEUS_VALIDATION_DIR: ${{ runner.temp }}/zeus-validation/screenshots
+      ZEUS_TEST_RESULTS: ${{ runner.temp }}/zeus-test-results
+      ZEUS_SOURCE_SHA: ${{ github.sha }}
+      ZEUS_SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+      ZEUS_BUILD_OUTCOME: pending
+      ZEUS_TEST_OUTCOME: pending
+      ZEUS_SMOKE_OUTCOME: pending
+      ZEUS_PUBLISH_OUTCOME: pending
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - name: Build native Windows application
+      - name: Build every project
+        id: build
         run: dotnet build Zeus.slnx -c Release
-      - name: Test shared rules
-        run: dotnet test tests/Zeus.Core.Tests/Zeus.Core.Tests.csproj -c Release --no-build
+      - name: Exercise all tests on the actual Windows runner
+        id: windowsTests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $failed = $false
+          $projects = @(Get-ChildItem tests -Recurse -Filter '*.csproj' | Sort-Object FullName)
+          if ($projects.Count -lt 6) { throw 'The Windows test suite is incomplete.' }
+          foreach ($project in $projects) {
+            $resultDirectory = Join-Path $env:ZEUS_TEST_RESULTS $project.BaseName
+            dotnet test $project.FullName -c Release --no-build --results-directory $resultDirectory --logger 'trx;LogFileName=results.trx'
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+            $resultFile = Join-Path $resultDirectory 'results.trx'
+            if (!(Test-Path $resultFile)) { $failed = $true; continue }
+            [xml]$trx = Get-Content $resultFile
+            $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
+            if ($null -eq $counters -or [int]$counters.total -le 0 -or [int]$counters.passed -le 0 -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
       - name: Exercise read-only Windows diagnostic
+        id: smoke
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: dotnet run --project tools/Zeus.SmokeCheck/Zeus.SmokeCheck.csproj -c Release --no-build
-      - name: Publish portable development package
+      - name: Publish portable Windows package
+        id: publish
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: pwsh
         run: ./scripts/publish-windows.ps1
-      - uses: actions/upload-artifact@v4
+      - name: Upload portable package
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
         with:
           name: zeus-windows-x64
-          path: artifacts/zeus-win-x64.zip
+          path: |
+            artifacts/zeus-win-x64.zip
+            artifacts/zeus-win-x64.zip.sha256
           if-no-files-found: error
+      - name: Save sanitized acceptance evidence
+        id: evidence
+        if: always()
+        shell: pwsh
+        env:
+          ZEUS_BUILD_OUTCOME: ${{ steps.build.outcome }}
+          ZEUS_TEST_OUTCOME: ${{ steps.windowsTests.outcome }}
+          ZEUS_SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          ZEUS_PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+        run: |
+          New-Item -ItemType Directory -Force '.validation/screenshots' | Out-Null
+          $projects = @()
+          $totals = @{ total = 0; passed = 0; failed = 0; skipped = 0 }
+          if (Test-Path $env:ZEUS_TEST_RESULTS) {
+            foreach ($file in @(Get-ChildItem $env:ZEUS_TEST_RESULTS -Recurse -Filter '*.trx' | Sort-Object FullName)) {
+              [xml]$trx = Get-Content $file.FullName
+              $c = $trx.SelectSingleNode("//*[local-name()='Counters']")
+              if ($null -eq $c) { continue }
+              $counts = [ordered]@{
+                project = $file.Directory.Name
+                total = [int]$c.total
+                passed = [int]$c.passed
+                failed = [int]$c.failed
+                skipped = [int]$c.notExecuted
+              }
+              $projects += $counts
+              foreach ($key in @('total', 'passed', 'failed', 'skipped')) { $totals[$key] += $counts[$key] }
+            }
+          }
+          $screenshots = @()
+          if (Test-Path $env:ZEUS_VALIDATION_DIR) {
+            foreach ($file in @(Get-ChildItem $env:ZEUS_VALIDATION_DIR -Filter 'zeus-*.png' | Sort-Object Name)) {
+              Copy-Item $file.FullName (Join-Path '.validation/screenshots' $file.Name)
+              $screenshots += $file.Name
+            }
+          }
+          $outcomes = [ordered]@{
+            build = $env:ZEUS_BUILD_OUTCOME
+            windowsTests = $env:ZEUS_TEST_OUTCOME
+            smoke = $env:ZEUS_SMOKE_OUTCOME
+            publish = $env:ZEUS_PUBLISH_OUTCOME
+          }
+          $verified = ($outcomes.Values | Where-Object { $_ -ne 'success' }).Count -eq 0 `
+            -and $totals.total -gt 0 -and $totals.passed -eq $totals.total -and $totals.failed -eq 0 -and $totals.skipped -eq 0 `
+            -and $projects.Count -ge 6 -and $screenshots.Count -ge 11
+          $report = [ordered]@{
+            schemaVersion = 1
+            sourceCommit = $env:ZEUS_SOURCE_SHA
+            sourceBranch = $env:ZEUS_SOURCE_BRANCH
+            runId = $env:GITHUB_RUN_ID
+            runAttempt = $env:GITHUB_RUN_ATTEMPT
+            runUrl = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            recordedAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
+            runner = 'windows-latest'
+            accepted = $verified
+            outcomes = $outcomes
+            testCounts = $totals
+            testProjects = $projects
+            failures = @(
+              if (Test-Path $env:ZEUS_TEST_RESULTS) {
+                foreach ($file in @(Get-ChildItem $env:ZEUS_TEST_RESULTS -Recurse -Filter '*.trx')) {
+                  [xml]$trx = Get-Content $file.FullName
+                  foreach ($test in @($trx.SelectNodes("//*[local-name()='UnitTestResult' and @outcome='Failed']"))) {
+                    $message = $test.SelectSingleNode(".//*[local-name()='Message']")
+                    [ordered]@{ test = $test.testName; message = if ($message) { $message.InnerText.Substring(0, [Math]::Min($message.InnerText.Length, 2000)) } else { 'No failure message provided.' } }
+                  }
+                }
+              }
+            )
+            screenshots = $screenshots
+            limitations = @(
+              'Acceptance runs on a Windows CI virtual machine, not on every physical hardware configuration.',
+              'Repair, restore-point creation, driver installation, offline scan and reboot are not executed by CI.',
+              'CI does not establish measured performance gains or production code-signing status.'
+            )
+          }
+          $report | ConvertTo-Json -Depth 8 | Set-Content '.validation/status.json' -Encoding utf8
+      - name: Upload sanitized acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeus-windows-acceptance
+          path: .validation/
+          if-no-files-found: error
+      - name: Return validation evidence through Git
+        if: ${{ always() && steps.evidence.outcome == 'success' && github.event_name != 'pull_request' }}
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $source = $env:ZEUS_SOURCE_SHA
+          if ($source -notmatch '^[0-9a-f]{40}$') { throw 'Unexpected source commit identifier.' }
+          $branch = "validation/zeus-$source/run-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          git config user.name 'ZEUS validation bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c $branch
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create a dedicated evidence branch.' }
+          git add -- .validation/status.json .validation/screenshots
+          if ($LASTEXITCODE -ne 0) { throw 'Could not stage sanitized evidence.' }
+          git commit -m "Record Windows validation for $source"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not commit sanitized evidence.' }
+          git push origin "HEAD:refs/heads/$branch"
+          if ($LASTEXITCODE -ne 0) { throw 'Git evidence return failed; the Actions evidence artifact is still available.' }

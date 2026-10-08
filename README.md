@@ -1,84 +1,84 @@
 # ZEUS
 
-Aplicativo nativo para diagnóstico e manutenção de computadores Windows, com interface em português, plano de recomendações e execução explícita de ações oficiais.
+Aplicativo Windows para diagnóstico, manutenção e otimização com dados reais, interface em português e revisão das alterações antes da execução.
 
-**Estado: MVP em desenvolvimento.** O aplicativo utiliza dados reais do computador. Não promete ganhos fixos de desempenho e não inclui limpeza de registro, desativação de proteção, instalação automática de drivers ou mudanças de firmware.
+**Estado: versão de desenvolvimento com módulos integrados; aceitação nativa acompanhada pelo GitHub Actions.** Os resultados de cada execução são registrados. Ganhos de desempenho precisam ser medidos no computador e na tarefa do usuário.
 
-## Recursos desta versão
+## Recursos
 
-- Inventário de CPU, RAM, GPU, unidades e programas de inicialização.
-- Estado do Microsoft Defender quando acessível; informações ausentes são sinalizadas.
-- Recomendações conservadoras baseadas no diagnóstico.
-- Análise de volume, verificação/reparo de imagem Windows e arquivos protegidos, verificação rápida do Defender.
-- Confirmação das ações, elevação via UAC e ponto de restauração confirmado antes dos reparos.
-- Histórico local, exportação de diagnóstico e layouts Minimal/Completo.
+| Área | O que o aplicativo faz |
+| --- | --- |
+| Hardware | Lê CPU, RAM, GPU e drivers, placa-mãe, BIOS, módulos RAM, volumes, discos físicos, bateria e rede. Sensores aparecem somente quando o Windows fornece a leitura. |
+| Carga real | Amostra CPU, memória e processos por cinco segundos, sem encerrar processos ou esvaziar a RAM. |
+| Limpeza | Analisa temporários do usuário com mais de sete dias; permite selecionar, guardar em recuperação, restaurar e excluir definitivamente em operações separadas. |
+| Inicialização | Desativa entradas selecionadas de HKCU Run, preserva comando/tipo anteriores e permite desfazer. Heurísticas protegem entradas de segurança, backup e sincronização. |
+| Perfil | Perguntas de uso orientam recomendações; efeitos visuais e planos de energia existentes têm revisão e recuperação próprias. |
+| Manutenção | DISM e SFC para verificar/reparar o Windows; análise e otimização do volume pelo mecanismo nativo, conforme o tipo de mídia. |
+| Proteção | Atualização de assinaturas e verificações rápida, completa e offline do Microsoft Defender ativo. O Windows mantém suas políticas de remediação. |
+| Drivers | Consulta candidatos oficiais do Windows Update, mostra licenças e instala as identidades selecionadas após proteção de recuperação e exportação dos drivers existentes. |
+| Plano geral | Reúne preferências visuais explicitamente incluídas e as seleções de limpeza, inicialização e manutenção. Exibe o plano antes de executar sequencialmente. |
+| Aparência | Temas Completo, Mínimo e Aurora, inspirado no macOS, para a interface do ZEUS. |
+| Histórico | Resultados, logs, estados anteriores e recuperação de sessões interrompidas; exportação de relatório JSON. |
 
-As verificações não são reparos automáticos. Um comando concluído não garante que todos os problemas foram corrigidos; resultados e logs devem ser conferidos. Ponto de restauração não substitui backup dos seus documentos.
+Nenhuma manutenção é selecionada automaticamente. Drivers e Defender offline possuem fluxos de revisão específicos. O tema altera a interface do ZEUS; as preferências de efeitos do Windows são uma operação separada.
 
-## Requisitos
+Mover arquivos para recuperação **não libera espaço**. Só a exclusão definitiva remove os bytes guardados; ela não passa pela Lixeira e não pode ser desfeita. Ponto de restauração não recupera documentos apagados. O módulo limita a análise a 10.000 candidatos e arquivos de até 128 MiB.
 
-- Windows 11 x64 em versão suportada para o aplicativo.
-- SDK .NET definido em [global.json](global.json) para desenvolvimento.
-- Administração somente para manutenção que a exige; diagnóstico básico e interface usam permissões comuns.
-- Proteção do Sistema disponível e criação de um ponto novo para os reparos protegidos. O Windows pode limitar a criação de pontos, incluindo o intervalo de 24 horas do cmdlet utilizado.
+## Requisitos e execução
 
-Pacotes portáteis são builds de desenvolvimento sem assinatura de produção. ARM64 é um alvo de publicação possível, ainda pendente de validação em hardware. Esta versão não constitui um novo motor antivírus.
+- Windows 11 x64 em versão suportada.
+- Proteção do Sistema disponível para reparos e instalação de drivers. O auxiliar exige um ponto **novo e confirmado**, sem contornar limites ou políticas do Windows.
+- Autorização de administrador via UAC para manutenção; a interface e as alterações do próprio usuário usam permissões comuns.
+- Conexão para consultar/baixar drivers e, quando necessário, fontes de reparo do Windows.
 
-## Desenvolver no Windows
+Extraia a pasta inteira de `zeus-win-x64.zip` e execute `Zeus.Desktop.exe`. O pacote autocontido inclui o runtime e `Zeus.Maintenance.exe`; não copie apenas um executável. Builds atuais são distribuições de desenvolvimento sem assinatura Authenticode de produção. ARM64 é um alvo de publicação ainda sem aceitação em hardware.
+
+O ZEUS usa as ferramentas do Windows; não constitui um novo motor antivírus. Atualizações de BIOS/firmware, overclock, limpeza de registro e desativação de segurança ficam fora deste produto. Um comando concluído não comprova correção de todos os erros ou aumento de desempenho.
+
+## Desenvolvimento e publicação
+
+O SDK está definido em [global.json](global.json).
 
 ```powershell
 dotnet restore Zeus.slnx
 dotnet build Zeus.slnx -c Release
-dotnet test tests/Zeus.Core.Tests/Zeus.Core.Tests.csproj -c Release
+# Testes nativos: execute em uma máquina Windows de teste.
+Get-ChildItem tests -Recurse -Filter *.csproj | ForEach-Object {
+    dotnet test $_.FullName -c Release --no-build
+}
 dotnet run --project src/Zeus.Desktop/Zeus.Desktop.csproj
-```
-
-O auxiliar `Zeus.Maintenance` deve permanecer junto do executável Desktop. O build copia seus arquivos para permitir execução local; a publicação abaixo inclui ambos.
-
-## Gerar o pacote portátil
-
-```powershell
 pwsh -File scripts/publish-windows.ps1
 ```
 
-O pacote autocontido fica em `artifacts/zeus-win-x64.zip`. Extraia a pasta inteira e execute `Zeus.Desktop.exe`. Não copie apenas o executável. O runtime acompanha o pacote, sem exigir SDK na máquina do usuário.
-
-O workflow em [.github/workflows/ci.yml](.github/workflows/ci.yml) compila e testa o projeto, executa diagnóstico somente de leitura em Windows e gera o artefato portátil. Os artefatos ficam na execução correspondente em [GitHub Actions](https://github.com/ggabedesing/zeus/actions).
-
-## Trabalhar no ambiente Linux da nuvem
+O teste que aplica/restaura efeitos visuais exige `ZEUS_WINDOWS_ACCEPTANCE=1` em Windows descartável. Essa opção é definida no workflow e não precisa ser habilitada em PCs pessoais. Os arquivos de publicação ficam em `artifacts/`, incluindo ZIP, SHA-256 e identificação do código-fonte.
 
 ```bash
 bash scripts/setup-cloud.sh
 export PATH="/workspace/.dotnet:$PATH"
 export DOTNET_CLI_HOME=/workspace/.dotnet-home
 export NUGET_PACKAGES=/workspace/.nuget/packages
-dotnet build Zeus.slnx -c Release -m:2
-dotnet test tests/Zeus.Core.Tests/Zeus.Core.Tests.csproj -c Release
+dotnet build Zeus.slnx -c Release
+for project in Zeus.Core.Tests Zeus.Cleanup.Tests Zeus.Maintenance.Protocol.Tests Zeus.UserOptimization.Tests Zeus.Hardware.Tests; do
+  dotnet test "tests/$project/$project.csproj" -c Release --no-build
+done
 ```
 
-O setup baixa o SDK oficial e confere SHA-512 com os metadados da Microsoft. Use o checkout existente: tarefas na nuvem já são isoladas, sem necessidade de criar worktrees.
+O setup da nuvem baixa o SDK oficial e verifica SHA-512 pelos metadados da Microsoft. Linux permite compilar todos os projetos e testar as regras portáveis; WPF, UAC, registro e comandos do sistema exigem Windows.
 
-Linux permite compilar o alvo Windows e testar as regras compartilhadas. A interface WPF, UAC, sensores, Defender e reparos exigem Windows para validação funcional. Não execute reparos em CI; use máquinas de teste com backups e snapshots para esses cenários.
+O [workflow de aceitação](.github/workflows/ci.yml) executa testes reais em Windows, abre a interface WPF, coleta inventário/carga e captura as oito áreas e três temas. Também testa aplicar/restaurar preferências e entradas de inicialização isoladas. Os pacotes e a evidência ficam no [GitHub Actions](https://github.com/ggabedesing/zeus/actions). Uma branch `validation/zeus-<commit>/run-<id>-<tentativa>` registra resultados do commit exato; ela contém evidência, não código de produto.
+
+Reparos, instalação de drivers, criação de pontos de restauração e reinícios não são executados automaticamente pelo CI. Os cenários necessários antes de uma distribuição de produção estão em [docs/validacao-windows.md](docs/validacao-windows.md).
 
 ## Estrutura
 
 | Projeto | Responsabilidade |
 | --- | --- |
-| `Zeus.Core` | Modelos, catálogo, política de manutenção e recomendações |
-| `Zeus.Windows` | Coleta real e coordenação do auxiliar elevado |
-| `Zeus.Maintenance` | Execução de operações previamente implementadas |
-| `Zeus.Desktop` | Interface WPF, diagnóstico, seleção de ações e histórico |
-| `Zeus.Core.Tests` | Testes de regras, permissões lógicas e recomendações |
-| `Zeus.SmokeCheck` | Diagnóstico somente de leitura para CI Windows |
+| `Zeus.Core` | Modelos, recomendações e protocolo validado de manutenção |
+| `Zeus.Cleanup` | Limpeza seletiva, journal e recuperação de arquivos |
+| `Zeus.Windows` | Inventário, carga, preferências, Windows Update e coordenação do auxiliar |
+| `Zeus.Maintenance` | Operações administrativas previamente implementadas |
+| `Zeus.Desktop` | Interface WPF, revisão do plano, histórico e exportação |
+| `tests/` | Regras portáveis, fronteiras de arquivos, registro e aceitação nativa |
+| `Zeus.SmokeCheck` | Diagnóstico nativo somente de leitura |
 
-O projeto não aceita scripts livres para execução administrativa. Leia [SECURITY.md](SECURITY.md) para o modelo de recuperação e distribuição.
-
-## Próximas etapas
-
-1. Validar interface, UAC e recuperação em máquinas Windows de teste.
-2. Medir o consumo do próprio aplicativo e os resultados em PCs fracos.
-3. Desenvolver limpeza seletiva com recuperação específica e revisão de inicialização.
-4. Adicionar automação de drivers com fontes oficiais e matriz de compatibilidade.
-5. Expandir sensores, perfis de uso e personalização.
-
-O [relatório de viabilidade](docs/relatorio-viabilidade-zeus.md) detalha o produto, as fontes pesquisadas e os limites de cada módulo.
+Leia [SECURITY.md](SECURITY.md) e o [relatório de viabilidade com fontes](docs/relatorio-viabilidade-zeus.md).

@@ -41,7 +41,7 @@ public sealed class MaintenancePolicyTests
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(6)]
+    [InlineData(11)]
     [InlineData(int.MaxValue)]
     public void UnrecognizedIdsAreRejectedBeforeExecution(int unrecognized)
     {
@@ -75,7 +75,9 @@ public sealed class MaintenancePolicyTests
             MaintenanceActionId.DefenderQuickScan];
 
         Assert.Equal(expected, MaintenancePolicy.ValidateAndOrder(expected.Reverse()));
-        Assert.Equal(expected, MaintenancePolicy.ValidateAndOrder(Enum.GetValues<MaintenanceActionId>()));
+        Assert.Equal(expected, MaintenancePolicy.ValidateAndOrder(expected));
+        Assert.Equal(Enum.GetValues<MaintenanceActionId>().Length,
+            MaintenancePolicy.ValidateAndOrder(Enum.GetValues<MaintenanceActionId>()).Count);
     }
 
     [Fact]

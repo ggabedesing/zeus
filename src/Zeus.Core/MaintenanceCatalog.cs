@@ -40,7 +40,37 @@ public static class MaintenanceCatalog
                 "Analisar unidade do Windows",
                 "Solicita somente a análise de otimização do volume do sistema. Não exclui arquivos nem força desfragmentação ou reparo de setores.",
                 RequiresRestorePoint: false,
-                MayRequireRestart: false)
+                MayRequireRestart: false),
+            new MaintenanceActionDefinition(
+                MaintenanceActionId.UpdateDefenderSignatures,
+                "Atualizar definições do Defender",
+                "Solicita as definições oficiais do Microsoft Defender quando ele está ativo no modo normal. Respeita outro antivírus instalado.",
+                RequiresRestorePoint: false,
+                MayRequireRestart: false),
+            new MaintenanceActionDefinition(
+                MaintenanceActionId.DefenderFullScan,
+                "Verificação completa do Defender",
+                "Solicita uma verificação completa pelo Defender ativo. Pode levar horas; resultados e ameaças ficam na Segurança do Windows.",
+                RequiresRestorePoint: false,
+                MayRequireRestart: false),
+            new MaintenanceActionDefinition(
+                MaintenanceActionId.DefenderOfflineScan,
+                "Verificação offline do Defender",
+                "Pode reiniciar o computador imediatamente para verificar fora do Windows. Salve seu trabalho e confirme a recuperação do BitLocker antes de autorizar.",
+                RequiresRestorePoint: false,
+                MayRequireRestart: true),
+            new MaintenanceActionDefinition(
+                MaintenanceActionId.OptimizeSystemDrive,
+                "Otimizar unidade do Windows",
+                "Delega ao Windows a otimização apropriada ao tipo de volume, incluindo TRIM quando aplicável. Não força desfragmentação de SSD nem altera serviços.",
+                RequiresRestorePoint: false,
+                MayRequireRestart: false),
+            new MaintenanceActionDefinition(
+                MaintenanceActionId.InstallDriverUpdate,
+                "Instalar driver selecionado do Windows Update",
+                "Instala somente a identidade selecionada após nova consulta ao Windows Update, novo ponto de restauração e exportação dos drivers existentes. Não instala BIOS ou firmware.",
+                RequiresRestorePoint: true,
+                MayRequireRestart: true)
         });
 
     public static MaintenanceActionDefinition Get(MaintenanceActionId id)

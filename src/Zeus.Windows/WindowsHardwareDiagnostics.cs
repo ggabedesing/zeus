@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Management;
@@ -14,53 +15,98 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("O diagnóstico requer Windows.");
 
-        var warnings = new List<string>();
-        async Task<T> Read<T>(string label, Func<T> read, T fallback)
+        // Parallel providers prevent sequential minute-long waits; WMI enumerations
+        // and PowerShell subprocesses additionally have their own deadlines.
+        var warnings = new ConcurrentQueue<string>();
+        async Task<T> Read<T>(string label, Func<CancellationToken, T> read, T fallback)
         {
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(TimeSpan.FromSeconds(18));
             try
             {
-                return await Task.Run(read, cancellationToken)
-                    .WaitAsync(TimeSpan.FromSeconds(20), cancellationToken);
+                return await Task.Run(() => read(deadline.Token), deadline.Token).WaitAsync(deadline.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                warnings.Enqueue($"{label}: o provedor excedeu o prazo de consulta; dados indisponíveis.");
+                return fallback;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception error)
             {
-                warnings.Add($"{label}: não foi possível obter dados ({error.Message}).");
+                warnings.Enqueue($"{label}: não foi possível obter dados ({error.Message}).");
                 return fallback;
             }
         }
 
-        var cpu = await Read<CpuInfo?>("Processador", ReadCpu, null);
-        var memory = await Read<MemoryInfo?>("Memória", ReadMemory, null);
-        var graphics = await Read<IReadOnlyList<GpuInfo>>("Placas de vídeo", ReadGraphics, []);
-        var disks = await Read<IReadOnlyList<DiskInfo>>("Discos", ReadDisks, []);
-        var startup = await Read<IReadOnlyList<StartupInfo>>("Inicialização", ReadStartup, []);
-        SecurityInfo? security = null;
-        try
+        async Task<T> ReadAsync<T>(string label, Func<CancellationToken, Task<T>> read, T fallback)
         {
-            security = await ReadSecurityAsync(cancellationToken);
+            try { return await read(cancellationToken); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception error)
+            {
+                warnings.Enqueue($"{label}: dados indisponíveis ({error.Message}).");
+                return fallback;
+            }
         }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception error)
+
+        var cpuTask = Read<CpuInfo?>("Processador", ReadCpu, null);
+        var memoryTask = Read<MemoryInfo?>("Memória", ReadMemory, null);
+        var graphicsTask = Read<IReadOnlyList<GpuInfo>>("Placas de vídeo", ReadGraphics, []);
+        var disksTask = Read<IReadOnlyList<DiskInfo>>("Volumes", ReadDisks, []);
+        var startupTask = Read<IReadOnlyList<StartupInfo>>("Inicialização", ReadStartup, []);
+        var boardTask = Read<BoardInfo?>("Placa-mãe", ReadBoard, null);
+        var biosTask = Read<BiosInfo?>("BIOS", ReadBios, null);
+        var modulesTask = Read<IReadOnlyList<MemoryModuleInfo>>("Módulos de memória", token => ReadMemoryModules(token, warnings), []);
+        var batteriesTask = Read<IReadOnlyList<BatteryInfo>>("Baterias", ReadBatteries, []);
+        var networkTask = Read<IReadOnlyList<NetworkAdapterInfo>>("Adaptadores de rede", ReadNetworkAdapters, []);
+        var securityTask = ReadAsync<SecurityInfo?>("Defender (outro antivírus pode estar ativo)", ReadSecurityAsync, null);
+        var physicalTask = ReadAsync<IReadOnlyList<PhysicalDiskInfo>>("Armazenamento físico", async token =>
         {
-            warnings.Add($"Defender: estado indisponível ({error.Message}). Outro antivírus pode estar ativo.");
-        }
-        warnings.Add("Temperaturas, desgaste físico e consumo não são inferidos; este diagnóstico não substitui sensores ou inspeção do hardware.");
+            try { return await ReadPhysicalDisksAsync(warnings, token); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception)
+            {
+                warnings.Enqueue("Armazenamento: provedor Storage indisponível; inventário básico via Win32_DiskDrive, sem sensores de confiabilidade.");
+                return await Read<IReadOnlyList<PhysicalDiskInfo>>("Discos físicos (Win32_DiskDrive)", token => ReadPhysicalDisksFallback(token, warnings), []);
+            }
+        }, []);
+
+        await Task.WhenAll(cpuTask, memoryTask, graphicsTask, disksTask, startupTask, boardTask,
+            biosTask, modulesTask, batteriesTask, networkTask, securityTask, physicalTask);
+        cancellationToken.ThrowIfCancellationRequested();
+        var physical = await physicalTask;
+        warnings.Enqueue(physical.Any(disk => disk.TemperatureCelsius.HasValue)
+            ? "Algumas temperaturas de disco foram informadas pelo provedor Storage. Temperaturas de CPU/GPU e consumo não são coletados."
+            : "Temperaturas de CPU/GPU e consumo não são coletados; nenhum sensor de temperatura de disco foi disponibilizado pelo provedor.");
+        warnings.Enqueue("Saúde e desgaste dos discos refletem somente o provedor consultado; não substituem backup ou inspeção física. Frequência de RAM não determina dual channel; velocidade de rede não mede a Internet.");
         return new HardwareSnapshot(DateTimeOffset.UtcNow, Environment.OSVersion.VersionString,
-            Environment.MachineName, cpu, memory, graphics, disks, startup, security, warnings);
+            Environment.MachineName, await cpuTask, await memoryTask, await graphicsTask, await disksTask,
+            await startupTask, await securityTask, warnings.ToArray(), await boardTask, await biosTask,
+            await modulesTask, physical, await batteriesTask, await networkTask);
     }
 
     private static ManagementObjectCollection Query(string query)
     {
         using var searcher = new ManagementObjectSearcher(new ManagementScope("root\\CIMV2"), new ObjectQuery(query),
-            new System.Management.EnumerationOptions { Timeout = TimeSpan.FromSeconds(12), ReturnImmediately = false });
+            new System.Management.EnumerationOptions
+            {
+                Timeout = TimeSpan.FromSeconds(10), ReturnImmediately = true, Rewindable = false
+            });
         return searcher.Get();
     }
 
-    private static string StringValue(ManagementBaseObject value, string field) =>
-        Convert.ToString(value[field], CultureInfo.InvariantCulture)?.Trim() ?? "Desconhecido";
+    private static string StringValue(ManagementBaseObject value, string field)
+    {
+        var text = Convert.ToString(value[field], CultureInfo.InvariantCulture)?.Trim();
+        return string.IsNullOrWhiteSpace(text) ? "Desconhecido" : text;
+    }
 
-    private static CpuInfo? ReadCpu()
+    private static ulong? UnsignedValue(ManagementBaseObject row, string field) =>
+        row[field] is { } value && ulong.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture),
+            NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
+
+    private static CpuInfo? ReadCpu(CancellationToken token)
     {
         using var rows = Query("SELECT Name,NumberOfCores,NumberOfLogicalProcessors FROM Win32_Processor");
         var names = new List<string>();
@@ -70,6 +116,7 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         {
             using (row)
             {
+                token.ThrowIfCancellationRequested();
                 names.Add(StringValue(row, "Name"));
                 cores += Convert.ToInt32(row["NumberOfCores"], CultureInfo.InvariantCulture);
                 logical += Convert.ToInt32(row["NumberOfLogicalProcessors"], CultureInfo.InvariantCulture);
@@ -78,34 +125,46 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         return names.Count == 0 ? null : new CpuInfo(string.Join(" / ", names.Distinct()), cores, logical);
     }
 
-    private static MemoryInfo? ReadMemory()
+    private static MemoryInfo? ReadMemory(CancellationToken token)
     {
         using var rows = Query("SELECT TotalVisibleMemorySize,FreePhysicalMemory FROM Win32_OperatingSystem");
         foreach (ManagementObject row in rows)
         {
             using (row)
-                return new MemoryInfo(Convert.ToUInt64(row["TotalVisibleMemorySize"], CultureInfo.InvariantCulture) * 1024,
-                    Convert.ToUInt64(row["FreePhysicalMemory"], CultureInfo.InvariantCulture) * 1024);
+            {
+                token.ThrowIfCancellationRequested();
+                var total = UnsignedValue(row, "TotalVisibleMemorySize");
+                var free = UnsignedValue(row, "FreePhysicalMemory");
+                if (total is null or 0 || free is null)
+                    throw new InvalidDataException("O provedor não forneceu memória total e disponível válidas.");
+                return new MemoryInfo(checked(total.Value * 1024), checked(free.Value * 1024));
+            }
         }
         return null;
     }
 
-    private static IReadOnlyList<GpuInfo> ReadGraphics()
+    private static IReadOnlyList<GpuInfo> ReadGraphics(CancellationToken token)
     {
         using var rows = Query("SELECT Name,DriverVersion FROM Win32_VideoController");
         var result = new List<GpuInfo>();
         foreach (ManagementObject row in rows)
         {
-            using (row) result.Add(new GpuInfo(StringValue(row, "Name"), StringValue(row, "DriverVersion")));
+            using (row)
+            {
+                token.ThrowIfCancellationRequested();
+                // AdapterRAM is UInt32 and truncates modern VRAM; do not report it.
+                result.Add(new GpuInfo(StringValue(row, "Name"), StringValue(row, "DriverVersion")));
+            }
         }
         return result;
     }
 
-    private static IReadOnlyList<DiskInfo> ReadDisks()
+    private static IReadOnlyList<DiskInfo> ReadDisks(CancellationToken token)
     {
         var result = new List<DiskInfo>();
         foreach (var drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed))
         {
+            token.ThrowIfCancellationRequested();
             if (!drive.IsReady) continue;
             result.Add(new DiskInfo(string.IsNullOrWhiteSpace(drive.VolumeLabel) ? "Disco local" : drive.VolumeLabel,
                 drive.Name, (ulong)drive.TotalSize, (ulong)drive.AvailableFreeSpace, drive.DriveFormat));
@@ -113,42 +172,207 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         return result;
     }
 
-    private static IReadOnlyList<StartupInfo> ReadStartup()
+    private static IReadOnlyList<StartupInfo> ReadStartup(CancellationToken token)
     {
         using var rows = Query("SELECT Name,Location,User FROM Win32_StartupCommand");
         var result = new List<StartupInfo>();
         foreach (ManagementObject row in rows)
         {
             using (row)
+            {
+                token.ThrowIfCancellationRequested();
                 result.Add(new StartupInfo(StringValue(row, "Name"), StringValue(row, "Location"), StringValue(row, "User")));
+            }
         }
         return result.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
     }
 
-    private static async Task<SecurityInfo> ReadSecurityAsync(CancellationToken token)
+    private static BoardInfo? ReadBoard(CancellationToken token)
     {
-        const string script = "& { $ErrorActionPreference = 'Stop'; $s = Defender\\Get-MpComputerStatus; " +
+        using var rows = Query("SELECT Manufacturer,Product FROM Win32_BaseBoard");
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+            {
+                token.ThrowIfCancellationRequested();
+                return new BoardInfo(StringValue(row, "Manufacturer"), StringValue(row, "Product"));
+            }
+        }
+        return null;
+    }
+
+    private static BiosInfo? ReadBios(CancellationToken token)
+    {
+        using var rows = Query("SELECT Manufacturer,SMBIOSBIOSVersion,ReleaseDate FROM Win32_BIOS");
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+            {
+                token.ThrowIfCancellationRequested();
+                string? releaseDate = null;
+                if (row["ReleaseDate"] is string raw && raw.Length >= 8 &&
+                    DateOnly.TryParseExact(raw[..8], "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+                    releaseDate = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                return new BiosInfo(StringValue(row, "Manufacturer"), StringValue(row, "SMBIOSBIOSVersion"), releaseDate);
+            }
+        }
+        return null;
+    }
+
+    private static IReadOnlyList<MemoryModuleInfo> ReadMemoryModules(CancellationToken token, ConcurrentQueue<string> warnings)
+    {
+        using var rows = Query("SELECT DeviceLocator,BankLabel,Capacity,Speed,ConfiguredClockSpeed,Manufacturer FROM Win32_PhysicalMemory");
+        var result = new List<MemoryModuleInfo>();
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+            {
+                token.ThrowIfCancellationRequested();
+                var location = StringValue(row, "DeviceLocator");
+                if (location == "Desconhecido") location = StringValue(row, "BankLabel");
+                var capacity = UnsignedValue(row, "Capacity");
+                if (!TryReadCapacity(capacity, $"Módulo de memória {location}", warnings, out var bytes)) continue;
+                var speed = UnsignedValue(row, "ConfiguredClockSpeed");
+                if (speed is null or 0) speed = UnsignedValue(row, "Speed");
+                result.Add(new MemoryModuleInfo(location, bytes,
+                    speed is > 0 and <= uint.MaxValue ? (uint)speed.Value : null, StringValue(row, "Manufacturer")));
+            }
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<BatteryInfo> ReadBatteries(CancellationToken token)
+    {
+        using var rows = Query("SELECT Name,EstimatedChargeRemaining,BatteryStatus FROM Win32_Battery");
+        var result = new List<BatteryInfo>();
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+            {
+                token.ThrowIfCancellationRequested();
+                var charge = UnsignedValue(row, "EstimatedChargeRemaining");
+                var status = UnsignedValue(row, "BatteryStatus") switch
+                {
+                    3 => "Carga completa", 4 => "Carga baixa", 5 => "Carga crítica", 6 => "Carregando",
+                    7 => "Carregando, carga alta", 8 => "Carregando, carga baixa", 9 => "Carregando, carga crítica",
+                    11 => "Carga parcial", _ => "Desconhecido"
+                };
+                result.Add(new BatteryInfo(StringValue(row, "Name"), charge is <= 100 ? (int)charge.Value : null, status));
+            }
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<NetworkAdapterInfo> ReadNetworkAdapters(CancellationToken token)
+    {
+        using var rows = Query("SELECT Name,NetConnectionStatus,Speed FROM Win32_NetworkAdapter WHERE PhysicalAdapter = TRUE");
+        var result = new List<NetworkAdapterInfo>();
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+            {
+                token.ThrowIfCancellationRequested();
+                var status = UnsignedValue(row, "NetConnectionStatus") switch
+                {
+                    0 => "Desconectado", 1 => "Conectando", 2 => "Conectado", 3 => "Desconectando",
+                    4 => "Hardware indisponível", 5 => "Hardware desabilitado", 6 => "Falha de hardware",
+                    7 => "Mídia desconectada", 8 => "Autenticando", 9 => "Autenticação concluída",
+                    10 => "Falha de autenticação", 11 => "Endereço inválido", 12 => "Credenciais necessárias",
+                    _ => "Desconhecido"
+                };
+                var speed = UnsignedValue(row, "Speed");
+                result.Add(new NetworkAdapterInfo(StringValue(row, "Name"), status, speed is > 0 ? speed : null));
+            }
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<PhysicalDiskInfo> ReadPhysicalDisksFallback(CancellationToken token, ConcurrentQueue<string> warnings)
+    {
+        using var rows = Query("SELECT Model,Size,InterfaceType,MediaType,Status FROM Win32_DiskDrive");
+        var result = new List<PhysicalDiskInfo>();
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+            {
+                token.ThrowIfCancellationRequested();
+                var name = StringValue(row, "Model");
+                if (!TryReadCapacity(UnsignedValue(row, "Size"), $"Disco físico {name}", warnings, out var bytes)) continue;
+                // "Fixed hard disk media" does not distinguish SSD/HDD; InterfaceType
+                // can report SCSI for NVMe. Preserve the fallback provider limitation.
+                result.Add(new PhysicalDiskInfo(name, StringValue(row, "MediaType"),
+                    StringValue(row, "InterfaceType") + " (Win32_DiskDrive)", bytes,
+                    StringValue(row, "Status") + " (Win32_DiskDrive)", null, null));
+            }
+        }
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<PhysicalDiskInfo>> ReadPhysicalDisksAsync(
+        ConcurrentQueue<string> warnings, CancellationToken token)
+    {
+        const string script = "& { $items = @(); $notes = @(); " +
+            "foreach ($d in @(Storage\\Get-PhysicalDisk -ErrorAction Stop)) { " +
+            "$r = $null; try { $r = $d | Storage\\Get-StorageReliabilityCounter -ErrorAction Stop } " +
+            "catch { $notes += ('Sensores de confiabilidade indisponíveis para ' + [string]$d.FriendlyName + '.'); }; " +
+            "$items += [pscustomobject]@{ Name = [string]$d.FriendlyName; MediaType = [string]$d.MediaType; " +
+            "BusType = [string]$d.BusType; SizeBytes = [uint64]$d.Size; HealthStatus = [string]$d.HealthStatus; " +
+            "TemperatureCelsius = if ($null -ne $r -and $null -ne $r.Temperature -and $r.Temperature -gt 0 -and $r.Temperature -le 125) { [double]$r.Temperature } else { $null }; " +
+            "Wear = if ($null -ne $r -and $null -ne $r.Wear) { [uint64]$r.Wear } else { $null } }; }; " +
+            "[pscustomobject]@{ Disks = @($items); Warnings = @($notes) } | Microsoft.PowerShell.Utility\\ConvertTo-Json -Depth 4 -Compress }";
+        using var json = await RunPowerShellJsonAsync(script, token, WindowsPowerShellModule.Utility, WindowsPowerShellModule.Storage);
+        if (json.RootElement.TryGetProperty("Warnings", out var notes))
+            foreach (var note in notes.EnumerateArray())
+                if (note.GetString() is { } text) warnings.Enqueue(text);
+        var disks = json.RootElement.GetProperty("Disks");
+        var result = new List<PhysicalDiskInfo>();
+        foreach (var disk in disks.EnumerateArray())
+        {
+            token.ThrowIfCancellationRequested();
+            if (ParsePhysicalDisk(disk, warnings) is { } observed) result.Add(observed);
+        }
+        return result;
+    }
+
+    internal static PhysicalDiskInfo? ParsePhysicalDisk(JsonElement disk, ConcurrentQueue<string> warnings)
+    {
+        var name = JsonText(disk, "Name");
+        if (!TryReadCapacity(NullableUInt64(disk, "SizeBytes"), $"Disco físico {name}", warnings, out var bytes)) return null;
+        var wear = NullableUInt64(disk, "Wear");
+        if (wear is > 100)
+            warnings.Enqueue($"Disco físico {name}: desgaste informado de {wear}% acima do limite estimado de 100%; preserve um backup e consulte o fabricante.");
+        return new PhysicalDiskInfo(name, JsonText(disk, "MediaType"), JsonText(disk, "BusType"), bytes,
+            JsonText(disk, "HealthStatus"), NullableDouble(disk, "TemperatureCelsius"), wear);
+    }
+
+    internal static bool TryReadCapacity(ulong? reported, string component, ConcurrentQueue<string> warnings, out ulong bytes)
+    {
+        bytes = reported ?? 0;
+        if (bytes > 0) return true;
+        warnings.Enqueue($"{component}: capacidade não fornecida pelo provedor; componente omitido para evitar informar zero bytes como medição.");
+        return false;
+    }
+
+    private static string JsonText(JsonElement value, string property) =>
+        value.TryGetProperty(property, out var field) && field.ValueKind == JsonValueKind.String &&
+        !string.IsNullOrWhiteSpace(field.GetString()) ? field.GetString()! : "Desconhecido";
+
+    private static double? NullableDouble(JsonElement value, string property) =>
+        value.TryGetProperty(property, out var field) && field.ValueKind == JsonValueKind.Number &&
+        field.TryGetDouble(out var number) && double.IsFinite(number) ? number : null;
+
+    private static ulong? NullableUInt64(JsonElement value, string property) =>
+        value.TryGetProperty(property, out var field) && field.ValueKind == JsonValueKind.Number &&
+        field.TryGetUInt64(out var number) ? number : null;
+
+    private static async Task<SecurityInfo?> ReadSecurityAsync(CancellationToken token)
+    {
+        const string script = "& { $s = Defender\\Get-MpComputerStatus; " +
             "[pscustomobject]@{ DefenderEnabled = [bool]$s.AntivirusEnabled; " +
             "RealTimeProtectionEnabled = [bool]$s.RealTimeProtectionEnabled; " +
             "SignatureUpdatedAt = if ($s.AntivirusSignatureLastUpdated) { $s.AntivirusSignatureLastUpdated.ToUniversalTime().ToString('o') } else { $null }; " +
             "Summary = [string]$s.AMRunningMode } | Microsoft.PowerShell.Utility\\ConvertTo-Json -Compress }";
-        var start = TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility, WindowsPowerShellModule.Defender);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("PowerShell não iniciou.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(token);
-        var errorTask = process.StandardError.ReadToEndAsync(token);
-        try
-        {
-            await process.WaitForExitAsync(token).WaitAsync(TimeSpan.FromSeconds(25), token);
-        }
-        catch
-        {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            throw;
-        }
-        var output = await outputTask;
-        var error = await errorTask;
-        if (process.ExitCode != 0) throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? $"Código {process.ExitCode}" : error.Trim());
-        using var json = JsonDocument.Parse(output.Trim());
+        using var json = await RunPowerShellJsonAsync(script, token, WindowsPowerShellModule.Utility, WindowsPowerShellModule.Defender);
         var root = json.RootElement;
         DateTimeOffset? updated = null;
         if (root.TryGetProperty("SignatureUpdatedAt", out var date) && date.ValueKind == JsonValueKind.String &&
@@ -157,5 +381,43 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         return new SecurityInfo(root.GetProperty("DefenderEnabled").GetBoolean(),
             root.GetProperty("RealTimeProtectionEnabled").GetBoolean(), updated,
             root.GetProperty("Summary").GetString() ?? "Estado consultado no Defender");
+    }
+
+    private static async Task<JsonDocument> RunPowerShellJsonAsync(string script, CancellationToken token,
+        params WindowsPowerShellModule[] modules)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(TimeSpan.FromSeconds(25));
+        var start = TrustedPowerShell.Create(script, modules);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("PowerShell não iniciou.");
+        var outputTask = process.StandardOutput.ReadToEndAsync(deadline.Token);
+        var errorTask = process.StandardError.ReadToEndAsync(deadline.Token);
+        try
+        {
+            await process.WaitForExitAsync(deadline.Token);
+            var output = await outputTask;
+            var error = await errorTask;
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? $"Código {process.ExitCode}" : error.Trim());
+            return JsonDocument.Parse(output.Trim());
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        {
+            throw new TimeoutException("O provedor PowerShell excedeu 25 segundos.");
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                try { process.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) { }
+            }
+            // Observe stream failures after cancellation without waiting for a failed
+            // provider's descendants to close inherited output handles.
+            if (!outputTask.IsCompleted) _ = outputTask.ContinueWith(t => _ = t.Exception,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+            if (!errorTask.IsCompleted) _ = errorTask.ContinueWith(t => _ = t.Exception,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+        }
     }
 }

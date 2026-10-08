@@ -69,16 +69,41 @@ public static class SessionStore
     }
 
     public static async Task WriteReportAsync(Guid sessionId, MaintenanceReport report)
+        => await WriteReportCoreAsync(sessionId, report, replaceExisting: true);
+
+    public static async Task WriteProgressReportAsync(Guid sessionId, MaintenanceReport report)
+        => await WriteReportCoreAsync(sessionId, report, replaceExisting: true);
+
+    /// <summary>The helper may create only the fixed driver-backup child.</summary>
+    public static string CreateProtectedChildDirectory(Guid sessionId, string constantName)
+    {
+        if (constantName != "driver-backup")
+            throw new ArgumentException("Diretório auxiliar não permitido.", nameof(constantName));
+        var child = Path.Combine(GetSessionDirectory(sessionId), constantName);
+        CreateOrValidate(child);
+        return child;
+    }
+
+    private static async Task WriteReportCoreAsync(Guid sessionId, MaintenanceReport report, bool replaceExisting)
     {
         if (report.SessionId != sessionId) throw new ArgumentException("Sessão e relatório diferentes.", nameof(report));
         var directory = GetSessionDirectory(sessionId);
-        var temporary = Path.Combine(directory, "report.pending");
-        await using (var stream = CreateProtectedFile(temporary))
+        var temporary = Path.Combine(directory, $"report-{Guid.NewGuid():N}.pending");
+        var destination = Path.Combine(directory, "report.json");
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, report, new JsonSerializerOptions { WriteIndented = true });
-            await stream.FlushAsync();
+            await using (var stream = CreateProtectedFile(temporary))
+            {
+                await JsonSerializer.SerializeAsync(stream, report, new JsonSerializerOptions { WriteIndented = true });
+                await stream.FlushAsync();
+            }
+            if (File.Exists(destination)) ValidateFile(destination);
+            File.Move(temporary, destination, overwrite: replaceExisting);
         }
-        File.Move(temporary, Path.Combine(directory, "report.json"), overwrite: false);
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 
     /// <summary>Only constant log names from the helper are accepted.</summary>

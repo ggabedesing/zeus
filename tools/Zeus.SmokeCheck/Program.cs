@@ -8,7 +8,7 @@ if (!OperatingSystem.IsWindows())
 
 try
 {
-    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(150));
     var snapshot = await new WindowsHardwareDiagnostics().CollectAsync(timeout.Token);
     if (string.IsNullOrWhiteSpace(snapshot.OperatingSystem))
         throw new InvalidOperationException("Operating system information was not collected.");
@@ -18,7 +18,15 @@ try
         throw new InvalidOperationException("Physical memory inventory was not collected.");
     if (snapshot.Disks.Count == 0 || snapshot.Disks.All(disk => disk.TotalBytes == 0))
         throw new InvalidOperationException("Storage inventory was not collected.");
-    Console.WriteLine("PASS: real operating system, CPU, memory and volume data collected.");
+    var performance = await new WindowsPerformanceProbe().SampleAsync(TimeSpan.FromSeconds(2), timeout.Token);
+    if (performance.CpuPercent is not { } cpu || cpu is < 0 or > 100)
+        throw new InvalidOperationException("Native Windows CPU observation was not collected.");
+    if (performance.TotalMemoryBytes == 0 || performance.AvailableMemoryBytes > performance.TotalMemoryBytes)
+        throw new InvalidOperationException("Native Windows physical memory observation was not collected.");
+    if (performance.Processes.Count == 0)
+        throw new InvalidOperationException("No real Windows process observation was collected.");
+    Console.WriteLine("PASS: real operating system, CPU, memory, volume and native performance data collected.");
+    Console.WriteLine($"Optional inventory: board={snapshot.Board is not null}; BIOS={snapshot.Bios is not null}; physicalDisks={snapshot.PhysicalDisks?.Count ?? 0}.");
     Console.WriteLine($"Optional warnings: {snapshot.Warnings.Count}. No repair or restore operation executed.");
     return 0;
 }
