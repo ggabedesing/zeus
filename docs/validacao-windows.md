@@ -58,6 +58,10 @@ A experiência de papel de parede agora tem prévia antes da confirmação, cóp
 
 O inventário mantém separados o estado/partida consultados por `Win32_Service` e as dependências declaradas pela consulta local `Get-Service`. Se a segunda fonte falhar, dependências ficam desconhecidas sem invalidar o inventário dos serviços. A tela de Manutenção descreve relações, grupos, referências que não foram resolvidas no inventário e estados observados; não inicia, para ou altera serviços. Um serviço parado isoladamente não é classificado como defeito. Nesta revisão, passaram 74 testes de hardware, 3 testes focados de inventário/WPF e a compilação Release sem avisos ou erros; o teste WPF clica no botão e confere a lista produzida. A suíte focal também cobre dados desconhecidos, referências ausentes e grupos.
 
+## Diagnóstico de dispositivos PnP
+
+A tela de Manutenção agora interpreta um catálogo selecionado de códigos PnP documentados pela Microsoft, com orientação de consulta segura para o dispositivo. Códigos que não estão no catálogo, valores inválidos e inventário indisponível permanecem explícitos, sem inferir causa física. O código, o estado retornado pelo Windows e o nome do dispositivo continuam visíveis. Nada habilita dispositivos, altera Registro/firmware ou instala drivers. A compilação Release passou sem avisos/erros; 68 testes do núcleo e 3 testes focados de inventário/WPF passaram. Os testes cobrem códigos 10, 28, 43 e 52, além de códigos desconhecidos e indisponíveis.
+
 ## Aceitação administrativa em máquinas de teste
 
 Use Windows 11 suportado, snapshots quando disponíveis e backups independentes. Guarde a versão/commit, ação, relatório e resultado após reiniciar. Execute cada cenário separadamente.

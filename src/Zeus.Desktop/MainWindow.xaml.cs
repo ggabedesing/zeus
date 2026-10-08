@@ -122,6 +122,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<DeviceRow> PerformanceResourceRows { get; } = [];
     public ObservableCollection<DeviceRow> StartupRows { get; } = [];
     public ObservableCollection<DeviceRow> ServiceDependencyRows { get; } = [];
+    public ObservableCollection<DeviceRow> DeviceRepairRows { get; } = [];
     public ObservableCollection<string> Warnings { get; } = [];
     public ObservableCollection<MaintenanceChoice> MaintenanceChoices { get; } = [];
     public ObservableCollection<HistoryRow> HistoryRows { get; } = [];
@@ -153,6 +154,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string StatusDetail { get => _statusDetail; private set => Set(ref _statusDetail, value); }
     public string ExecutionLog { get => _executionLog; private set => Set(ref _executionLog, value); }
     public string ServiceDependencySummary { get; private set; } = "Leia o inventário do Windows para consultar as dependências declaradas dos serviços.";
+    public string DeviceRepairSummary { get; private set; } = "Leia o inventário do Windows para consultar os códigos de problema PnP.";
     public string MaintenanceResultSummary { get => _maintenanceResultSummary; private set => Set(ref _maintenanceResultSummary, value); }
     public string CleanupSummary { get => _cleanupSummary; private set => Set(ref _cleanupSummary, value); }
     public string StartupSummary { get => _startupSummary; private set => Set(ref _startupSummary, value); }
@@ -302,6 +304,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ? "Inventário de serviços indisponível nesta coleta."
             : "Use a consulta para descrever as dependências declaradas no inventário.";
         Notify(nameof(ServiceDependencySummary));
+        DeviceRepairRows.Clear();
+        if (inventory is null)
+            DeviceRepairSummary = "Inventário PnP indisponível nesta coleta; estado dos dispositivos desconhecido.";
+        else
+        {
+            var deviceProblems = inventory.PnpDevices.Where(device => !string.IsNullOrWhiteSpace(device.ProblemCode)).ToArray();
+            foreach (var device in deviceProblems.Take(100))
+            {
+                var interpretation = PnpProblemInterpreter.Interpret(device.ProblemCode);
+                DeviceRepairRows.Add(new($"Código {device.ProblemCode} · {Available(device.Name)}",
+                    $"{interpretation.Meaning} Estado informado: {Available(device.Status)}. {interpretation.Guidance}"));
+            }
+            DeviceRepairSummary = deviceProblems.Length == 0
+                ? "Nenhum código de problema PnP foi retornado nesta leitura; isso não exclui falhas não reportadas por esta fonte."
+                : $"{deviceProblems.Length} dispositivo(s) com código reportado. As interpretações são limitadas ao significado documentado do código; causa física não determinada." +
+                    (deviceProblems.Length > 100 ? " Exibindo os primeiros 100; o relatório contém o inventário coletado." : string.Empty);
+        }
+        Notify(nameof(DeviceRepairSummary));
         HardwareCards.Add(new("Inventário do Windows", inventory is null ? "Indisponível" : $"{inventory.Processes.Count} processos · {inventory.Services.Count} serviços", inventory is null ? "As fontes do Windows não responderam nesta coleta." : $"{inventory.Drivers.Count} drivers · {inventory.PnpDevices.Count} dispositivos · {inventory.InstalledSoftware.Count} programas"));
         GraphicsRows.Clear(); foreach (var item in snapshot.Graphics) GraphicsRows.Add(new(Available(item.Name), $"Driver {Available(item.DriverVersion)}"));
         DiskRows.Clear(); foreach (var disk in snapshot.Disks) DiskRows.Add(new($"{disk.DriveLetter} · {Available(disk.Name)}", $"{ByteFormatting.Format(disk.FreeBytes)} livres de {ByteFormatting.Format(disk.TotalBytes)} · {Available(disk.FileSystem)}"));

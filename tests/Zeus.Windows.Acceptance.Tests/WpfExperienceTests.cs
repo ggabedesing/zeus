@@ -81,6 +81,12 @@ public sealed class WpfExperienceTests
         Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);
         Assert.NotEmpty(window.HardwareCards);
         Assert.NotNull(window.Snapshot);
+        Assert.NotEmpty(window.DeviceRepairSummary);
+        Assert.All(window.DeviceRepairRows, row =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(row.Title));
+            Assert.False(string.IsNullOrWhiteSpace(row.Detail));
+        });
         var serviceDependencyButton = Assert.IsType<Button>(window.FindName("AnalyzeServiceDependenciesButton"));
         Assert.Equal("analyze-service-dependencies", AutomationProperties.GetAutomationId(serviceDependencyButton));
         Assert.True(serviceDependencyButton.IsEnabled);
