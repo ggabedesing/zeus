@@ -16,6 +16,8 @@ O teste do MSI roda em um Windows descartável hospedado pelo GitHub; não valid
 
 Em 2026-10-08, a coleta real deste PC retornou um disco físico e nenhum dos contadores de temperatura, desgaste, horas ligado ou erros de leitura/gravação. A interface mantém esses campos como indisponíveis. A checagem de fumaça não executou reparos. Depois da ampliação, o build Release passou sem avisos/erros, os testes de hardware passaram em 82 casos e a aceitação Windows passou em 40, com um teste administrativo ignorado.
 
+Após a correção do limite do inventário, a checagem somente de leitura voltou a passar neste PC em `57f742e` sem solicitar elevação. Confirmou sistema operacional, CPU, RAM, volumes, contadores nativos de CPU/memória, processos, placa-mãe, BIOS, dois módulos e quatro slots declarados pelo firmware. Os canais de RAM não foram inferidos. Para o único disco físico consultado, o provedor não expôs temperatura, desgaste, horas ligado nem contadores de erro; isso permanece indisponível e não representa declaração de saúde. A leitura também encontrou dois adaptadores com uso dedicado de GPU e apenas um com capacidade disponível. Nenhum jogo ou OBS conhecido foi identificado entre os processos acessíveis; isso não confirma que estivessem fechados. Nenhum reparo foi executado. O registro sanitizado está em [smoke-local-2026-10-08.json](evidencias/smoke-local-2026-10-08.json).
+
 ## Testes automatizados
 
 | Área | Evidência exigida pelo workflow |

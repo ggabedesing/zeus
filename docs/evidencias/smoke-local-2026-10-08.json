@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "local-read-only-diagnostic-smoke",
+  "recordedAtUtc": "2026-10-08T20:22:36Z",
+  "sourceCommit": "57f742e73ea3a5515d6ef7121b870bafb6e169da",
+  "elevation": "not requested",
+  "outcome": "success",
+  "checks": {
+    "operatingSystem": true,
+    "cpuInventory": true,
+    "memoryInventory": true,
+    "volumeInventory": true,
+    "nativeCpuAndMemoryCounters": true,
+    "processObservation": true,
+    "motherboard": true,
+    "bios": true,
+    "physicalDiskCount": 1,
+    "memoryModules": 2,
+    "firmwareDeclaredMemorySlots": 4,
+    "memoryChannelsInferred": false
+  },
+  "optionalStorageCounters": {
+    "temperatureAvailable": 0,
+    "wearAvailable": 0,
+    "powerOnHoursAvailable": 0,
+    "readWriteErrorCountersAvailable": 0,
+    "physicalDisks": 1
+  },
+  "performanceCounters": {
+    "gpuMemoryAdapters": 2,
+    "dedicatedUsageAvailable": 2,
+    "dedicatedCapacityAvailable": 1,
+    "dedicatedOccupancyAvailable": 1,
+    "gameOrObsDetected": false,
+    "obsEncoderActivityAvailable": false
+  },
+  "warnings": 6,
+  "maintenancePerformed": false,
+  "limitations": [
+    "This smoke check confirms that required readings were collected; it is not a full hardware acceptance suite.",
+    "Unavailable storage reliability counters are not interpreted as zero health or as proof that the disk is healthy.",
+    "No known game or OBS process was found among accessible processes; this does not prove they were closed.",
+    "The performance sample does not prove a bottleneck or measured performance improvement."
+  ]
+}
