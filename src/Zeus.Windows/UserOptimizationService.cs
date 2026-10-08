@@ -374,7 +374,8 @@ public sealed class UserOptimizationService
             await using var fileLock = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             return await action();
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or Win32Exception or COMException or InvalidDataException or ArgumentException or NotSupportedException)
+        catch (Exception exception) when (exception is not PlatformNotSupportedException &&
+                                          (exception is IOException or UnauthorizedAccessException or Win32Exception or COMException or InvalidDataException or ArgumentException or NotSupportedException))
         {
             return Failure($"A operação não foi concluída: {exception.Message} Se houve mudança parcial, consulte o histórico para restaurar.");
         }
