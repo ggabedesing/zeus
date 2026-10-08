@@ -41,6 +41,10 @@ No commit `e68f904`, a nova leitura DXGI foi conferida no mesmo PC: dois adaptad
 
 Na validação local atual, `Zeus.SmokeCheck` coletou CPU, RAM, volumes, dados de desempenho nativos e inventário opcional de placa-mãe/BIOS/disco. Foram vistos dois adaptadores GPU, uso dedicado em dois e capacidade/ocupação correspondente em um. Nenhum jogo/OBS conhecido apareceu entre os processos acessíveis dessa amostra; isso não comprova que estejam fechados, e a atividade de encoder ficou indisponível. A detecção sintética cobre associação `VideoEncode` ao PID do OBS, sem afirmar transmissão ao vivo. Compilação Release sem avisos/erros, 64 testes de hardware aprovados e 39 testes de aceitação aprovados (1 teste administrativo ignorado). Nenhum reparo ou alteração de configuração foi executado.
 
+Os coletores WMI de desempenho agora mantêm instâncias válidas já lidas se a enumeração for interrompida no meio, marcando a lista como parcial; uma falha antes da primeira instância mantém a métrica indisponível. Cancelamento continua sendo propagado e encerra a coleta.
+
+Esta revisão compilou a solução Release sem avisos/erros; 66 testes de hardware passaram, incluindo os dois casos de preservação parcial/indisponibilidade. A aceitação Windows passou em 39 testes, com 1 teste administrativo ignorado. O smoke test nativo foi concluído sem executar reparos; nesta amostra a telemetria de encoder continuou indisponível.
+
 ## Aceitação administrativa em máquinas de teste
 
 Use Windows 11 suportado, snapshots quando disponíveis e backups independentes. Guarde a versão/commit, ação, relatório e resultado após reiniciar. Execute cada cenário separadamente.

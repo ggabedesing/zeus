@@ -254,11 +254,26 @@ public sealed class WindowsPerformanceProbe
         catch (OperationCanceledException) { throw; }
         catch (Exception error)
         {
-            warnings.Add($"{label}: contador {className} indisponível ({error.GetType().Name}).");
-            return [];
+            return HandleCounterReadFailure(label, className, result, error, warnings);
         }
         if (result.Count == 0) warnings.Add($"{label}: o provedor não retornou instâncias; a métrica permanece indisponível.");
         return result;
+    }
+
+    internal static IReadOnlyList<T> HandleCounterReadFailure<T>(string label, string className,
+        IReadOnlyList<T> validRows, Exception error, ICollection<string> warnings) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(validRows);
+        ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(warnings);
+        if (validRows.Count == 0)
+        {
+            warnings.Add($"{label}: contador {className} indisponível ({error.GetType().Name}).");
+            return [];
+        }
+
+        warnings.Add($"{label}: leitura interrompida após {validRows.Count} instância(s) válidas ({error.GetType().Name}); os dados parciais foram preservados e a lista pode estar incompleta.");
+        return validRows;
     }
 
     private static double? CounterDouble(ManagementBaseObject row, string property)

@@ -25,6 +25,31 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void InterruptedCounterReadPreservesValidRowsAndMarksTheListPartial()
+    {
+        var rows = new[] { new ProcessObservation(1, "process", 10, 1024) };
+        var warnings = new List<string>();
+
+        var result = WindowsPerformanceProbe.HandleCounterReadFailure("GPU", "counter", rows,
+            new TimeoutException(), warnings);
+
+        Assert.Same(rows, result);
+        Assert.Contains("dados parciais foram preservados", Assert.Single(warnings));
+    }
+
+    [Fact]
+    public void InterruptedCounterReadWithoutValidRowsRemainsUnavailable()
+    {
+        var warnings = new List<string>();
+
+        var result = WindowsPerformanceProbe.HandleCounterReadFailure<ProcessObservation>("GPU", "counter", [],
+            new TimeoutException(), warnings);
+
+        Assert.Empty(result);
+        Assert.Contains("indisponível", Assert.Single(warnings));
+    }
+
+    [Fact]
     public void DedicatedGpuOccupancyRequiresBothUsageAndReportedCapacity()
     {
         Assert.Equal(75d, new GpuMemoryObservation("gpu", 3, 0, 3, 4).DedicatedOccupancyPercent);
