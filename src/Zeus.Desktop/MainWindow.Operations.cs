@@ -202,6 +202,7 @@ public partial class MainWindow
                     var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(2), token);
                     DisplayPerformanceObservation(observation);
                     await StorePerformanceObservationAsync(id, observation);
+                    BuildPersonalPlan();
                     var interval = AdaptiveSamplingPolicy.NextInterval(observation);
                     PerformanceSummary += $" · próxima amostra em {interval.TotalSeconds:0} s";
                     StatusDetail = $"Sessão {id:N} · {_performanceHistory.Snapshot().Count} amostras guardadas em memória. Cancele para encerrar.";

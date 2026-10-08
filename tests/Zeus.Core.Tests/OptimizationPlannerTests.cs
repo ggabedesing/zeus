@@ -123,7 +123,7 @@ public sealed class OptimizationPlannerTests
         var snapshot = HealthySnapshot();
         var unknown = ruleEngine.Evaluate(snapshot, OptimizationProfile.GamingStreaming);
         var observed = ruleEngine.Evaluate(snapshot, OptimizationProfile.GamingStreaming,
-            new OptimizationWorkloadEvidence(55, 60, true, true));
+            new OptimizationWorkloadEvidence(55, 60, true, true, false, 6, 12));
         var contextRule = Assert.Single(observed.Rules, result => result.Rule.Id == "gaming.streaming-context");
 
         Assert.Equal(OptimizationPlanStatus.NeedsMoreData, unknown.Status);
@@ -143,6 +143,37 @@ public sealed class OptimizationPlannerTests
         Assert.True(memoryRule.Triggered);
         Assert.Contains("não comprova gargalo", memoryRule.Reason);
         Assert.Null(memoryRule.Action);
+    }
+
+    [Fact]
+    public void GamingGpuMemoryRuleRequiresSustainedEvidenceAndNeverClaimsPressureOrCreatesAction()
+    {
+        var snapshot = HealthySnapshot();
+        var unknown = ruleEngine.Evaluate(snapshot, OptimizationProfile.Gaming);
+        var high = ruleEngine.Evaluate(snapshot, OptimizationProfile.GamingStreaming,
+            new OptimizationWorkloadEvidence(55, 60, true, true, true, 6, 12));
+        var insufficient = ruleEngine.Evaluate(snapshot, OptimizationProfile.Gaming,
+            new OptimizationWorkloadEvidence(55, 60, true, false, true, 4, 9));
+        var ordinary = ruleEngine.Evaluate(snapshot, OptimizationProfile.Gaming,
+            new OptimizationWorkloadEvidence(55, 60, true, false, false, 6, 12));
+
+        var missingRule = Assert.Single(unknown.Rules, result => result.Rule.Id == "gaming.gpu-memory-occupancy");
+        var highRule = Assert.Single(high.Rules, result => result.Rule.Id == "gaming.gpu-memory-occupancy");
+        var insufficientRule = Assert.Single(insufficient.Rules, result => result.Rule.Id == "gaming.gpu-memory-occupancy");
+        var ordinaryRule = Assert.Single(ordinary.Rules, result => result.Rule.Id == "gaming.gpu-memory-occupancy");
+
+        Assert.False(missingRule.EvidenceAvailable);
+        Assert.False(missingRule.Triggered);
+        Assert.True(highRule.Triggered);
+        Assert.Equal(RuleConfidence.Low, highRule.Rule.Confidence);
+        Assert.Contains("não comprova pressão", highRule.Reason);
+        Assert.Contains("6 amostras válidas", highRule.Reason);
+        Assert.Null(highRule.Action);
+        Assert.False(insufficientRule.EvidenceAvailable);
+        Assert.False(insufficientRule.Triggered);
+        Assert.True(ordinaryRule.EvidenceAvailable);
+        Assert.False(ordinaryRule.Triggered);
+        Assert.Null(ordinaryRule.Action);
     }
 
     [Theory]

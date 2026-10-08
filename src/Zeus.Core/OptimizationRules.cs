@@ -46,7 +46,10 @@ public sealed record OptimizationWorkloadEvidence(
     double? CpuPercent,
     double? AvailableMemoryPercent,
     bool? KnownGameProcessDetected,
-    bool? ObsProcessDetected);
+    bool? ObsProcessDetected,
+    bool? SustainedHighGpuMemoryOccupancy = null,
+    int? GpuMemoryOccupancyValidSamples = null,
+    double? GpuMemoryOccupancyWindowSeconds = null);
 
 /// <summary>
 /// Formal metadata and evaluation for evidence-based review rules. The plan intentionally
@@ -54,6 +57,8 @@ public sealed record OptimizationWorkloadEvidence(
 /// </summary>
 public sealed class OptimizationRuleEngine
 {
+    private const int MinimumGpuOccupancySamples = 5;
+    private const double MinimumGpuOccupancyWindowSeconds = 10;
     private static readonly IReadOnlySet<OptimizationProfile> AllProfiles = new HashSet<OptimizationProfile>(Enum.GetValues<OptimizationProfile>());
 
     private static readonly OptimizationRuleDefinition[] DefaultDefinitions =
@@ -88,6 +93,10 @@ public sealed class OptimizationRuleEngine
             new HashSet<OptimizationProfile> { OptimizationProfile.Gaming, OptimizationProfile.GamingStreaming },
             "Memória disponível na amostra e processo de jogo conhecido presente na lista observada.",
             "Repetir durante a partida, conferir paginação e processos que usam memória; não esvaziar RAM automaticamente.", [], true),
+        new("gaming.gpu-memory-occupancy", "Investigar ocupação sustentada da memória dedicada da GPU", OptimizationBenefit.WorkloadDiagnosis, RuleConfidence.Low,
+            new HashSet<OptimizationProfile> { OptimizationProfile.Gaming, OptimizationProfile.GamingStreaming },
+            "Ocupação dedicada válida por adaptador em pelo menos cinco amostras ao longo de dez segundos.",
+            "Repetir durante a mesma tarefa e verificar configurações do jogo, uso compartilhado e fluidez; ocupação alta não comprova pressão, gargalo ou perda de desempenho.", [], true),
         new("workload.cpu-load", "Validar carga de CPU durante a tarefa", OptimizationBenefit.WorkloadDiagnosis, RuleConfidence.Low,
             new HashSet<OptimizationProfile> { OptimizationProfile.Work, OptimizationProfile.Editing, OptimizationProfile.Development },
             "Amostra válida de CPU durante a tarefa selecionada.",
@@ -146,6 +155,24 @@ public sealed class OptimizationRuleEngine
                     workloadEvidenceAvailable ? $"Há {workload!.AvailableMemoryPercent:0.#}% de memória disponível nesta amostra; o limiar de revisão de 10% não foi atingido." :
                     "Amostra válida de memória e processo de jogo conhecido não estão disponíveis em conjunto; ausência na lista observada não prova que o jogo esteja fechado.",
                     workloadEvidenceAvailable, triggered, null));
+                continue;
+            }
+            if (definition.Id == "gaming.gpu-memory-occupancy")
+            {
+                var samples = workload?.GpuMemoryOccupancyValidSamples;
+                var window = workload?.GpuMemoryOccupancyWindowSeconds;
+                var windowIsValid = samples >= MinimumGpuOccupancySamples && window >= MinimumGpuOccupancyWindowSeconds;
+                var workloadEvidenceAvailable = windowIsValid && workload?.SustainedHighGpuMemoryOccupancy is not null;
+                var triggered = workloadEvidenceAvailable && workload!.SustainedHighGpuMemoryOccupancy == true;
+                var measurement = samples is { } count && window is { } seconds
+                    ? $" Evidência: {count} amostras válidas em {seconds:0.#} s."
+                    : string.Empty;
+                var occupancyReason = triggered
+                    ? "Ao menos um adaptador apresentou ocupação dedicada alta e sustentada. Isso é um sinal para investigar; não comprova pressão, gargalo ou perda de desempenho." + measurement
+                    : workloadEvidenceAvailable
+                        ? "A janela observada não atingiu o critério de ocupação dedicada alta e sustentada." + measurement
+                        : "Não há amostras válidas suficientes de memória dedicada da GPU; ausência de dados não indica folga.";
+                results.Add(new(definition, occupancyReason, workloadEvidenceAvailable, triggered, null));
                 continue;
             }
             if (definition.Id == "workload.cpu-load")

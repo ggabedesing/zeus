@@ -523,15 +523,33 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _ => OptimizationProfile.General
     };
 
-    private static OptimizationWorkloadEvidence? ToWorkloadEvidence(PerformanceObservation? observation)
+    private OptimizationWorkloadEvidence? ToWorkloadEvidence(PerformanceObservation? observation)
     {
         if (observation is not { } sample) return null;
         double? availableMemoryPercent = sample.TotalMemoryBytes > 0 && sample.AvailableMemoryBytes <= sample.TotalMemoryBytes
             ? (double)sample.AvailableMemoryBytes / sample.TotalMemoryBytes * 100
             : null;
+        var currentSession = _performanceHistory.Snapshot()
+            .Where(entry => entry.SessionId == _performanceSessionId)
+            .Select(entry => entry.Observation)
+            .ToArray();
+        var gpuAssessments = GpuMemoryOccupancyAnalyzer.Assess(currentSession);
+        bool? sustainedGpuOccupancy = gpuAssessments.Any(assessment => assessment.State == GpuMemoryOccupancyState.SustainedHighOccupancy)
+            ? true
+            : gpuAssessments.Count > 0 && gpuAssessments.All(assessment => assessment.State == GpuMemoryOccupancyState.NoSustainedHighOccupancy)
+                ? false
+                : null;
+        var evidenceAssessments = gpuAssessments.Any(assessment => assessment.State == GpuMemoryOccupancyState.SustainedHighOccupancy)
+            ? gpuAssessments.Where(assessment => assessment.State == GpuMemoryOccupancyState.SustainedHighOccupancy).ToArray()
+            : gpuAssessments.ToArray();
+        int? validGpuSamples = evidenceAssessments.Length > 0 ? evidenceAssessments.Min(assessment => assessment.ValidSamples) : null;
+        double? gpuWindowSeconds = evidenceAssessments.Length > 0 ? evidenceAssessments.Min(assessment => assessment.Window.TotalSeconds) : null;
         return new(sample.CpuPercent, availableMemoryPercent,
             sample.ActivityContext?.KnownGameProcessDetected,
-            sample.ActivityContext?.ObsProcessDetected);
+            sample.ActivityContext?.ObsProcessDetected,
+            sustainedGpuOccupancy,
+            validGpuSamples,
+            gpuWindowSeconds);
     }
 
     private void ShowPendingHardware()
