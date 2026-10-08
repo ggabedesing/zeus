@@ -55,6 +55,7 @@ internal sealed class DesktopStorage
             foreach (var step in report.Steps)
             {
                 if (step is null || !Enum.IsDefined(step.Action) || !Enum.IsDefined(step.Outcome) ||
+                    !Enum.IsDefined(step.Verification) ||
                     !actions.Add((step.Action, step.Action == MaintenanceActionId.InstallDriverUpdate ? step.TargetId : null)) || step.Message is null)
                     throw new InvalidDataException("O histórico contém uma ação inválida ou repetida.");
                 if (step.Action == MaintenanceActionId.InstallDriverUpdate && !MaintenanceRequestProtocol.TryParseDriverIdentity(step.TargetId, out _, out _))
@@ -120,14 +121,15 @@ internal sealed class DesktopStorage
 
     private static StoredMaintenanceSession ToStored(MaintenanceReport report) => new(
         report.SessionId.ToString("D"), report.StartedAt, report.FinishedAt, report.RestorePointConfirmed, report.IsComplete, report.Error,
-        report.Steps.Select((step, index) => new StoredMaintenanceStep(index, step.Action.ToString(), step.Outcome.ToString(), step.Message, step.LogFile, step.TargetId)).ToArray());
+        report.Steps.Select((step, index) => new StoredMaintenanceStep(index, step.Action.ToString(), step.Outcome.ToString(), step.Message, step.LogFile, step.TargetId, step.Verification.ToString())).ToArray());
 
     private static MaintenanceReport FromStored(StoredMaintenanceSession session)
     {
         if (!Guid.TryParseExact(session.SessionId, "D", out var id) || id == Guid.Empty)
             throw new InvalidDataException("O banco contém um identificador de sessão inválido.");
         var steps = session.Steps.OrderBy(step => step.Sequence).Select(step => new MaintenanceStepResult(
-            ParseEnum<MaintenanceActionId>(step.Action), ParseEnum<StepOutcome>(step.Outcome), step.Message, step.LogFile, step.TargetId)).ToArray();
+            ParseEnum<MaintenanceActionId>(step.Action), ParseEnum<StepOutcome>(step.Outcome), step.Message, step.LogFile, step.TargetId,
+            ParseEnum<MaintenanceVerificationStatus>(step.Verification))).ToArray();
         return new(id, session.StartedAt, session.FinishedAt, session.RestorePointConfirmed, steps, session.Error, session.IsComplete);
     }
 

@@ -63,7 +63,8 @@ public sealed class ElevatedMaintenanceExecutor : IMaintenanceExecutor, IAdvance
             var cleanupError = await TryForgetLaunchReceiptAsync(id);
             return new MaintenanceReport(id, started, DateTimeOffset.UtcNow, false,
                 selected.Select(request => new MaintenanceStepResult(request.Action, StepOutcome.Cancelled,
-                    "Autorização de administrador cancelada; nenhuma ação executada." + cleanupError, TargetId: request.TargetId)).ToArray());
+                    "Autorização de administrador cancelada; nenhuma ação executada." + cleanupError, TargetId: request.TargetId,
+                    Verification: MaintenanceVerificationStatus.NotStarted)).ToArray());
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException or UnauthorizedAccessException)
         {

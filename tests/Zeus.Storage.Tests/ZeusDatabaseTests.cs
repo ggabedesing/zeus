@@ -73,7 +73,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         var database = CreateDatabase();
         var id = Guid.NewGuid().ToString("D");
         var session = new StoredMaintenanceSession(id, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow, true, false,
-            "A conclusão não foi confirmada", [new(0, "VerifySystemFiles", "Failed", "Saída não confirmada", "log.txt", null)]);
+            "A conclusão não foi confirmada", [new(0, "InstallDriverUpdate", "Succeeded", "Windows Update confirmou a identidade", "log.txt", "12345678-1234-1234-1234-123456789abc:1", "ProviderConfirmed")]);
 
         await database.SaveMaintenanceHistoryAsync([session]);
         var restored = Assert.Single(await database.ReadMaintenanceHistoryAsync());
@@ -81,8 +81,9 @@ public sealed class ZeusDatabaseTests : IDisposable
         Assert.Equal(id, restored.SessionId);
         Assert.True(restored.RestorePointConfirmed);
         Assert.False(restored.IsComplete);
-        Assert.Equal("VerifySystemFiles", Assert.Single(restored.Steps).Action);
+        Assert.Equal("InstallDriverUpdate", Assert.Single(restored.Steps).Action);
         Assert.Equal("log.txt", restored.Steps[0].LogFile);
+        Assert.Equal("ProviderConfirmed", restored.Steps[0].Verification);
         Assert.Equal(1, (await database.CheckHealthAsync()).MaintenanceSessionCount);
     }
 
@@ -107,7 +108,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         Assert.Equal(42.5, sample.CpuPercent);
         Assert.Equal("{\"gpu\":[]}", sample.DetailsJson);
         var health = await database.CheckHealthAsync();
-        Assert.Equal(2, health.SchemaVersion);
+        Assert.Equal(3, health.SchemaVersion);
         Assert.Equal(1, health.PerformanceSessionCount);
         Assert.Equal(1, health.PerformanceSampleCount);
     }
@@ -122,7 +123,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         {
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
-            command.CommandText = "DROP TABLE performance_samples; DROP TABLE performance_sessions; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1;";
+            command.CommandText = "DROP TABLE performance_samples; DROP TABLE performance_sessions; DROP TABLE maintenance_steps; CREATE TABLE maintenance_steps(session_id TEXT NOT NULL REFERENCES maintenance_sessions(session_id) ON DELETE CASCADE,sequence INTEGER NOT NULL CHECK(sequence >= 0),action TEXT NOT NULL,outcome TEXT NOT NULL,message TEXT NOT NULL,log_file TEXT NULL,target_id TEXT NULL,PRIMARY KEY(session_id,sequence)); DELETE FROM schema_migrations WHERE version IN (2,3); PRAGMA user_version=1;";
             await command.ExecuteNonQueryAsync();
         }
 
@@ -130,9 +131,40 @@ public sealed class ZeusDatabaseTests : IDisposable
         var health = await upgraded.CheckHealthAsync();
 
         Assert.True(health.IsHealthy);
-        Assert.Equal(2, health.SchemaVersion);
+        Assert.Equal(3, health.SchemaVersion);
         Assert.Equal("{\"theme\":\"Aurora\"}", await upgraded.ReadSettingAsync("preferences"));
         Assert.Empty(await upgraded.ReadPerformanceSessionsAsync());
+    }
+
+    [Fact]
+    public async Task SchemaV2AddsVerificationStatusWithoutChangingHistoricalSteps()
+    {
+        var path = Path.Combine(_root, "zeus.db");
+        var initial = new ZeusDatabase(path);
+        var sessionId = Guid.NewGuid().ToString("D");
+        await initial.SaveMaintenanceHistoryAsync([new(sessionId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
+            false, true, null, [new(0, "VerifySystemFiles", "Succeeded", "Verificação concluída", null, null, "CommandCompleted")])]);
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE maintenance_steps_v2(session_id TEXT NOT NULL REFERENCES maintenance_sessions(session_id) ON DELETE CASCADE,sequence INTEGER NOT NULL CHECK(sequence >= 0),action TEXT NOT NULL,outcome TEXT NOT NULL,message TEXT NOT NULL,log_file TEXT NULL,target_id TEXT NULL,PRIMARY KEY(session_id,sequence)); INSERT INTO maintenance_steps_v2 SELECT session_id,sequence,action,outcome,message,log_file,target_id FROM maintenance_steps; DROP TABLE maintenance_steps; ALTER TABLE maintenance_steps_v2 RENAME TO maintenance_steps; DELETE FROM schema_migrations WHERE version=3; PRAGMA user_version=2;";
+            await command.ExecuteNonQueryAsync();
+            await using var verify = connection.CreateCommand();
+            verify.CommandText = "SELECT COUNT(*) FROM pragma_table_info('maintenance_steps') WHERE name='verification_status';";
+            Assert.Equal(0L, (long)(await verify.ExecuteScalarAsync())!);
+            verify.CommandText = "PRAGMA user_version;";
+            Assert.Equal(2L, (long)(await verify.ExecuteScalarAsync())!);
+        }
+
+        var upgraded = new ZeusDatabase(path);
+        var health = await upgraded.CheckHealthAsync();
+        var migrated = Assert.Single(await upgraded.ReadMaintenanceHistoryAsync());
+
+        Assert.True(health.IsHealthy);
+        Assert.Equal(3, health.SchemaVersion);
+        Assert.Equal("NotRecorded", Assert.Single(migrated.Steps).Verification);
+        Assert.Equal("Verificação concluída", migrated.Steps[0].Message);
     }
 
     [Fact]

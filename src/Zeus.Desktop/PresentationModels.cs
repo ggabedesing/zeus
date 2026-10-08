@@ -95,12 +95,21 @@ public sealed record HistoryRow(Guid SessionId, string Title, string Summary, st
         if (!report.IsComplete) summary = "Conclusão não confirmada · " + summary;
         return new(report.SessionId, report.StartedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss"), summary,
             report.RestorePointConfirmed ? "Proteção de recuperação confirmada pelo auxiliar." : "Esta sessão não confirmou um ponto de restauração.",
-            report.Steps.Select(step => $"{MaintenanceCatalog.Get(step.Action).Title}{(step.TargetId is null ? "" : $" [{step.TargetId}]")} — {OutcomeTitle(step.Outcome)}: {step.Message}").ToArray(),
+            report.Steps.Select(step => $"{MaintenanceCatalog.Get(step.Action).Title}{(step.TargetId is null ? "" : $" [{step.TargetId}]")} — {OutcomeTitle(step.Outcome)} · {VerificationTitle(step.Verification)}: {step.Message}").ToArray(),
             report.Error ?? string.Empty, report.Steps.Any(step => !string.IsNullOrWhiteSpace(step.LogFile)));
     }
     private static string OutcomeTitle(StepOutcome outcome) => outcome switch
     {
         StepOutcome.Succeeded => "Concluída", StepOutcome.Failed => "Falhou", StepOutcome.Skipped => "Não executada", StepOutcome.Cancelled => "Cancelada", _ => "Estado desconhecido"
+    };
+    private static string VerificationTitle(MaintenanceVerificationStatus status) => status switch
+    {
+        MaintenanceVerificationStatus.NotStarted => "não iniciada",
+        MaintenanceVerificationStatus.Pending => "em andamento, sem verificação",
+        MaintenanceVerificationStatus.CommandCompleted => "comando concluído; confira a saída",
+        MaintenanceVerificationStatus.ProviderConfirmed => "resultado confirmado pelo provedor",
+        MaintenanceVerificationStatus.ManualReviewRequired => "revisão manual necessária",
+        _ => "verificação não registrada"
     };
 }
 

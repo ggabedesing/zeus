@@ -34,6 +34,7 @@ public sealed class DesktopStorageTests : IDisposable
 
         Assert.Equal(report.SessionId, migratedHistory.SessionId);
         Assert.Equal(MaintenanceActionId.VerifySystemFiles, migratedHistory.Steps[0].Action);
+        Assert.Equal(MaintenanceVerificationStatus.NotRecorded, migratedHistory.Steps[0].Verification);
         Assert.True(migratedPreferences.IsMinimal);
         Assert.Equal(UsageProfile.Gaming, migratedPreferences.Profile);
         Assert.True(File.Exists(historyPath));
@@ -69,6 +70,22 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(31.0, Assert.Single(restored.GpuEngines!).UtilizationPercent);
         Assert.Equal("Ethernet", Assert.Single(restored.Networks!).Adapter);
         Assert.Equal(21.5, sample.CpuPercent!.Value);
+    }
+
+    [Fact]
+    public async Task MaintenanceVerificationStatePersistsAndAppearsInHistory()
+    {
+        var storage = new DesktopStorage(_root);
+        var report = new MaintenanceReport(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, false,
+            [new(MaintenanceActionId.InstallDriverUpdate, StepOutcome.Succeeded, "Provedor confirmou instalação.",
+                TargetId: "12345678-1234-1234-1234-123456789abc:1", Verification: MaintenanceVerificationStatus.ProviderConfirmed)]);
+
+        await storage.SaveHistoryAsync([report]);
+        var restored = Assert.Single(await storage.ReadHistoryAsync());
+        var row = HistoryRow.From(restored);
+
+        Assert.Equal(MaintenanceVerificationStatus.ProviderConfirmed, Assert.Single(restored.Steps).Verification);
+        Assert.Contains("resultado confirmado pelo provedor", Assert.Single(row.Steps));
     }
 
     public void Dispose()

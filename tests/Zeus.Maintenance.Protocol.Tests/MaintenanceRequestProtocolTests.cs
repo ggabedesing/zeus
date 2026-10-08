@@ -166,6 +166,16 @@ public sealed class MaintenanceRequestProtocolTests
         Assert.True(System.Text.Json.JsonSerializer.Deserialize<MaintenanceReport>(oldJson)!.IsComplete);
     }
 
+    [Fact]
+    public void HistoricalStepsWithoutVerificationRemainExplicitlyUnrecorded()
+    {
+        var oldJson = "{\"SessionId\":\"" + SessionId + "\",\"StartedAt\":\"2026-01-01T00:00:00Z\",\"FinishedAt\":\"2026-01-01T00:01:00Z\",\"RestorePointConfirmed\":false,\"Steps\":[{\"Action\":3,\"Outcome\":0,\"Message\":\"Concluída\"}]}";
+
+        var report = System.Text.Json.JsonSerializer.Deserialize<MaintenanceReport>(oldJson)!;
+
+        Assert.Equal(MaintenanceVerificationStatus.NotRecorded, Assert.Single(report.Steps).Verification);
+    }
+
     private static bool Read(string payload, out IReadOnlyList<MaintenanceRequest> requests) =>
         MaintenanceRequestProtocol.TryReadArguments(["--session", SessionId, "--requests", Convert.ToBase64String(Encoding.UTF8.GetBytes(payload))],
             out _, out requests);

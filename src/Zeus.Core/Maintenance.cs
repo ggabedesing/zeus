@@ -24,12 +24,24 @@ public enum StepOutcome
     Cancelled
 }
 
+/// <summary>Post-action evidence; command completion alone does not prove the Windows state was repaired.</summary>
+public enum MaintenanceVerificationStatus
+{
+    NotRecorded,
+    NotStarted,
+    Pending,
+    CommandCompleted,
+    ProviderConfirmed,
+    ManualReviewRequired
+}
+
 public sealed record MaintenanceStepResult(
     MaintenanceActionId Action,
     StepOutcome Outcome,
     string Message,
     string? LogFile = null,
-    string? TargetId = null);
+    string? TargetId = null,
+    MaintenanceVerificationStatus Verification = MaintenanceVerificationStatus.NotRecorded);
 
 public sealed record MaintenanceReport(
     Guid SessionId,

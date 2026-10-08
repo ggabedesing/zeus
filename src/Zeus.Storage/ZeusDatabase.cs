@@ -19,7 +19,8 @@ public sealed record StoredMaintenanceStep(
     string Outcome,
     string Message,
     string? LogFile,
-    string? TargetId);
+    string? TargetId,
+    string Verification = "NotRecorded");
 
 public sealed record StoredMaintenanceSession(
     string SessionId,
@@ -51,7 +52,7 @@ public sealed record DatabaseHealth(
 /// <summary>Local, versioned SQLite storage for user configuration, activity and maintenance history.</summary>
 public sealed class ZeusDatabase
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
     private const int ActivityRetentionLimit = 10_000;
     private const int PerformanceSessionRetentionLimit = 200;
     private const int PerformanceSampleRetentionLimit = 4_000;
@@ -97,6 +98,11 @@ public sealed class ZeusDatabase
                 await ValidateSchemaV1Async(connection, cancellationToken);
                 await UpgradeSchemaV2Async(connection, cancellationToken);
                 version = 2;
+            }
+            if (version == 2)
+            {
+                await UpgradeSchemaV3Async(connection, cancellationToken);
+                version = 3;
             }
             if (version != CurrentSchemaVersion) throw new InvalidDataException("A versão do esquema do banco não é reconhecida. O arquivo foi preservado.");
             await ValidateSchemaAsync(connection, cancellationToken);
@@ -246,13 +252,13 @@ public sealed class ZeusDatabase
         {
             var session = sessions[index];
             await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT sequence,action,outcome,message,log_file,target_id FROM maintenance_steps WHERE session_id=$id ORDER BY sequence;";
+            command.CommandText = "SELECT sequence,action,outcome,message,log_file,target_id,verification_status FROM maintenance_steps WHERE session_id=$id ORDER BY sequence;";
             command.Parameters.AddWithValue("$id", session.SessionId);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             var steps = new List<StoredMaintenanceStep>();
             while (await reader.ReadAsync(cancellationToken))
                 steps.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-                    reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5)));
+                    reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetString(6)));
             sessions[index] = session with { Steps = steps };
         }
         return sessions;
@@ -510,6 +516,34 @@ public sealed class ZeusDatabase
         await transaction.CommitAsync(cancellationToken);
     }
 
+    private static async Task UpgradeSchemaV3Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        using var transaction = connection.BeginTransaction();
+        if (!await HasColumnAsync(connection, transaction, "maintenance_steps", "verification_status", cancellationToken))
+            await ExecuteAsync(connection, transaction,
+                "ALTER TABLE maintenance_steps ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'NotRecorded';", cancellationToken);
+        await using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "INSERT OR IGNORE INTO schema_migrations(version,applied_utc) VALUES(3,$applied); PRAGMA user_version=3;";
+            command.Parameters.AddWithValue("$applied", Utc(DateTimeOffset.UtcNow));
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static async Task<bool> HasColumnAsync(SqliteConnection connection, SqliteTransaction transaction,
+        string table, string column, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"PRAGMA table_info({table});";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            if (string.Equals(reader.GetString(1), column, StringComparison.Ordinal)) return true;
+        return false;
+    }
+
     private static Task ValidateSchemaV1Async(SqliteConnection connection, CancellationToken cancellationToken) =>
         ValidateSchemaTablesAsync(connection, cancellationToken,
             "schema_migrations", "app_settings", "app_metadata", "activity_entries", "maintenance_sessions", "maintenance_steps");
@@ -565,7 +599,7 @@ public sealed class ZeusDatabase
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "INSERT INTO maintenance_steps(session_id,sequence,action,outcome,message,log_file,target_id) VALUES($id,$sequence,$action,$outcome,$message,$log,$target);";
+        command.CommandText = "INSERT INTO maintenance_steps(session_id,sequence,action,outcome,message,log_file,target_id,verification_status) VALUES($id,$sequence,$action,$outcome,$message,$log,$target,$verification);";
         command.Parameters.AddWithValue("$id", sessionId);
         command.Parameters.AddWithValue("$sequence", step.Sequence);
         command.Parameters.AddWithValue("$action", step.Action);
@@ -573,6 +607,7 @@ public sealed class ZeusDatabase
         command.Parameters.AddWithValue("$message", step.Message);
         command.Parameters.AddWithValue("$log", (object?)step.LogFile ?? DBNull.Value);
         command.Parameters.AddWithValue("$target", (object?)step.TargetId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$verification", step.Verification);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

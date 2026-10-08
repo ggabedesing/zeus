@@ -91,13 +91,16 @@ internal static class CommandRunner
                 ? Timeout.InfiniteTimeSpan : TimeSpan.FromMinutes(45));
         if (result.LogError is not null)
             return new MaintenanceStepResult(action, StepOutcome.Failed,
-                $"O comando terminou com código {result.ExitCode}, mas o registro do log falhou: {result.LogError}. O reparo não foi interrompido; verifique também os registros do Windows.", result.LogFile);
+                $"O comando terminou com código {result.ExitCode}, mas o registro do log falhou: {result.LogError}. O reparo não foi interrompido; verifique também os registros do Windows.", result.LogFile,
+                Verification: MaintenanceVerificationStatus.ManualReviewRequired);
         if (result.TimedOut)
             return new MaintenanceStepResult(action, StepOutcome.Failed,
-                "O limite de espera do diagnóstico foi excedido. A supervisão terminou; uma verificação do Defender já iniciada pode continuar no Windows.", result.LogFile);
+                "O limite de espera do diagnóstico foi excedido. A supervisão terminou; uma verificação do Defender já iniciada pode continuar no Windows.", result.LogFile,
+                Verification: MaintenanceVerificationStatus.ManualReviewRequired);
         if (result.ExitCode is not 0 and not 3010)
             return new MaintenanceStepResult(action, StepOutcome.Failed,
-                $"O comando retornou código {result.ExitCode}. Consulte o log para o diagnóstico; não foi confirmada correção.", result.LogFile);
+                $"O comando retornou código {result.ExitCode}. Consulte o log para o diagnóstico; não foi confirmada correção.", result.LogFile,
+                Verification: MaintenanceVerificationStatus.ManualReviewRequired);
 
         var message = action switch
         {
@@ -114,7 +117,12 @@ internal static class CommandRunner
             _ => throw new ArgumentOutOfRangeException(nameof(action))
         };
         if (result.ExitCode == 3010) message += " O Windows solicitou reinicialização; reinicie quando for conveniente.";
-        return new MaintenanceStepResult(action, StepOutcome.Succeeded, message, result.LogFile);
+        var verification = action switch
+        {
+            MaintenanceActionId.RepairWindowsImage or MaintenanceActionId.RepairSystemFiles or MaintenanceActionId.DefenderOfflineScan or MaintenanceActionId.OptimizeSystemDrive or MaintenanceActionId.DefenderQuickScan or MaintenanceActionId.DefenderFullScan => MaintenanceVerificationStatus.ManualReviewRequired,
+            _ => MaintenanceVerificationStatus.CommandCompleted
+        };
+        return new MaintenanceStepResult(action, StepOutcome.Succeeded, message, result.LogFile, Verification: verification);
     }
 
     private static async Task<MaintenanceStepResult> InstallDriverAsync(Guid sessionId, MaintenanceRequest request)
@@ -133,7 +141,7 @@ internal static class CommandRunner
                 !Directory.EnumerateFiles(backupDirectory, "*.inf", SearchOption.AllDirectories).Any())
                 return new MaintenanceStepResult(request.Action, StepOutcome.Failed,
                     "Instalação bloqueada: a exportação dos drivers existentes não foi confirmada. Consulte driver-backup.log. Nenhum novo driver foi solicitado.",
-                    backup.LogFile, request.TargetId);
+                    backup.LogFile, request.TargetId, MaintenanceVerificationStatus.NotStarted);
             ConfirmedDriverBackups.Add(sessionId);
         }
 
@@ -145,16 +153,17 @@ internal static class CommandRunner
             TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility), Timeout.InfiniteTimeSpan);
         if (result.LogError is not null)
             return new MaintenanceStepResult(request.Action, StepOutcome.Failed,
-                $"A instalação terminou com código {result.ExitCode}, mas o log falhou: {result.LogError}. Confira o Windows Update e os registros do Windows.", result.LogFile, request.TargetId);
+                $"A instalação terminou com código {result.ExitCode}, mas o log falhou: {result.LogError}. Confira o Windows Update e os registros do Windows.", result.LogFile, request.TargetId,
+                MaintenanceVerificationStatus.ManualReviewRequired);
         if (result.ExitCode != 0 || !result.Output.Contains("ZEUS_DRIVER_INSTALL_SUCCEEDED", StringComparison.Ordinal))
             return new MaintenanceStepResult(request.Action, StepOutcome.Failed,
                 "O Windows Update não confirmou uma instalação bem-sucedida. Resultados parciais, códigos e falhas estão no log; um resultado com erros não é apresentado como sucesso.",
-                result.LogFile, request.TargetId);
+                result.LogFile, request.TargetId, MaintenanceVerificationStatus.ManualReviewRequired);
         var restart = result.Output.Contains("ZEUS_DRIVER_REBOOT_REQUIRED true", StringComparison.Ordinal);
         return new MaintenanceStepResult(request.Action, StepOutcome.Succeeded,
             "O Windows Update confirmou a instalação da identidade selecionada. Backup dos drivers anteriores preservado na sessão; valide o dispositivo e seu problema original." +
             (restart ? " O Windows solicitou reinicialização; salve seu trabalho e reinicie quando conveniente." : ""),
-            result.LogFile, request.TargetId);
+            result.LogFile, request.TargetId, MaintenanceVerificationStatus.ProviderConfirmed);
     }
 
     private const string DriverInstallScript = """

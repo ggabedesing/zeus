@@ -80,7 +80,8 @@ public sealed class PendingMaintenanceSessions
             {
                 reports.Add(new MaintenanceReport(id, started, DateTimeOffset.UtcNow, false,
                     requests.Select(request => new MaintenanceStepResult(request.Action, StepOutcome.Skipped,
-                        "O resultado desta ação não foi confirmado. Nenhuma ação será repetida automaticamente.", TargetId: request.TargetId)).ToArray(),
+                        "O resultado desta ação não foi confirmado. Nenhuma ação será repetida automaticamente.", TargetId: request.TargetId,
+                        Verification: MaintenanceVerificationStatus.ManualReviewRequired)).ToArray(),
                     "Sessão pendente: não foi possível confirmar a conclusão. Consulte os logs antes de iniciar outro plano. " + error.Message,
                     IsComplete: false));
             }
