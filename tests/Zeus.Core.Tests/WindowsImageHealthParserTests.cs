@@ -24,3 +24,38 @@ public sealed class WindowsImageHealthParserTests
             WindowsImageHealthParser.ParseScanHealth(exitCode, output));
     }
 }
+
+public sealed class SfcVerificationParserTests
+{
+    private const string CleanCbsEntries = "2026-10-08 12:00:00, Info CSI [SR] Beginning Verify and Repair transaction\n2026-10-08 12:00:01, Info CSI [SR] Verify complete";
+
+    [Fact]
+    public void RecognizesNewCbsEntriesWithNoIntegrityViolations()
+    {
+        Assert.Equal(SfcVerificationState.NoIntegrityViolationsDetected, SfcVerificationParser.Parse(0, CleanCbsEntries));
+    }
+
+    [Fact]
+    public void RecognizesFilesThatDifferWithoutClaimingVerifyOnlyRepairedThem()
+    {
+        var log = CleanCbsEntries + "\n2026-10-08 12:00:02, Info CSI [SR] Repairing corrupted file sample.dll from store";
+        Assert.Equal(SfcVerificationState.IntegrityViolationsDetected, SfcVerificationParser.Parse(0, log));
+    }
+
+    [Fact]
+    public void RecognizesUnrepairableFileAsItsOwnState()
+    {
+        var log = CleanCbsEntries + "\n2026-10-08 12:00:02, Info CSI [SR] Cannot repair member file sample.dll";
+        Assert.Equal(SfcVerificationState.UnrepairableIntegrityViolationsDetected, SfcVerificationParser.Parse(0, log));
+    }
+
+    [Theory]
+    [InlineData(0, "unrecognized localized CBS entries")]
+    [InlineData(1, "[SR] Verify complete")]
+    [InlineData(0, "[SR] Beginning Verify and Repair transaction")]
+    [InlineData(0, null)]
+    public void IncompleteOrUnrecognizedEvidenceRemainsUnknown(int exitCode, string? log)
+    {
+        Assert.Equal(SfcVerificationState.Unknown, SfcVerificationParser.Parse(exitCode, log));
+    }
+}
