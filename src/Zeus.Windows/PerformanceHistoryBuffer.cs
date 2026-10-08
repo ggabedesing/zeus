@@ -17,7 +17,8 @@ public sealed record PerformanceComparison(
     PerformanceMetricComparison? CpuUsage = null,
     PerformanceMetricComparison? MemoryUsage = null,
     IReadOnlyList<PerformanceNetworkComparison>? NetworkTraffic = null,
-    IReadOnlyList<PerformanceDiskComparison>? DiskIo = null);
+    IReadOnlyList<PerformanceDiskComparison>? DiskIo = null,
+    PerformanceActivityContextComparison? ActivityContext = null);
 
 public sealed record PerformanceMetricComparison(
     double? ReferencePercent,
@@ -51,6 +52,18 @@ public sealed record PerformanceDiskComparison(
     double? LaterReadLatencyMilliseconds,
     int ReferenceLatencySamples,
     int LaterLatencySamples);
+
+public sealed record PerformanceActivityContextComparison(
+    int ReferenceAvailableSamples,
+    int LaterAvailableSamples,
+    int ReferenceGameDetectedSamples,
+    int LaterGameDetectedSamples,
+    int ReferenceObsDetectedSamples,
+    int LaterObsDetectedSamples,
+    int ReferenceObsEncoderKnownSamples,
+    int LaterObsEncoderKnownSamples,
+    int ReferenceObsEncoderActiveSamples,
+    int LaterObsEncoderActiveSamples);
 
 /// <summary>A process-local, bounded history that preserves observations until exported.</summary>
 public sealed class PerformanceHistoryBuffer
@@ -254,10 +267,31 @@ public static class PerformanceComparisonBuilder
                 referenceLatency.Average, laterLatency.Average, referenceLatency.Count, laterLatency.Count);
         }).ToArray();
 
+        static (int Available, int Games, int Obs, int EncoderKnown, int EncoderActive) SummarizeContext(
+            IReadOnlyList<PerformanceObservation> samples)
+        {
+            var contexts = samples.Select(sample => sample.ActivityContext).Where(context => context is not null).ToArray();
+            return (contexts.Length,
+                contexts.Count(context => context!.KnownGameProcessDetected),
+                contexts.Count(context => context!.ObsProcessDetected),
+                contexts.Count(context => context!.ObsVideoEncodeEngineActive.HasValue),
+                contexts.Count(context => context!.ObsVideoEncodeEngineActive == true));
+        }
+
+        var referenceContext = SummarizeContext(reference);
+        var laterContext = SummarizeContext(later);
+        PerformanceActivityContextComparison? activityContext = referenceContext.Available + laterContext.Available == 0
+            ? null
+            : new(referenceContext.Available, laterContext.Available,
+                referenceContext.Games, laterContext.Games,
+                referenceContext.Obs, laterContext.Obs,
+                referenceContext.EncoderKnown, laterContext.EncoderKnown,
+                referenceContext.EncoderActive, laterContext.EncoderActive);
+
         return new(reference.Count, later.Count,
             cpuUsage.ReferencePercent, cpuUsage.LaterPercent,
             memoryUsage.ReferencePercent, memoryUsage.LaterPercent,
             reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk, gpuMemory,
-            cpuUsage, memoryUsage, networkTraffic, diskIo);
+            cpuUsage, memoryUsage, networkTraffic, diskIo, activityContext);
     }
 }

@@ -322,6 +322,35 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void ComparisonSummarizesGameObsAndEncoderContextWithSeparateCoverage()
+    {
+        var reference = new[]
+        {
+            Sample(20) with { ActivityContext = new(true, true, "FortniteClient-Win64-Shipping", DetectionConfidence.Medium, "fixture", true, 20) },
+            Sample(30) with { ActivityContext = new(false, false, null, DetectionConfidence.Low, "fixture", null, null) }
+        };
+        var later = new[]
+        {
+            Sample(40) with { ActivityContext = new(true, false, null, DetectionConfidence.High, "fixture", false, 0) },
+            Sample(50)
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+
+        var context = Assert.IsType<PerformanceActivityContextComparison>(comparison.ActivityContext);
+        Assert.Equal(2, context.ReferenceAvailableSamples);
+        Assert.Equal(1, context.LaterAvailableSamples);
+        Assert.Equal(1, context.ReferenceGameDetectedSamples);
+        Assert.Equal(0, context.LaterGameDetectedSamples);
+        Assert.Equal(1, context.ReferenceObsDetectedSamples);
+        Assert.Equal(1, context.LaterObsDetectedSamples);
+        Assert.Equal(1, context.ReferenceObsEncoderKnownSamples);
+        Assert.Equal(1, context.LaterObsEncoderKnownSamples);
+        Assert.Equal(1, context.ReferenceObsEncoderActiveSamples);
+        Assert.Equal(0, context.LaterObsEncoderActiveSamples);
+    }
+
+    [Fact]
     public void ComparisonKeepsUnavailableCountersUnknown()
     {
         var unavailable = Sample(null) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 };
@@ -349,6 +378,7 @@ public sealed class PerformanceCounterTests
         Assert.Null(comparison.MemoryUsage);
         Assert.Null(comparison.NetworkTraffic);
         Assert.Null(comparison.DiskIo);
+        Assert.Null(comparison.ActivityContext);
     }
 
     [Fact]
