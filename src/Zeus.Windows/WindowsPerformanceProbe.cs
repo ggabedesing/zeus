@@ -13,7 +13,12 @@ public sealed record ProcessObservation(int Id, string Name, double? CpuPercent,
 public sealed record GpuEngineObservation(string InstanceName, int? ProcessId, string EngineType, double UtilizationPercent, string? ProcessName = null);
 public sealed record DiskPerformanceObservation(string InstanceName, ulong? BytesPerSecond, double? ActivePercent, double? AverageReadLatencyMilliseconds);
 public sealed record NetworkPerformanceObservation(string Adapter, ulong? BytesPerSecond, ulong? LinkBitsPerSecond, ulong? QueueLength, ulong? ErrorPackets);
-public sealed record GpuMemoryObservation(string AdapterInstance, ulong? DedicatedUsageBytes, ulong? SharedUsageBytes, ulong? TotalCommittedBytes);
+public sealed record GpuMemoryObservation(string AdapterInstance, ulong? DedicatedUsageBytes, ulong? SharedUsageBytes,
+    ulong? TotalCommittedBytes, ulong? DedicatedCapacityBytes = null)
+{
+    public double? DedicatedOccupancyPercent => DedicatedCapacityBytes is { } capacity && capacity > 0 && DedicatedUsageBytes is { } usage
+        ? usage / (double)capacity * 100 : null;
+}
 
 public sealed record PerformanceObservation(
     DateTimeOffset CollectedAt,
@@ -105,7 +110,7 @@ public sealed class WindowsPerformanceProbe
         var disks = ReadDiskCounters(token, warnings);
         var networks = ReadNetworkCounters(token, warnings);
         var activityContext = ActivityContextDetector.Detect(top);
-        warnings.Add("GPU: utilização por instância/engine não é uso total. Memória dedicada/compartilhada são contadores de uso por adaptador, sem orçamento total para inferir pressão; sensores ausentes permanecem desconhecidos.");
+        warnings.Add("GPU: utilização por instância/engine não é uso total. Ocupação de memória dedicada compara uso reportado com capacidade DXGI correspondente e, sozinha, não diagnostica pressão ou gargalo; sensores ausentes permanecem desconhecidos.");
         warnings.Add("Disco e rede: contadores são taxas locais; tráfego não mede latência ou qualidade da Internet e erros são contagens reportadas pelo adaptador.");
         warnings.Add("Detecção de jogos/OBS usa somente os 50 processos com maior CPU/RAM observados; ausência nessa lista não confirma que o programa esteja fechado.");
         warnings.Add("A amostra reflete a carga atual. Compare tarefas e condições equivalentes; CPU/RAM livres não medem FPS ou garantem melhorias.");
@@ -166,8 +171,9 @@ public sealed class WindowsPerformanceProbe
                     engineMatch.Success ? engineMatch.Groups[1].Value : "Desconhecido", utilization.Value);
             });
 
-    private static IReadOnlyList<GpuMemoryObservation> ReadGpuMemoryCounters(CancellationToken token, List<string> warnings) =>
-        ReadCounterRows("Memória GPU", "Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory",
+    private static IReadOnlyList<GpuMemoryObservation> ReadGpuMemoryCounters(CancellationToken token, List<string> warnings)
+    {
+        var readings = ReadCounterRows("Memória GPU", "Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory",
             "SELECT Name,DedicatedUsage,SharedUsage,TotalCommitted FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory", 128, token, warnings, row =>
             {
                 var instance = Convert.ToString(row["Name"], System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
@@ -175,6 +181,28 @@ public sealed class WindowsPerformanceProbe
                 return new GpuMemoryObservation(instance, CounterUInt64(row, "DedicatedUsage"),
                     CounterUInt64(row, "SharedUsage"), CounterUInt64(row, "TotalCommitted"));
             });
+        if (readings.Count == 0) return readings;
+
+        try
+        {
+            var adapters = DxgiAdapterMemoryReader.ReadAdapters();
+            var capacities = adapters.ToDictionary(adapter => adapter.AdapterInstance,
+                    adapter => adapter.DedicatedCapacityBytes == 0 ? (ulong?)null : adapter.DedicatedCapacityBytes,
+                    StringComparer.OrdinalIgnoreCase);
+            var unmatched = readings.Count(reading => reading.DedicatedUsageBytes is > 0 &&
+                (!capacities.TryGetValue(reading.AdapterInstance, out var capacity) || !capacity.HasValue));
+            if (unmatched > 0)
+                warnings.Add($"Memória GPU: capacidade dedicada DXGI não correspondeu a {unmatched} instância(s) com uso dedicado positivo; a ocupação dessas instâncias permanece indisponível.");
+            return readings.Select(reading => capacities.TryGetValue(reading.AdapterInstance, out var capacity) && capacity.HasValue
+                ? reading with { DedicatedCapacityBytes = capacity }
+                : reading).ToArray();
+        }
+        catch (Exception error)
+        {
+            warnings.Add($"Memória GPU: capacidade dedicada DXGI indisponível ({error.GetType().Name}); contadores de uso permanecem disponíveis.");
+            return readings;
+        }
+    }
 
     private static IReadOnlyList<DiskPerformanceObservation> ReadDiskCounters(CancellationToken token, List<string> warnings) =>
         ReadCounterRows("Disco", "Win32_PerfFormattedData_PerfDisk_PhysicalDisk",

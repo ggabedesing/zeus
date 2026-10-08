@@ -25,6 +25,21 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void DedicatedGpuOccupancyRequiresBothUsageAndReportedCapacity()
+    {
+        Assert.Equal(75d, new GpuMemoryObservation("gpu", 3, 0, 3, 4).DedicatedOccupancyPercent);
+        Assert.Null(new GpuMemoryObservation("gpu", 3, 0, 3, 0).DedicatedOccupancyPercent);
+        Assert.Null(new GpuMemoryObservation("gpu", null, 0, 3, 4).DedicatedOccupancyPercent);
+    }
+
+    [Fact]
+    public void DxgiLuidMapsToWindowsGpuCounterInstanceFormat()
+    {
+        var instance = DxgiAdapterMemoryReader.FormatInstance(new() { HighPart = 0, LowPart = 0x1057F });
+        Assert.Equal("luid_0x00000000_0x0001057F_phys_0", instance);
+    }
+
+    [Fact]
     public void HistoryBufferRetainsOnlyNewestEntriesAndPreservesSessions()
     {
         var buffer = new PerformanceHistoryBuffer(2);
@@ -101,12 +116,12 @@ public sealed class PerformanceCounterTests
     {
         var reference = new[]
         {
-            Sample(20) with { GpuMemory = [new("luid_gpu_a", 100, 200, 300)] },
-            Sample(30) with { GpuMemory = [new("luid_gpu_a", 300, 400, 700), new("luid_gpu_b", 50, 60, 110)] }
+            Sample(20) with { GpuMemory = [new("luid_gpu_a", 100, 200, 300, 1_000)] },
+            Sample(30) with { GpuMemory = [new("luid_gpu_a", 300, 400, 700, 1_000), new("luid_gpu_b", 50, 60, 110, 100)] }
         };
         var later = new[]
         {
-            Sample(40) with { GpuMemory = [new("luid_gpu_a", 500, 600, 1100)] },
+            Sample(40) with { GpuMemory = [new("luid_gpu_a", 500, 600, 1100, 1_000)] },
             Sample(50) with { GpuMemory = [] }
         };
 
@@ -117,9 +132,12 @@ public sealed class PerformanceCounterTests
         Assert.Equal(500, gpuA.LaterDedicatedBytes);
         Assert.Equal(2, gpuA.ReferenceAvailableSamples);
         Assert.Equal(1, gpuA.LaterAvailableSamples);
+        Assert.Equal(20, gpuA.ReferenceOccupancyPercent);
+        Assert.Equal(50, gpuA.LaterOccupancyPercent);
         var gpuB = Assert.Single(comparison.GpuMemoryUsage!, item => item.AdapterInstance == "luid_gpu_b");
         Assert.Equal(50, gpuB.ReferenceDedicatedBytes);
         Assert.Null(gpuB.LaterDedicatedBytes);
+        Assert.Null(gpuB.LaterOccupancyPercent);
         Assert.Equal(0, gpuB.LaterAvailableSamples);
     }
 

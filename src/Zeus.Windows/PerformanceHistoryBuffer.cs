@@ -26,7 +26,9 @@ public sealed record PerformanceGpuMemoryComparison(
     double? ReferenceDedicatedBytes,
     double? LaterDedicatedBytes,
     int ReferenceAvailableSamples,
-    int LaterAvailableSamples);
+    int LaterAvailableSamples,
+    double? ReferenceOccupancyPercent = null,
+    double? LaterOccupancyPercent = null);
 
 /// <summary>A process-local, bounded history that preserves observations until exported.</summary>
 public sealed class PerformanceHistoryBuffer
@@ -136,9 +138,21 @@ public static class PerformanceComparisonBuilder
                 return (values.Length == 0 ? null : values.Average(), values.Length);
             }
 
+            static (double? Average, int Count) SummarizeOccupancy(IReadOnlyList<PerformanceObservation> samples, string adapterName)
+            {
+                var values = samples.SelectMany(sample => sample.GpuMemory ?? [])
+                    .Where(memory => string.Equals(memory.AdapterInstance, adapterName, StringComparison.OrdinalIgnoreCase))
+                    .Select(memory => memory.DedicatedOccupancyPercent).Where(value => value is { } number && double.IsFinite(number) && number >= 0)
+                    .Select(value => value!.Value).ToArray();
+                return (values.Length == 0 ? null : values.Average(), values.Length);
+            }
+
             var left = Summarize(reference, adapter);
             var right = Summarize(later, adapter);
-            return new PerformanceGpuMemoryComparison(adapter, left.Average, right.Average, left.Count, right.Count);
+            var leftOccupancy = SummarizeOccupancy(reference, adapter);
+            var rightOccupancy = SummarizeOccupancy(later, adapter);
+            return new PerformanceGpuMemoryComparison(adapter, left.Average, right.Average, left.Count, right.Count,
+                leftOccupancy.Average, rightOccupancy.Average);
         }).ToArray();
 
         return new(reference.Count, later.Count,

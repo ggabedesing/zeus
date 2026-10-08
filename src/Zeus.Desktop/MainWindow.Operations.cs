@@ -311,7 +311,7 @@ public partial class MainWindow
         }
         foreach (var gpuMemory in observation.GpuMemory ?? [])
             PerformanceResourceRows.Add(new($"Memória GPU · {gpuMemory.AdapterInstance}",
-                $"Uso dedicado: {FormatBytes(gpuMemory.DedicatedUsageBytes)} · compartilhado: {FormatBytes(gpuMemory.SharedUsageBytes)} · comprometido: {FormatBytes(gpuMemory.TotalCommittedBytes)} · sem orçamento total para inferir pressão"));
+                $"Uso dedicado reportado: {FormatBytes(gpuMemory.DedicatedUsageBytes)} de {FormatBytes(gpuMemory.DedicatedCapacityBytes)} · ocupação: {FormatMetric(gpuMemory.DedicatedOccupancyPercent)} · compartilhado: {FormatBytes(gpuMemory.SharedUsageBytes)} · comprometido: {FormatBytes(gpuMemory.TotalCommittedBytes)}"));
         foreach (var disk in observation.Disks ?? [])
             PerformanceResourceRows.Add(new($"Disco · {disk.InstanceName}", $"Transferência: {FormatBytesPerSecond(disk.BytesPerSecond)} · ativo: {(disk.ActivePercent is { } active ? $"{active:0.#}%" : "indisponível")} · leitura: {(disk.AverageReadLatencyMilliseconds is { } latency ? $"{latency:0.##} ms" : "indisponível")}"));
         foreach (var network in observation.Networks ?? [])
