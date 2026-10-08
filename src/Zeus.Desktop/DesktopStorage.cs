@@ -56,10 +56,12 @@ internal sealed class DesktopStorage
             {
                 if (step is null || !Enum.IsDefined(step.Action) || !Enum.IsDefined(step.Outcome) ||
                     !Enum.IsDefined(step.Verification) ||
-                    !actions.Add((step.Action, step.Action == MaintenanceActionId.InstallDriverUpdate ? step.TargetId : null)) || step.Message is null)
+                    !actions.Add((step.Action, step.Action is MaintenanceActionId.InstallDriverUpdate or MaintenanceActionId.RollbackDriver ? step.TargetId : null)) || step.Message is null)
                     throw new InvalidDataException("O histórico contém uma ação inválida ou repetida.");
                 if (step.Action == MaintenanceActionId.InstallDriverUpdate && !MaintenanceRequestProtocol.TryParseDriverIdentity(step.TargetId, out _, out _))
                     throw new InvalidDataException("O histórico contém uma identidade de driver inválida.");
+                if (step.Action == MaintenanceActionId.RollbackDriver && !MaintenanceRequestProtocol.TryParsePnpInstanceId(step.TargetId))
+                    throw new InvalidDataException("O histórico contém uma identidade PnP inválida para reversão de driver.");
             }
         }
     }

@@ -84,7 +84,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Path.Combine(storageRoot ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zeus"), "Cleanup"));
         InitializeComponent();
         MaxWidth = SystemParameters.WorkArea.Width; MaxHeight = SystemParameters.WorkArea.Height;
-        foreach (var definition in MaintenanceCatalog.All.Where(d => d.Id is not MaintenanceActionId.InstallDriverUpdate and not MaintenanceActionId.DefenderOfflineScan))
+        foreach (var definition in MaintenanceCatalog.All.Where(d => d.Id is not MaintenanceActionId.InstallDriverUpdate and not MaintenanceActionId.RollbackDriver and not MaintenanceActionId.DefenderOfflineScan))
         {
             var choice = new MaintenanceChoice(definition);
             choice.PropertyChanged += (_, _) => NotifyActionState();
@@ -167,6 +167,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<ChangeRow> UserChanges { get; } = [];
     public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
+    public ObservableCollection<DriverRollbackChoice> RollbackDriverChoices { get; } = [];
     public ObservableCollection<WingetUpdateRow> WingetUpdates { get; } = [];
     public ObservableCollection<WindowsUpdateRow> PendingWindowsUpdates { get; } = [];
     public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
@@ -186,6 +187,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanSetPowerPlan => !_isBusy && SelectedPowerPlan is { IsActive: false };
     public bool CanApplyWallpaper => !_isBusy && !string.IsNullOrWhiteSpace(SelectedWallpaperPath);
     public bool CanInstallDriver => !_isBusy && DriverCandidates.Any(d => d.IsSelected) && DriverCandidates.Where(d => d.IsSelected).All(d => d.LicenseReady);
+    private DriverRollbackChoice? _selectedRollbackDriver;
+    public DriverRollbackChoice? SelectedRollbackDriver { get => _selectedRollbackDriver; set { if (Set(ref _selectedRollbackDriver, value)) NotifyActionState(); } }
+    public bool CanRollbackDriver => !_isBusy && SelectedRollbackDriver is not null && MaintenanceRequestProtocol.TryParsePnpInstanceId(SelectedRollbackDriver.InstanceId);
+    public string RollbackDriverSummary { get; private set; } = "Leia o diagnóstico para identificar dispositivos presentes que podem ser selecionados.";
     public bool CanOfflineScan => !_isBusy && OfflineRestartConfirmed && OfflineRecoveryConfirmed;
     public string StatusTitle { get => _statusTitle; private set => Set(ref _statusTitle, value); }
     public string StatusDetail { get => _statusDetail; private set => Set(ref _statusDetail, value); }
@@ -332,6 +337,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void DisplaySnapshot(HardwareSnapshot snapshot)
     {
+        RollbackDriverChoices.Clear();
+        var pnpInventory = snapshot.WindowsInventory?.PnpDevices;
+        if (pnpInventory is null) RollbackDriverSummary = "Inventário PnP indisponível; não é possível identificar alvos para reversão.";
+        else
+        {
+            foreach (var device in pnpInventory.Where(device => device.IsPresent == true && MaintenanceRequestProtocol.TryParsePnpInstanceId(device.InstanceId)))
+                RollbackDriverChoices.Add(new(device));
+            var presenceUnknown = pnpInventory.Any(device => device.IsPresent is null);
+            RollbackDriverSummary = RollbackDriverChoices.Count > 0
+                ? $"{RollbackDriverChoices.Count} dispositivo(s) identificado(s) como presente(s) nesta coleta. A reversão exige uma cópia anterior mantida pelo Windows; dados desatualizados serão revalidados pelo auxiliar."
+                : presenceUnknown ? "A fonte de presença está indisponível ou incompleta; nenhum dispositivo foi liberado para reversão. Atualize o diagnóstico."
+                : "Nenhum dispositivo presente com identidade válida foi retornado nesta coleta.";
+        }
+        SelectedRollbackDriver = RollbackDriverChoices.FirstOrDefault();
+        Notify(nameof(RollbackDriverSummary));
         HardwareCards.Clear();
         var cpu = snapshot.Cpu;
         HardwareCards.Add(new("Processador", cpu?.Name ?? "Indisponível", cpu is null ? "O Windows não retornou esta leitura." : $"{cpu.PhysicalCores} núcleos · {cpu.LogicalProcessors} processadores lógicos"));
@@ -605,7 +625,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
-    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }
+    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanRollbackDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }
     private string? MaintenanceSelectionError()
     {
         var selected = MaintenanceChoices.Where(choice => choice.IsSelected)

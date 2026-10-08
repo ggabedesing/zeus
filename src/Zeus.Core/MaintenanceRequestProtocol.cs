@@ -93,6 +93,15 @@ public static class MaintenanceRequestProtocol
             int.TryParse(revisionText, NumberStyles.None, CultureInfo.InvariantCulture, out revision) && revision > 0;
     }
 
+    public static bool TryParsePnpInstanceId(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target) || target.Length > 200 || target != target.Trim() ||
+            target.Any(char.IsControl) || target.StartsWith('\\') || target.EndsWith('\\'))
+            return false;
+        var separator = target.IndexOf('\\');
+        return separator is > 0 and < 32 && separator < target.Length - 1;
+    }
+
     private static bool TryReadLegacy(string input, out IReadOnlyList<MaintenanceRequest> requests)
     {
         requests = [];

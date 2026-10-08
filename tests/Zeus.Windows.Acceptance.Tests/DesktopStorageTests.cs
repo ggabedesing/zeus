@@ -92,6 +92,20 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Contains("resultado confirmado pelo provedor", Assert.Single(row.Steps));
     }
 
+    [Fact]
+    public async Task DriverRollbackTargetIsPersistedAndMalformedTargetIsRejected()
+    {
+        var storage = new DesktopStorage(_root);
+        var report = new MaintenanceReport(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, false,
+            [new(MaintenanceActionId.RollbackDriver, StepOutcome.Failed, "Sem driver anterior disponível.",
+                TargetId: "USB\\VID_1234&PID_5678\\A1", Verification: MaintenanceVerificationStatus.ManualReviewRequired)]);
+        await storage.SaveHistoryAsync([report]);
+        Assert.Equal("USB\\VID_1234&PID_5678\\A1", Assert.Single(Assert.Single(await storage.ReadHistoryAsync()).Steps).TargetId);
+
+        var invalid = report with { SessionId = Guid.NewGuid(), Steps = [report.Steps[0] with { TargetId = "not-a-pnp-id" }] };
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.SaveHistoryAsync([invalid]));
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

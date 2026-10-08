@@ -41,7 +41,7 @@ public sealed class MaintenancePolicyTests
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(11)]
+    [InlineData(12)]
     [InlineData(int.MaxValue)]
     public void UnrecognizedIdsAreRejectedBeforeExecution(int unrecognized)
     {

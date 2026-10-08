@@ -13,7 +13,8 @@ public enum MaintenanceActionId
     DefenderFullScan,
     DefenderOfflineScan,
     OptimizeSystemDrive,
-    InstallDriverUpdate
+    InstallDriverUpdate,
+    RollbackDriver
 }
 
 public enum StepOutcome

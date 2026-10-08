@@ -53,7 +53,8 @@ public sealed record NetworkConfigurationInfo(string Adapter, string[] Addresses
 public sealed record ProxyConfigurationInfo(bool? ManualProxyEnabled, string? ManualProxyServer,
     string? AutoConfigUrl, bool? AutoDetectEnabled, string? BypassList, bool IsAvailable);
 public sealed record DriverInfo(string Device, string Provider, string Version, string? Date, string? Signer);
-public sealed record PnpDeviceInfo(string Name, string Class, string Status, string? ProblemCode);
+public sealed record PnpDeviceInfo(string Name, string Class, string Status, string? ProblemCode,
+    string? InstanceId = null, bool? IsPresent = null);
 public sealed record ProcessInfo(string Name, int Id, double? CpuSeconds, ulong? WorkingSetBytes);
 public sealed record ServiceInfo(string Name, string DisplayName, string Status, string StartType,
     string[]? Dependencies = null, bool? DependenciesAvailable = null);

@@ -70,6 +70,12 @@ public static class MaintenanceCatalog
                 "Instalar driver selecionado do Windows Update",
                 "Instala somente a identidade selecionada após nova consulta ao Windows Update, novo ponto de restauração e exportação dos drivers existentes. Não instala BIOS ou firmware.",
                 RequiresRestorePoint: true,
+                MayRequireRestart: true),
+            new MaintenanceActionDefinition(
+                MaintenanceActionId.RollbackDriver,
+                "Reverter driver de um dispositivo",
+                "Pede ao Windows para voltar ao driver anterior deste dispositivo. Exige que o Windows ainda mantenha uma cópia anterior; o ZEUS exporta o pacote atual antes da reversão e não reinicia automaticamente.",
+                RequiresRestorePoint: false,
                 MayRequireRestart: true)
         });
 

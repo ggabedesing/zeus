@@ -88,6 +88,7 @@ public partial class MainWindow
         text.Append("\nO Windows solicitará autorização de administrador. A execução é sequencial e pode demorar; mantenha o computador conectado à energia.\n\n");
         if (definitions.Any(d => d.RequiresRestorePoint)) text.Append("Os reparos e a instalação de driver exigem proteção de recuperação confirmada. Se não for possível confirmar, essas ações serão bloqueadas. Restauração do sistema não recupera documentos apagados.\n\n");
         if (ordered.Any(r => r.Action == MaintenanceActionId.InstallDriverUpdate)) text.Append("Somente o candidato exato será consultado novamente e instalado. O auxiliar exportará os drivers existentes antes da alteração. Uma versão mais recente não garante melhoria.\n\n");
+        if (ordered.Any(r => r.Action == MaintenanceActionId.RollbackDriver)) text.Append($"Dispositivo: {ordered.Single().TargetId}\nO ZEUS exportará o pacote atualmente instalado antes de pedir ao Windows a reversão deste único dispositivo. O Windows pode não manter uma versão anterior; nesse caso, nada será alterado. A reinicialização, se solicitada, será manual. Confira se o backup exportado está preservado.\n\n");
         if (ordered.Any(r => r.Action is MaintenanceActionId.DefenderQuickScan or MaintenanceActionId.DefenderFullScan or MaintenanceActionId.DefenderOfflineScan)) text.Append("O Defender segue as políticas de remediação de ameaças do Windows. Consulte os resultados em Segurança do Windows.\n\n");
         if (ordered.Any(r => r.Action == MaintenanceActionId.DefenderOfflineScan)) text.Append("ATENÇÃO: a verificação offline pode reiniciar este computador imediatamente. Salve seu trabalho. Tenha a recuperação do BitLocker disponível se a unidade estiver criptografada.\n\n");
         text.Append("Executar este plano agora?");
@@ -691,6 +692,16 @@ public partial class MainWindow
         var selected = DriverCandidates.Where(d => d.IsSelected).ToArray();
         if (!Confirm($"Instalar os candidatos selecionados?\n\n{string.Join("\n\n", selected.Select(d => $"• {d.Title}\nDispositivo: {Available(d.DeviceName)} · Fabricante: {Available(d.Manufacturer)}\nFornecedor declarado: {d.DriverProvider} · Categoria inferida: {d.ProviderCategory}\nClasse: {d.DriverClass} · Data do driver: {d.DriverDate}\nVersão: {Available(d.DriverVersion)}\nOrigem: {d.DriverSource}\nIdentidade: {d.Id}"))}\n\nConfirme a indicação para cada atualização. A versão numérica e a assinatura/hash do arquivo não são confirmados nesta busca. Pode haver reinicialização e incompatibilidade; o auxiliar exigirá proteção e exportará os drivers atuais antes do lote.", "Revisar candidatos de drivers")) return;
         await ReviewAndExecuteAsync(selected.Select(d => new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, d.Id, d.RequiresEula && d.EulaAccepted)).ToArray());
+    }
+
+    private async void RollbackDriver_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanRollbackDriver || SelectedRollbackDriver is null) return;
+        var device = SelectedRollbackDriver.Device;
+        if (!Confirm($"Solicitar ao Windows a reversão do driver deste dispositivo?\n\n{device.Name}\nClasse: {device.Class}\nIdentidade PnP: {device.InstanceId}\n\nO ZEUS exportará primeiro o pacote atual. A reversão depende da cópia anterior mantida pelo Windows e pode falhar sem alterar nada. Se houver solicitação de reinicialização, ela será manual. Revise o resultado e o log antes de qualquer nova tentativa.", "Revisar reversão de driver")) return;
+        var priorReportCount = _reports.Count;
+        await ReviewAndExecuteAsync([new MaintenanceRequest(MaintenanceActionId.RollbackDriver, device.InstanceId)]);
+        if (_reports.Count > priorReportCount) await RefreshDiagnosticsAsync();
     }
 
     private async void Export_Click(object sender, RoutedEventArgs e)

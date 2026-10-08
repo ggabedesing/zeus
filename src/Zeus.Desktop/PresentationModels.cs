@@ -114,6 +114,13 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
     }
 }
 
+public sealed class DriverRollbackChoice(PnpDeviceInfo device)
+{
+    public PnpDeviceInfo Device { get; } = device;
+    public string InstanceId => Device.InstanceId ?? string.Empty;
+    public string Label => $"{Device.Name} · {Device.Class}";
+}
+
 public sealed record WingetUpdateRow(WingetUpdateCandidate Candidate, bool PendingReview = false)
 {
     public string Name => Candidate.Name;

@@ -20,6 +20,12 @@ Após a correção do limite do inventário, a checagem somente de leitura volto
 
 ## Testes automatizados
 
+### Reversão de driver — verificação local em 2026-10-08
+
+O auxiliar valida o ID PnP, exige sessão exclusiva, confere novamente que o dispositivo está presente, identifica o INF instalado, exporta e confirma o pacote em `driver-backup` e só então chama `DiRollbackDriver` sem interface do Windows. O relatório só marca confirmação do provedor se o Windows aceitar a chamada e a coleta posterior mostrar mudança de INF ou versão. Se a cópia anterior não existir, a API informa que não há itens e a ação falha sem declarar sucesso. A tela não reinicia o PC.
+
+Compilação local do Desktop e do auxiliar: sem avisos ou erros. Testes: Core 73/73, protocolo 63/63, hardware 84/84 e aceitação Windows 41 aprovados/1 teste administrativo ignorado. O teste ignorado exige validação de ACL elevada; nenhum driver foi revertido, nenhum reparo foi executado e UAC não foi testado nesta alteração. Os testes de links simbólicos da solução completa não puderam ser validados nesta sessão por falta do privilégio do Windows para criá-los.
+
 | Área | Evidência exigida pelo workflow |
 | --- | --- |
 | Compilação | Todos os projetos Release compilados no Windows |
@@ -134,7 +140,8 @@ Use Windows 11 suportado, snapshots quando disponíveis e backups independentes.
 | SSD e HDD | Mecanismo nativo escolhe a operação; não força desfragmentação de SSD | Pendente em mídia física |
 | Oferta de driver desaparece ou muda | Identidade reconsultada; instalação bloqueada sem correspondência | Pendente com oferta real |
 | Licença de driver e backup | Aceite por candidato; exportação confirmada antes de instalar; falha bloqueia | Pendente com oferta real |
-| Atualização de driver e reversão | Instalação oficial registrada; dispositivo validado após reinício e recuperação ensaiada | Pendente |
+| Atualização de driver | Instalação oficial registrada; dispositivo validado após reinício e recuperação ensaiada | Pendente |
+| Reversão de driver | Dispositivo PnP presente; exportação do INF atual confirmada; chamada `DiRollbackDriver`; mudança de INF/versão verificada e reinicialização manual quando solicitada | Implementada; ensaio administrativo com driver de laboratório pendente. A API usa somente a versão anterior mantida pelo Windows; se não existir, não há reversão. [Documentação Microsoft](https://learn.microsoft.com/pt-br/windows/win32/api/newdev/nf-newdev-dirollbackdriver) |
 | Falha de gravação / interrupção | Estado incompleto indicado; relatórios parciais recuperados sem repetir ações | Fixtures de journal e armazenamento aprovadas em Windows; interrupção real do auxiliar pendente |
 | PC com pouca RAM e armazenamento limitado | Medir consumo do ZEUS e comparar tarefa equivalente antes/depois | Pendente em equipamento físico |
 | Assinatura e distribuição | Authenticode, hash e entrega do pacote verificados | Hash implementado; assinatura de produção pendente |

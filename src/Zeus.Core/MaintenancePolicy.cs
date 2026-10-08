@@ -52,6 +52,7 @@ public static class MaintenancePolicy
             throw new ArgumentException("Selecione pelo menos uma ação para iniciar a manutenção.", nameof(requests));
         var selectedActions = new HashSet<MaintenanceActionId>();
         var driverTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rollbackTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var request in supplied)
         {
             _ = MaintenanceCatalog.Get(request.Action);
@@ -62,6 +63,13 @@ public static class MaintenancePolicy
                 if (!driverTargets.Add(id.ToString("D") + ":" + revision))
                     throw new ArgumentException("O plano contém a mesma identidade de driver mais de uma vez.", nameof(requests));
             }
+            else if (request.Action == MaintenanceActionId.RollbackDriver)
+            {
+                if (!MaintenanceRequestProtocol.TryParsePnpInstanceId(request.TargetId) || request.EulaAccepted)
+                    throw new ArgumentException("A reversão exige a identidade PnP de um dispositivo presente e não aceita dados de licença.", nameof(requests));
+                if (!rollbackTargets.Add(request.TargetId!))
+                    throw new ArgumentException("O plano contém a mesma identidade de dispositivo mais de uma vez.", nameof(requests));
+            }
             else
             {
                 if (!selectedActions.Add(request.Action))
@@ -70,6 +78,8 @@ public static class MaintenancePolicy
                     throw new ArgumentException("Somente a instalação de driver permite identidade e aceite de licença.", nameof(requests));
             }
         }
+        if (rollbackTargets.Count > 0 && supplied.Length != 1)
+            throw new ArgumentException("A reversão de driver precisa ser revisada e executada em uma sessão exclusiva.", nameof(requests));
         EnsureScansAndRepairsAreSeparate(supplied.Select(request => request.Action), nameof(requests));
         // OrderBy is stable: drivers retain the explicit order selected by the user.
         return Array.AsReadOnly(supplied.OrderBy(request => GetOrder(request.Action)).ToArray());
@@ -101,6 +111,7 @@ public static class MaintenancePolicy
         MaintenanceActionId.DefenderQuickScan => 8,
         MaintenanceActionId.DefenderFullScan => 9,
         MaintenanceActionId.DefenderOfflineScan => 10,
+        MaintenanceActionId.RollbackDriver => 11,
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Ação desconhecida.")
     };
 }

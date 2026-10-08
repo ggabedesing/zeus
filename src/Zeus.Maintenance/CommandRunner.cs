@@ -35,6 +35,8 @@ internal static class CommandRunner
         var action = request.Action;
         if (action == MaintenanceActionId.InstallDriverUpdate)
             return await InstallDriverAsync(sessionId, request);
+        if (action == MaintenanceActionId.RollbackDriver)
+            return await RollbackDriverAsync(sessionId, request);
         ProcessStartInfo start;
         var repair = MaintenanceCatalog.Get(action).RequiresRestorePoint;
         var logName = action + ".log";
@@ -218,6 +220,46 @@ internal static class CommandRunner
             "O Windows Update confirmou a instalação da identidade selecionada. Backup dos drivers anteriores preservado na sessão; valide o dispositivo e seu problema original." +
             (restart ? " O Windows solicitou reinicialização; salve seu trabalho e reinicie quando conveniente." : ""),
             result.LogFile, request.TargetId, MaintenanceVerificationStatus.ProviderConfirmed);
+    }
+
+    private static async Task<MaintenanceStepResult> RollbackDriverAsync(Guid sessionId, MaintenanceRequest request)
+    {
+        if (!MaintenanceRequestProtocol.TryParsePnpInstanceId(request.TargetId))
+            throw new ArgumentException("Identidade PnP inválida.", nameof(request));
+        var instanceId = request.TargetId!;
+        var logPath = Path.Combine(SessionStore.GetSessionDirectory(sessionId), "driver-rollback.log");
+        var backupDirectory = SessionStore.CreateProtectedChildDirectory(sessionId, "driver-backup");
+        await using var audit = new StreamWriter(SessionStore.CreateLog(sessionId, "driver-rollback.log"), new UTF8Encoding(false));
+        await audit.WriteLineAsync($"ZEUS driver rollback · {DateTimeOffset.UtcNow:O}");
+        await audit.WriteLineAsync($"Dispositivo PnP exato: {instanceId}");
+        try
+        {
+            var before = WindowsDriverRollback.ReadDriverState(instanceId);
+            if (before is null || !System.Text.RegularExpressions.Regex.IsMatch(before.InfName, "^oem[0-9]+\\.inf$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+                return new(request.Action, StepOutcome.Failed, "Reversão bloqueada: o driver atualmente instalado não pôde ser identificado por um INF OEM exportável. Nenhuma alteração foi solicitada.", logPath, instanceId, MaintenanceVerificationStatus.NotStarted);
+            await audit.WriteLineAsync($"Antes: dispositivo={before.DeviceName}; INF={before.InfName}; versão={before.Version}; fornecedor={before.Provider}");
+            var backup = await RunAsync(sessionId, "driver-rollback-export.log",
+                Native("pnputil.exe", "/export-driver", before.InfName, backupDirectory), TimeSpan.FromMinutes(5));
+            var exported = !backup.TimedOut && backup.ExitCode == 0 && backup.LogError is null &&
+                Directory.EnumerateFiles(backupDirectory, "*.inf", SearchOption.AllDirectories).Any();
+            await audit.WriteLineAsync($"Exportação antes da reversão: saída={backup.ExitCode}; timeout={backup.TimedOut}; logErro={backup.LogError ?? "nenhum"}; pacoteConfirmado={exported}; destino={backupDirectory}");
+            if (!exported)
+                return new(request.Action, StepOutcome.Failed, "Reversão bloqueada: não foi possível exportar e confirmar o pacote atualmente instalado. Nenhuma reversão foi solicitada; consulte driver-rollback-export.log.", backup.LogFile, instanceId, MaintenanceVerificationStatus.NotStarted);
+
+            var result = WindowsDriverRollback.Rollback(instanceId);
+            await audit.WriteLineAsync($"API DiRollbackDriver: sucesso={result.Succeeded}; erroWin32={result.ErrorCode}; reinicialização={result.RebootRequired}");
+            await audit.WriteLineAsync($"Depois: {(result.After is null ? "desconhecido" : $"INF={result.After.InfName}; versão={result.After.Version}; fornecedor={result.After.Provider}")}");
+            await audit.WriteLineAsync($"Resultado: {result.Message}");
+            var outcome = result.Succeeded ? StepOutcome.Succeeded : StepOutcome.Failed;
+            var message = result.Message + (result.RebootRequired ? " O Windows solicitou reinicialização; ela não será iniciada pelo ZEUS." : "");
+            var verification = result.Succeeded ? MaintenanceVerificationStatus.ProviderConfirmed : MaintenanceVerificationStatus.ManualReviewRequired;
+            return new(request.Action, outcome, message, logPath, instanceId, verification);
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or System.Management.ManagementException or UnauthorizedAccessException or IOException)
+        {
+            await audit.WriteLineAsync($"Falha: {error}");
+            return new(request.Action, StepOutcome.Failed, "A reversão não foi confirmada. Consulte o log e confira manualmente o estado do dispositivo antes de tentar novamente.", logPath, instanceId, MaintenanceVerificationStatus.ManualReviewRequired);
+        }
     }
 
     private const string DriverInstallScript = """

@@ -17,6 +17,8 @@ public sealed class MaintenanceRequestProtocolTests
         Assert.Equal(3, (int)MaintenanceActionId.VerifySystemFiles);
         Assert.Equal(4, (int)MaintenanceActionId.RepairSystemFiles);
         Assert.Equal(5, (int)MaintenanceActionId.AnalyzeSystemDrive);
+        Assert.Equal(10, (int)MaintenanceActionId.InstallDriverUpdate);
+        Assert.Equal(11, (int)MaintenanceActionId.RollbackDriver);
     }
 
     [Fact]
@@ -103,6 +105,36 @@ public sealed class MaintenanceRequestProtocolTests
     }
 
     [Theory]
+    [InlineData("PCI\\VEN_10DE&DEV_1C82\\4&2A1B2C3D&0&0008", true)]
+    [InlineData("USB\\VID_046D&PID_C52B\\ABC123", true)]
+    [InlineData("\\PCI\\DEVICE", false)]
+    [InlineData("PCI", false)]
+    [InlineData("PCI\\", false)]
+    [InlineData("PCI\\DEVICE\r\ncalc", false)]
+    [InlineData(" PCI\\DEVICE", false)]
+    [InlineData("PCI\\DEVICE;calc", true)]
+    [InlineData(null, false)]
+    public void PnpInstanceIdsAreBoundedOpaqueIdentifiers(string? target, bool allowed)
+    {
+        Assert.Equal(allowed, MaintenanceRequestProtocol.TryParsePnpInstanceId(target));
+    }
+
+    [Fact]
+    public void DriverRollbackRequiresOneExplicitDeviceAndCannotBeMixedWithOtherActions()
+    {
+        const string device = "PCI\\VEN_10DE&DEV_1C82\\4&2A1B2C3D&0&0008";
+        var request = new MaintenanceRequest(MaintenanceActionId.RollbackDriver, device);
+        Assert.Equal(request, Assert.Single(MaintenancePolicy.ValidateRequests([request])));
+        Assert.False(MaintenanceCatalog.Get(MaintenanceActionId.RollbackDriver).RequiresRestorePoint);
+        Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateRequests([
+            request, new(MaintenanceActionId.DefenderQuickScan)]));
+        Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateRequests([
+            request with { EulaAccepted = true }]));
+        Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateRequests([
+            request, request with { TargetId = device.ToLowerInvariant() }]));
+    }
+
+    [Theory]
     [InlineData("DefenderQuickScan", true)]
     [InlineData("ScanWindowsImage,RepairWindowsImage", false)]
     [InlineData("0", false)]
@@ -110,6 +142,7 @@ public sealed class MaintenanceRequestProtocolTests
     [InlineData("defenderquickscan", false)]
     [InlineData("DefenderQuickScan;calc", false)]
     [InlineData("InstallDriverUpdate", false)]
+    [InlineData("RollbackDriver", false)]
     [InlineData("", false)]
     public void LegacyArgumentsRemainStrictAndCannotInstallUnidentifiedDriver(string actions, bool allowed)
     {
@@ -162,12 +195,14 @@ public sealed class MaintenanceRequestProtocolTests
     {
         Assert.All(Enum.GetValues<MaintenanceActionId>(), action => Assert.Equal(action, MaintenanceCatalog.Get(action).Id));
         var requests = Enum.GetValues<MaintenanceActionId>()
-            .Where(action => action is not MaintenanceActionId.ScanWindowsImage and not MaintenanceActionId.VerifySystemFiles)
+            .Where(action => action is not MaintenanceActionId.ScanWindowsImage and not MaintenanceActionId.VerifySystemFiles and not MaintenanceActionId.RollbackDriver)
             .Select(action => new MaintenanceRequest(action, action == MaintenanceActionId.InstallDriverUpdate ? DriverId : null)).ToArray();
         var ordered = MaintenancePolicy.ValidateRequests(requests);
         Assert.Equal(requests.Length, ordered.Count);
         Assert.Equal(MaintenanceActionId.DefenderOfflineScan, ordered[^1].Action);
         Assert.Throws<NotSupportedException>(() => ((IList<MaintenanceRequest>)ordered).Clear());
+        var rollback = MaintenancePolicy.ValidateRequests([new MaintenanceRequest(MaintenanceActionId.RollbackDriver, "USB\\VID_1234&PID_5678\\A1")]);
+        Assert.Equal(MaintenanceActionId.RollbackDriver, Assert.Single(rollback).Action);
     }
 
     [Fact]
