@@ -27,4 +27,18 @@ public sealed class DriverSupportCatalogTests
     [InlineData("Unknown Device Company")]
     public void UnknownProviderHasNoSuggestedDestination(string? provider) =>
         Assert.Null(DriverSupportCatalog.Find(provider));
+
+    [Fact]
+    public void DeviceManufacturerTakesPriorityOverDriverProvider()
+    {
+        var source = Assert.IsType<DriverSupportSource>(DriverSupportCatalog.FindForDevice("Dell Inc.", "Intel Corporation"));
+        Assert.Equal("Dell", source.Name);
+    }
+
+    [Fact]
+    public void UnknownDeviceManufacturerFallsBackToDriverProvider()
+    {
+        var source = Assert.IsType<DriverSupportSource>(DriverSupportCatalog.FindForDevice("Unknown OEM", "Intel Corporation"));
+        Assert.Equal("Intel", source.Name);
+    }
 }

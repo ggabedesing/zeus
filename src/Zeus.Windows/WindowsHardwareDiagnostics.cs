@@ -118,7 +118,7 @@ try {
   if ([string]::IsNullOrWhiteSpace($proxyBypass)) { $proxyBypass = $null }
   $proxyAvailable = $true
 } catch { $warnings.Add('Proxy do usuário: configurações do Registro HKCU indisponíveis.') }
-$drivers = Read-Part 'Drivers' { Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop | Select-Object DeviceName,DriverProviderName,DriverVersion,@{n='Date';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}else{$null}}},Signer,IsSigned }
+$drivers = Read-Part 'Drivers' { Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop | Select-Object DeviceName,Manufacturer,DriverProviderName,DriverVersion,@{n='Date';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}else{$null}}},Signer,IsSigned }
 $pnp = Read-Part 'Dispositivos PnP' { Get-CimInstance Win32_PnPEntity -ErrorAction Stop | Select-Object Name,PNPClass,Status,PNPDeviceID,@{n='ProblemCode';e={if($_.ConfigManagerErrorCode -ne 0){[string]$_.ConfigManagerErrorCode}else{$null}}} }
 $presentPnp = $null
 try { $presentPnp = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase); Get-PnpDevice -PresentOnly -ErrorAction Stop | ForEach-Object { if (![string]::IsNullOrWhiteSpace([string]$_.InstanceId)) { [void]$presentPnp.Add([string]$_.InstanceId) } } } catch { $warnings.Add('Presença de dispositivos PnP: fonte Get-PnpDevice indisponível; reversão de driver desativada.') }

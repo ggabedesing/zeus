@@ -14,6 +14,15 @@ public sealed class DriverInfoProviderBooleanTests
         Assert.Null(Assert.IsType<DriverInfo>(driver).IsSigned);
     }
 
+    [Fact]
+    public void MissingManufacturerRemainsUnknownForOlderInventoryData()
+    {
+        const string json = "{\"Device\":\"fixture\",\"Provider\":\"fixture\",\"Version\":\"1\",\"Date\":null,\"Signer\":null}";
+        var driver = JsonSerializer.Deserialize<DriverInfo>(json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        Assert.Null(Assert.IsType<DriverInfo>(driver).Manufacturer);
+    }
+
     [Theory]
     [InlineData("true", true)]
     [InlineData("false", false)]

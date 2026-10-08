@@ -5,6 +5,9 @@ public sealed record DriverSupportSource(string Name, Uri Uri);
 
 public static class DriverSupportCatalog
 {
+    public static DriverSupportSource? FindForDevice(string? manufacturer, string? driverProvider) =>
+        Find(manufacturer) ?? Find(driverProvider);
+
     public static DriverSupportSource? Find(string? provider)
     {
         if (string.IsNullOrWhiteSpace(provider)) return null;

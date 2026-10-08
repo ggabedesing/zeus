@@ -137,6 +137,7 @@ public sealed class WpfExperienceTests
         Assert.Contains("Win32_PnPSignedDriver", window.DriverInventorySummary, StringComparison.Ordinal);
         Assert.Equal(Math.Min(window.Snapshot.WindowsInventory!.Drivers.Count, 100), window.InstalledDriverRows.Count);
         Assert.All(window.InstalledDriverRows, row => Assert.Contains("Assinatura reportada:", row.Detail, StringComparison.Ordinal));
+        Assert.All(window.InstalledDriverRows, row => Assert.Contains("Fabricante do dispositivo:", row.Detail, StringComparison.Ordinal));
         var scanChoice = window.MaintenanceChoices.Single(choice => choice.Id == Zeus.Core.MaintenanceActionId.ScanWindowsImage);
         var repairChoice = window.MaintenanceChoices.Single(choice => choice.Id == Zeus.Core.MaintenanceActionId.RepairWindowsImage);
         scanChoice.IsSelected = true;

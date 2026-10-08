@@ -352,9 +352,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             foreach (var driver in shownDrivers)
             {
                 var signature = driver.IsSigned switch { true => "Sim (reportado pelo Windows)", false => "Não (reportado pelo Windows)", _ => "Indisponível" };
-                var source = DriverSupportCatalog.Find(driver.Provider);
+                var source = DriverSupportCatalog.FindForDevice(driver.Manufacturer, driver.Provider);
                 InstalledDriverRows.Add(new(Available(driver.Device),
-                    $"Fornecedor: {Available(driver.Provider)} · Versão: {Available(driver.Version)} · Data: {Available(driver.Date)}\nAssinatura reportada: {signature} · Signatário informado: {Available(driver.Signer)}",
+                    $"Fabricante do dispositivo: {Available(driver.Manufacturer)} · Fornecedor do driver: {Available(driver.Provider)} · Versão: {Available(driver.Version)} · Data: {Available(driver.Date)}\nAssinatura reportada: {signature} · Signatário informado: {Available(driver.Signer)}",
                     source?.Name));
             }
             var signed = orderedDrivers.Count(driver => driver.IsSigned == true);

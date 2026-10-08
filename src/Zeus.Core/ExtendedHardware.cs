@@ -53,7 +53,8 @@ public sealed record NetworkConfigurationInfo(string Adapter, string[] Addresses
 public sealed record ProxyConfigurationInfo(bool? ManualProxyEnabled, string? ManualProxyServer,
     string? AutoConfigUrl, bool? AutoDetectEnabled, string? BypassList, bool IsAvailable);
 public sealed record DriverInfo(string Device, string Provider, string Version, string? Date, string? Signer,
-    [property: System.Text.Json.Serialization.JsonConverter(typeof(ProviderNullableBooleanJsonConverter))] bool? IsSigned = null);
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(ProviderNullableBooleanJsonConverter))] bool? IsSigned = null,
+    string? Manufacturer = null);
 public sealed record PnpDeviceInfo(string Name, string Class, string Status, string? ProblemCode,
     string? InstanceId = null, bool? IsPresent = null);
 public sealed record ProcessInfo(string Name, int Id, double? CpuSeconds, ulong? WorkingSetBytes);
