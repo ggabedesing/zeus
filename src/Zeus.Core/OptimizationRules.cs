@@ -11,7 +11,7 @@ public enum OptimizationProfile
     Development
 }
 
-public enum OptimizationBenefit { MemoryCapacity, MemoryPressure, StorageCapacity, StartupReview, SecurityReview, DataQuality }
+public enum OptimizationBenefit { MemoryCapacity, MemoryPressure, StorageCapacity, StartupReview, SecurityReview, DataQuality, WorkloadDiagnosis }
 public enum RuleConfidence { Low, Medium, High }
 public enum OptimizationPlanStatus { RecommendationsAvailable, NoOptimizationRequired, NeedsMoreData, PrerequisitesNotMet }
 
@@ -41,6 +41,13 @@ public sealed record OptimizationPlan(
     IReadOnlyList<string> Conflicts,
     IReadOnlyList<string> UnmetDependencies);
 
+/// <summary>Explicitly sampled workload evidence; false process heuristics do not prove absence.</summary>
+public sealed record OptimizationWorkloadEvidence(
+    double? CpuPercent,
+    double? AvailableMemoryPercent,
+    bool? KnownGameProcessDetected,
+    bool? ObsProcessDetected);
+
 /// <summary>
 /// Formal metadata and evaluation for evidence-based review rules. The plan intentionally
 /// produces no executable actions; applying maintenance remains in the consent-gated engine.
@@ -68,7 +75,23 @@ public sealed class OptimizationRuleEngine
             "Verificar provedor e políticas em Segurança do Windows sem reduzir a proteção.", [], true),
         new("diagnostics.warnings", "Leitura limitada no diagnóstico", OptimizationBenefit.DataQuality, RuleConfidence.High, AllProfiles,
             "Aviso explícito emitido pelo coletor.",
-            "Resolver ou reconhecer a limitação e repetir somente a coleta afetada.", [], true)
+            "Resolver ou reconhecer a limitação e repetir somente a coleta afetada.", [], true),
+        new("gaming.cpu-load", "Validar carga de CPU durante jogos", OptimizationBenefit.WorkloadDiagnosis, RuleConfidence.Low,
+            new HashSet<OptimizationProfile> { OptimizationProfile.Gaming, OptimizationProfile.GamingStreaming },
+            "Amostra de CPU e processo de jogo conhecido presente na lista observada; presença não confirma partida.",
+            "Repetir a amostra durante uma partida e comparar carga total com processo, GPU, temperatura e limites do jogo.", [], true),
+        new("gaming.streaming-context", "Medir jogo e OBS em conjunto", OptimizationBenefit.WorkloadDiagnosis, RuleConfidence.Low,
+            new HashSet<OptimizationProfile> { OptimizationProfile.GamingStreaming },
+            "Processos conhecidos de jogo e OBS presentes na lista observada; isso não comprova partida ou transmissão ao vivo.",
+            "Repetir observações durante a partida e transmissão reais; comparar CPU, GPU, memória e codificador.", [], true),
+        new("gaming.memory-pressure", "Revisar memória disponível durante jogos", OptimizationBenefit.MemoryPressure, RuleConfidence.Low,
+            new HashSet<OptimizationProfile> { OptimizationProfile.Gaming, OptimizationProfile.GamingStreaming },
+            "Memória disponível na amostra e processo de jogo conhecido presente na lista observada.",
+            "Repetir durante a partida, conferir paginação e processos que usam memória; não esvaziar RAM automaticamente.", [], true),
+        new("workload.cpu-load", "Validar carga de CPU durante a tarefa", OptimizationBenefit.WorkloadDiagnosis, RuleConfidence.Low,
+            new HashSet<OptimizationProfile> { OptimizationProfile.Work, OptimizationProfile.Editing, OptimizationProfile.Development },
+            "Amostra válida de CPU durante a tarefa selecionada.",
+            "Repetir durante a tarefa e comparar CPU e processos; carga alta isolada não identifica causa nem prova gargalo.", [], true)
     ];
 
     private readonly OptimizationPlanner planner = new();
@@ -85,7 +108,7 @@ public sealed class OptimizationRuleEngine
 
     public IReadOnlyList<OptimizationRuleDefinition> GetDefinitions() => Array.AsReadOnly(definitions);
 
-    public OptimizationPlan Evaluate(HardwareSnapshot snapshot, OptimizationProfile profile)
+    public OptimizationPlan Evaluate(HardwareSnapshot snapshot, OptimizationProfile profile, OptimizationWorkloadEvidence? workload = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         if (!Enum.IsDefined(profile)) throw new ArgumentOutOfRangeException(nameof(profile));
@@ -94,6 +117,48 @@ public sealed class OptimizationRuleEngine
         var results = new List<OptimizationRuleResult>(definitions.Length);
         foreach (var definition in definitions)
         {
+            if (definition.Id == "gaming.cpu-load")
+            {
+                var workloadEvidenceAvailable = workload is { CpuPercent: not null, KnownGameProcessDetected: true };
+                var triggered = workloadEvidenceAvailable && workload!.CpuPercent >= 85;
+                results.Add(new(definition,
+                    triggered ? $"CPU total em {workload!.CpuPercent:0.#}% com processo de jogo conhecido entre os processos observados. Isso não comprova gargalo de CPU." :
+                    workloadEvidenceAvailable ? $"CPU total em {workload!.CpuPercent:0.#}% nesta amostra; o limiar de revisão de 85% não foi atingido." :
+                    "Amostra de CPU junto a um processo de jogo conhecido não disponível; ausência na lista observada não prova que o jogo esteja fechado.",
+                    workloadEvidenceAvailable, triggered, null));
+                continue;
+            }
+            if (definition.Id == "gaming.streaming-context")
+            {
+                var workloadEvidenceAvailable = workload is { KnownGameProcessDetected: true, ObsProcessDetected: true };
+                results.Add(new(definition,
+                    workloadEvidenceAvailable ? "Processos conhecidos de jogo e OBS aparecem na amostra. Isso não confirma partida nem transmissão ao vivo; meça a carga conjunta durante o uso real." :
+                    "Amostra não confirmou simultaneamente processos conhecidos de jogo e OBS. A lista é limitada e isso não prova que estejam fechados.",
+                    workloadEvidenceAvailable, workloadEvidenceAvailable, null));
+                continue;
+            }
+            if (definition.Id == "gaming.memory-pressure")
+            {
+                var workloadEvidenceAvailable = workload is { AvailableMemoryPercent: not null, KnownGameProcessDetected: true };
+                var triggered = workloadEvidenceAvailable && workload!.AvailableMemoryPercent <= 10;
+                results.Add(new(definition,
+                    triggered ? $"Há {workload!.AvailableMemoryPercent:0.#}% de memória disponível durante a amostra com processo de jogo conhecido. Repita a medição e verifique paginação; isso não comprova gargalo." :
+                    workloadEvidenceAvailable ? $"Há {workload!.AvailableMemoryPercent:0.#}% de memória disponível nesta amostra; o limiar de revisão de 10% não foi atingido." :
+                    "Amostra válida de memória e processo de jogo conhecido não estão disponíveis em conjunto; ausência na lista observada não prova que o jogo esteja fechado.",
+                    workloadEvidenceAvailable, triggered, null));
+                continue;
+            }
+            if (definition.Id == "workload.cpu-load")
+            {
+                var workloadEvidenceAvailable = workload?.CpuPercent is not null;
+                var triggered = workloadEvidenceAvailable && workload!.CpuPercent >= 85;
+                results.Add(new(definition,
+                    triggered ? $"CPU total em {workload!.CpuPercent:0.#}% durante a amostra. Carga alta isolada não identifica causa nem comprova gargalo." :
+                    workloadEvidenceAvailable ? $"CPU total em {workload!.CpuPercent:0.#}% nesta amostra; o limiar de revisão de 85% não foi atingido." :
+                    "Não há amostra válida de CPU durante a tarefa selecionada.",
+                    workloadEvidenceAvailable, triggered, null));
+                continue;
+            }
             var matches = recommendations.Where(recommendation => Matches(definition.Id, recommendation)).ToArray();
             var evidenceAvailable = HasEvidence(snapshot, definition.Id);
             var reason = matches.Length > 0
@@ -121,6 +186,42 @@ public sealed class OptimizationRuleEngine
         var unmet = new List<string>();
         var conflicts = new List<string>();
 
+        SuppressUnmetDependencies(resolved, profile, unmet);
+
+        var handledPairs = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rule in resolved.Values.Where(result => result.Triggered).OrderBy(result => result.Rule.Id, StringComparer.Ordinal).ToArray())
+        {
+            foreach (var conflictId in rule.Rule.ConflictsWith ?? [])
+            {
+                if (!resolved.TryGetValue(conflictId, out var other) || !other.Triggered) continue;
+                var pair = string.CompareOrdinal(rule.Rule.Id, conflictId) < 0 ? $"{rule.Rule.Id}|{conflictId}" : $"{conflictId}|{rule.Rule.Id}";
+                if (!handledPairs.Add(pair)) continue;
+
+                var winner = ComparePriority(rule, other) >= 0 ? rule : other;
+                var loser = winner.Rule.Id == rule.Rule.Id ? other : rule;
+                var detail = $"Conflito entre {rule.Rule.Id} e {other.Rule.Id}: mantida {winner.Rule.Id} pela confiança {winner.Rule.Confidence}; {loser.Rule.Id} foi suprimida.";
+                conflicts.Add(detail);
+                resolved[loser.Rule.Id] = loser with
+                {
+                    Triggered = false,
+                    Action = null,
+                    Reason = loser.Reason + $" Sugestão suprimida por conflito com {winner.Rule.Id}."
+                };
+            }
+        }
+
+        // Conflict suppression may block prerequisites, so evaluate dependencies again to a fixed point.
+        SuppressUnmetDependencies(resolved, profile, unmet);
+
+        return (definitions.Select(definition => resolved.TryGetValue(definition.Id, out var result) ? result : null)
+            .Where(result => result is not null).Cast<OptimizationRuleResult>().ToArray(), conflicts.ToArray(), unmet.ToArray());
+    }
+
+    private static void SuppressUnmetDependencies(
+        Dictionary<string, OptimizationRuleResult> resolved,
+        OptimizationProfile profile,
+        List<string> unmet)
+    {
         // Resolve prerequisites to a fixed point so a blocked prerequisite also blocks its dependents.
         bool changed;
         do
@@ -146,31 +247,6 @@ public sealed class OptimizationRuleEngine
                 }
             }
         } while (changed);
-
-        var handledPairs = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var rule in resolved.Values.Where(result => result.Triggered).OrderBy(result => result.Rule.Id, StringComparer.Ordinal).ToArray())
-        {
-            foreach (var conflictId in rule.Rule.ConflictsWith ?? [])
-            {
-                if (!resolved.TryGetValue(conflictId, out var other) || !other.Triggered) continue;
-                var pair = string.CompareOrdinal(rule.Rule.Id, conflictId) < 0 ? $"{rule.Rule.Id}|{conflictId}" : $"{conflictId}|{rule.Rule.Id}";
-                if (!handledPairs.Add(pair)) continue;
-
-                var winner = ComparePriority(rule, other) >= 0 ? rule : other;
-                var loser = winner.Rule.Id == rule.Rule.Id ? other : rule;
-                var detail = $"Conflito entre {rule.Rule.Id} e {other.Rule.Id}: mantida {winner.Rule.Id} pela confiança {winner.Rule.Confidence}; {loser.Rule.Id} foi suprimida.";
-                conflicts.Add(detail);
-                resolved[loser.Rule.Id] = loser with
-                {
-                    Triggered = false,
-                    Action = null,
-                    Reason = loser.Reason + $" Sugestão suprimida por conflito com {winner.Rule.Id}."
-                };
-            }
-        }
-
-        return (definitions.Select(definition => resolved.TryGetValue(definition.Id, out var result) ? result : null)
-            .Where(result => result is not null).Cast<OptimizationRuleResult>().ToArray(), conflicts.ToArray(), unmet.ToArray());
     }
 
     private static int ComparePriority(OptimizationRuleResult left, OptimizationRuleResult right)

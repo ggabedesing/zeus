@@ -110,7 +110,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<ChangeRow> UserChanges { get; } = [];
     public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
-    public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Uso equilibrado"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Battery, "Autonomia no notebook")];
+    public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
     public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS")];
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -263,14 +263,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         Recommendations.Clear();
         if (_snapshot is null) return;
-        _optimizationPlan = _ruleEngine.Evaluate(_snapshot, ToOptimizationProfile(SelectedProfile));
+        _optimizationPlan = _ruleEngine.Evaluate(_snapshot, ToOptimizationProfile(SelectedProfile), ToWorkloadEvidence(_performance));
         foreach (var result in _optimizationPlan.Rules.Where(result => result.Triggered))
             Recommendations.Add(new(result.Rule.Title, result.Reason, result.Action is { } a ? $"Revisar em Manutenção: {MaintenanceCatalog.Get(a).Title}" : ""));
         var profile = SelectedProfile switch
         {
             UsageProfile.Gaming => ("Durante seus jogos", "Meça com o jogo aberto. Compare uso de CPU e RAM; quedas de FPS também podem depender da GPU, temperatura e configurações do jogo. Atualize drivers apenas quando houver compatibilidade e indicação."),
+            UsageProfile.GamingStreaming => ("Durante jogos e transmissão", "Meça durante uma partida com OBS. A detecção de processos não confirma transmissão ao vivo; compare carga de CPU, GPU, memória e codificador antes de atribuir uma causa."),
             UsageProfile.Work => ("Durante o trabalho", "Meça com seus aplicativos e abas habituais. Revise inicialização preservando ferramentas de comunicação, segurança e sincronização necessárias."),
             UsageProfile.Creative => ("Durante edição e criação", "Meça durante a tarefa de edição ou exportação. Preserve backups e espaço de trabalho; confirme memória e armazenamento exigidos pelo seu editor antes de comprar componentes."),
+            UsageProfile.Development => ("Durante a programação", "Meça durante a compilação, execução local e ferramentas habituais. Compare carga e processos na mesma tarefa; não encerre processos ou serviços necessários ao ambiente."),
             UsageProfile.Battery => ("Priorize autonomia", "Revise o plano de energia disponível em Perfil. Reduzir efeitos visuais pode ajudar a interface; autonomia também depende de brilho, aplicativos e condição da bateria."),
             _ => ("Comece pela tarefa lenta", "Meça durante o uso que apresenta lentidão. Revise temporários e inicialização antes de escolher reparos ou alterações de energia.")
         };
@@ -287,11 +289,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static OptimizationProfile ToOptimizationProfile(UsageProfile profile) => profile switch
     {
         UsageProfile.Gaming => OptimizationProfile.Gaming,
+        UsageProfile.GamingStreaming => OptimizationProfile.GamingStreaming,
         UsageProfile.Work => OptimizationProfile.Work,
         UsageProfile.Creative => OptimizationProfile.Editing,
+        UsageProfile.Development => OptimizationProfile.Development,
         UsageProfile.Battery => OptimizationProfile.General,
         _ => OptimizationProfile.General
     };
+
+    private static OptimizationWorkloadEvidence? ToWorkloadEvidence(PerformanceObservation? observation)
+    {
+        if (observation is not { } sample) return null;
+        double? availableMemoryPercent = sample.TotalMemoryBytes > 0 && sample.AvailableMemoryBytes <= sample.TotalMemoryBytes
+            ? (double)sample.AvailableMemoryBytes / sample.TotalMemoryBytes * 100
+            : null;
+        return new(sample.CpuPercent, availableMemoryPercent,
+            sample.ActivityContext?.KnownGameProcessDetected,
+            sample.ActivityContext?.ObsProcessDetected);
+    }
 
     private void ShowPendingHardware()
     {

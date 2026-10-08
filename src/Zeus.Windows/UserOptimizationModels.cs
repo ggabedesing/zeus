@@ -1,6 +1,6 @@
 namespace Zeus.Windows;
 
-public enum UsageProfile { Balanced, Work, Gaming, Creative, Battery }
+public enum UsageProfile { Balanced = 0, Work = 1, Gaming = 2, Creative = 3, Battery = 4, GamingStreaming = 5, Development = 6 }
 public enum DesktopTheme { Minimal, Complete, MacInspired }
 
 /// <summary>The usage profile records a preference; it never selects a power plan automatically.</summary>

@@ -12,8 +12,8 @@ public sealed class OptimizationPlannerTests
     [Fact]
     public void FormalPlanDistinguishesNoReviewFromUnavailableEvidence()
     {
-        var healthy = ruleEngine.Evaluate(HealthySnapshot(), OptimizationProfile.Gaming);
-        var incomplete = ruleEngine.Evaluate(HealthySnapshot() with { Memory = null, Disks = [], Security = null }, OptimizationProfile.Gaming);
+        var healthy = ruleEngine.Evaluate(HealthySnapshot(), OptimizationProfile.General);
+        var incomplete = ruleEngine.Evaluate(HealthySnapshot() with { Memory = null, Disks = [], Security = null }, OptimizationProfile.General);
 
         Assert.Equal(OptimizationPlanStatus.NoOptimizationRequired, healthy.Status);
         Assert.Equal(OptimizationPlanStatus.NeedsMoreData, incomplete.Status);
@@ -37,6 +37,9 @@ public sealed class OptimizationPlannerTests
             Assert.True(Enum.IsDefined(rule.Confidence));
         });
         Assert.Contains(definitions, rule => rule.CompatibleProfiles.Contains(OptimizationProfile.GamingStreaming));
+        Assert.Contains(definitions, rule => rule.Id == "gaming.streaming-context" && rule.CompatibleProfiles.SetEquals([OptimizationProfile.GamingStreaming]));
+        Assert.Contains(definitions, rule => rule.Id == "workload.cpu-load" &&
+            rule.CompatibleProfiles.SetEquals([OptimizationProfile.Work, OptimizationProfile.Editing, OptimizationProfile.Development]));
     }
 
     [Fact]
@@ -98,6 +101,63 @@ public sealed class OptimizationPlannerTests
         Assert.Equal(OptimizationPlanStatus.PrerequisitesNotMet, plan.Status);
         Assert.NotEmpty(plan.UnmetDependencies);
         Assert.Contains(plan.Rules, result => result.Rule.Id == "storage.free-space" && !result.Triggered);
+    }
+
+    [Fact]
+    public void GamingRuleUsesObservedGameContextAndNeverCallsTheCpuReadingAProvenBottleneck()
+    {
+        var snapshot = HealthySnapshot();
+        var plan = ruleEngine.Evaluate(snapshot, OptimizationProfile.Gaming,
+            new OptimizationWorkloadEvidence(91, 42, true, false));
+        var gameCpu = Assert.Single(plan.Rules, result => result.Rule.Id == "gaming.cpu-load");
+
+        Assert.True(gameCpu.Triggered);
+        Assert.Equal(RuleConfidence.Low, gameCpu.Rule.Confidence);
+        Assert.Contains("não comprova gargalo", gameCpu.Reason);
+        Assert.Null(gameCpu.Action);
+    }
+
+    [Fact]
+    public void GamingStreamingRuleRequiresBothObservedProcessesAndDoesNotClaimLiveStreaming()
+    {
+        var snapshot = HealthySnapshot();
+        var unknown = ruleEngine.Evaluate(snapshot, OptimizationProfile.GamingStreaming);
+        var observed = ruleEngine.Evaluate(snapshot, OptimizationProfile.GamingStreaming,
+            new OptimizationWorkloadEvidence(55, 60, true, true));
+        var contextRule = Assert.Single(observed.Rules, result => result.Rule.Id == "gaming.streaming-context");
+
+        Assert.Equal(OptimizationPlanStatus.NeedsMoreData, unknown.Status);
+        Assert.Equal(OptimizationPlanStatus.RecommendationsAvailable, observed.Status);
+        Assert.True(contextRule.Triggered);
+        Assert.Contains("não confirma partida nem transmissão ao vivo", contextRule.Reason);
+    }
+
+    [Fact]
+    public void GamingMemorySignalRequiresObservedGameAndSampleAndStaysAReviewSuggestion()
+    {
+        var snapshot = HealthySnapshot();
+        var plan = ruleEngine.Evaluate(snapshot, OptimizationProfile.Gaming,
+            new OptimizationWorkloadEvidence(65, 8, true, false));
+        var memoryRule = Assert.Single(plan.Rules, result => result.Rule.Id == "gaming.memory-pressure");
+
+        Assert.True(memoryRule.Triggered);
+        Assert.Contains("não comprova gargalo", memoryRule.Reason);
+        Assert.Null(memoryRule.Action);
+    }
+
+    [Theory]
+    [InlineData(OptimizationProfile.Work)]
+    [InlineData(OptimizationProfile.Editing)]
+    [InlineData(OptimizationProfile.Development)]
+    public void WorkEditingAndDevelopmentProfilesEvaluateCpuOnlyWhenAWorkloadSampleExists(OptimizationProfile profile)
+    {
+        var engine = ruleEngine;
+        var snapshot = HealthySnapshot();
+        var unknown = engine.Evaluate(snapshot, profile);
+        var observed = engine.Evaluate(snapshot, profile, new OptimizationWorkloadEvidence(88, 35, false, false));
+
+        Assert.Equal(OptimizationPlanStatus.NeedsMoreData, unknown.Status);
+        Assert.Contains(observed.Rules, result => result.Rule.Id == "workload.cpu-load" && result.Triggered);
     }
 
     [Fact]

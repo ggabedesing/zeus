@@ -83,6 +83,8 @@ public sealed class WpfExperienceTests
         Assert.NotNull(window.Snapshot);
         Assert.NotNull(window.FormalOptimizationPlan);
         Assert.NotEmpty(window.FormalPlanSummary);
+        Assert.Contains(window.ProfileOptions, option => option.Value == Zeus.Windows.UsageProfile.GamingStreaming);
+        Assert.Contains(window.ProfileOptions, option => option.Value == Zeus.Windows.UsageProfile.Development);
         Assert.NotNull(window.Snapshot.Cpu);
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
