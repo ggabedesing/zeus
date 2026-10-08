@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 namespace Zeus.Windows;
 
 public sealed record ProcessObservation(int Id, string Name, double? CpuPercent, ulong WorkingSetBytes);
-public sealed record GpuEngineObservation(string InstanceName, int? ProcessId, string EngineType, double UtilizationPercent);
+public sealed record GpuEngineObservation(string InstanceName, int? ProcessId, string EngineType, double UtilizationPercent, string? ProcessName = null);
 public sealed record DiskPerformanceObservation(string InstanceName, ulong? BytesPerSecond, double? ActivePercent, double? AverageReadLatencyMilliseconds);
 public sealed record NetworkPerformanceObservation(string Adapter, ulong? BytesPerSecond, ulong? LinkBitsPerSecond, ulong? QueueLength, ulong? ErrorPackets);
 
@@ -98,7 +98,7 @@ public sealed class WindowsPerformanceProbe
             available = memory.AvailablePhysical;
         }
         else warnings.Add("Memória física indisponível via GlobalMemoryStatusEx; zero neste relatório indica ausência de leitura.");
-        var gpuEngines = ReadGpuCounters(token, warnings);
+        var gpuEngines = MapGpuEnginesToProcesses(ReadGpuCounters(token, warnings), top);
         var disks = ReadDiskCounters(token, warnings);
         var networks = ReadNetworkCounters(token, warnings);
         var activityContext = ActivityContextDetector.Detect(top);
@@ -136,6 +136,17 @@ public sealed class WindowsPerformanceProbe
         var load = ((afterTicks - beforeTicks) / (double)TimeSpan.TicksPerSecond) /
             elapsed.TotalSeconds / logicalProcessors * 100;
         return double.IsFinite(load) ? Math.Clamp(load, 0, 100) : null;
+    }
+
+    internal static IReadOnlyList<GpuEngineObservation> MapGpuEnginesToProcesses(
+        IReadOnlyList<GpuEngineObservation> engines, IReadOnlyList<ProcessObservation> processes)
+    {
+        ArgumentNullException.ThrowIfNull(engines);
+        ArgumentNullException.ThrowIfNull(processes);
+        var processNames = processes.ToDictionary(process => process.Id, process => process.Name);
+        return engines.Select(engine => engine.ProcessId is { } id && processNames.TryGetValue(id, out var name)
+            ? engine with { ProcessName = name }
+            : engine with { ProcessName = null }).ToArray();
     }
 
     private static IReadOnlyList<GpuEngineObservation> ReadGpuCounters(CancellationToken token, List<string> warnings) =>

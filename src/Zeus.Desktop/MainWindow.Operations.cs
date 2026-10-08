@@ -273,7 +273,12 @@ public partial class MainWindow
             ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · Memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}"));
         PerformanceResourceRows.Clear();
         foreach (var engine in (observation.GpuEngines ?? []).OrderByDescending(engine => engine.UtilizationPercent).Take(20))
-            PerformanceResourceRows.Add(new($"GPU {engine.EngineType} · PID {engine.ProcessId?.ToString() ?? "indisponível"}", $"Uso desta instância: {engine.UtilizationPercent:0.#}% · não representa uso total da GPU"));
+        {
+            var process = engine.ProcessId is { } pid
+                ? engine.ProcessName is { Length: > 0 } name ? $"{name} · PID {pid}" : $"PID {pid} · nome não mapeado"
+                : "processo não informado pelo contador";
+            PerformanceResourceRows.Add(new($"GPU {engine.EngineType} · {process}", $"Uso desta instância: {engine.UtilizationPercent:0.#}% · não representa uso total da GPU"));
+        }
         foreach (var disk in observation.Disks ?? [])
             PerformanceResourceRows.Add(new($"Disco · {disk.InstanceName}", $"Transferência: {FormatBytesPerSecond(disk.BytesPerSecond)} · ativo: {(disk.ActivePercent is { } active ? $"{active:0.#}%" : "indisponível")} · leitura: {(disk.AverageReadLatencyMilliseconds is { } latency ? $"{latency:0.##} ms" : "indisponível")}"));
         foreach (var network in observation.Networks ?? [])

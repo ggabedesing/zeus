@@ -6,6 +6,24 @@ namespace Zeus.Hardware.Tests;
 public sealed class PerformanceCounterTests
 {
     [Fact]
+    public void MapsGpuEnginePidToSampledProcessNameWithoutInventingMissingNames()
+    {
+        var engines = new GpuEngineObservation[]
+        {
+            new("pid_42_eng_0_engtype_3D", 42, "3D", 60),
+            new("pid_99_eng_0_engtype_3D", 99, "3D", 20),
+            new("_Total_eng_0_engtype_3D", null, "3D", 10)
+        };
+        var processes = new ProcessObservation[] { new(42, "game", 30, 1024) };
+
+        var mapped = WindowsPerformanceProbe.MapGpuEnginesToProcesses(engines, processes);
+
+        Assert.Equal("game", mapped[0].ProcessName);
+        Assert.Null(mapped[1].ProcessName);
+        Assert.Null(mapped[2].ProcessName);
+    }
+
+    [Fact]
     public void HistoryBufferRetainsOnlyNewestEntriesAndPreservesSessions()
     {
         var buffer = new PerformanceHistoryBuffer(2);
