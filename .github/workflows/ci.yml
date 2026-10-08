@@ -213,6 +213,7 @@ jobs:
         with:
           name: zeus-windows-acceptance
           path: .validation/
+          include-hidden-files: true
           if-no-files-found: error
       - name: Return validation evidence through Git
         if: ${{ always() && steps.evidence.outcome == 'success' && github.event_name != 'pull_request' }}
