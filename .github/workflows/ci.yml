@@ -72,6 +72,7 @@ jobs:
       ZEUS_TEST_OUTCOME: pending
       ZEUS_SMOKE_OUTCOME: pending
       ZEUS_PUBLISH_OUTCOME: pending
+      ZEUS_INSTALLER_TEST_OUTCOME: pending
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -105,6 +106,30 @@ jobs:
           $payload = Get-ChildItem artifacts -Directory -Filter 'zeus-win-x64-*' | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
           if ($null -eq $payload) { throw 'Published x64 application payload not found.' }
           ./scripts/build-installer.ps1 -PayloadDirectory $payload.FullName -ProductVersion "1.0.$env:GITHUB_RUN_NUMBER"
+      - name: Install, upgrade, and uninstall MSI on the disposable runner
+        id: installerTest
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        shell: pwsh
+        env:
+          ZEUS_TEST_PREVIOUS_MSI_DIR: ${{ runner.temp }}/zeus-installer-previous
+          ZEUS_INSTALLER_SMOKE_LOGS: ${{ runner.temp }}/zeus-installer-smoke
+        run: |
+          $runNumber = [int]$env:GITHUB_RUN_NUMBER
+          if ($runNumber -lt 1) { throw 'A valid MSI version number is needed for the upgrade check.' }
+          $version = "1.0.$runNumber"
+          $previousVersion = "1.0.$($runNumber - 1)"
+          $payload = Get-ChildItem artifacts -Directory -Filter 'zeus-win-x64-*' | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+          if ($null -eq $payload) { throw 'Published x64 application payload not found.' }
+          ./scripts/build-installer.ps1 -PayloadDirectory $payload.FullName -ProductVersion $previousVersion -OutputDirectory $env:ZEUS_TEST_PREVIOUS_MSI_DIR
+          ./scripts/test-installer-windows.ps1 -PreviousInstaller (Join-Path $env:ZEUS_TEST_PREVIOUS_MSI_DIR 'Zeus.Installer.msi') -CurrentInstaller (Join-Path $PWD 'artifacts/Zeus.Installer.msi') -ExpectedVersion $version -LogDirectory $env:ZEUS_INSTALLER_SMOKE_LOGS
+      - name: Upload MSI lifecycle logs
+        if: always() && steps.installerTest.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeus-installer-lifecycle-logs
+          path: ${{ runner.temp }}/zeus-installer-smoke/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload portable package
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
         uses: actions/upload-artifact@v4
@@ -141,6 +166,7 @@ jobs:
           ZEUS_TEST_OUTCOME: ${{ steps.windowsTests.outcome }}
           ZEUS_SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
           ZEUS_PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          ZEUS_INSTALLER_TEST_OUTCOME: ${{ steps.installerTest.outcome }}
         run: |
           New-Item -ItemType Directory -Force '.validation/screenshots' | Out-Null
           $projects = @()
@@ -173,6 +199,7 @@ jobs:
             windowsTests = $env:ZEUS_TEST_OUTCOME
             smoke = $env:ZEUS_SMOKE_OUTCOME
             publish = $env:ZEUS_PUBLISH_OUTCOME
+            installerTest = $env:ZEUS_INSTALLER_TEST_OUTCOME
           }
           $verified = ($outcomes.Values | Where-Object { $_ -ne 'success' }).Count -eq 0 `
             -and $totals.total -gt 0 -and $totals.passed -eq $totals.total -and $totals.failed -eq 0 -and $totals.skipped -eq 0 `
