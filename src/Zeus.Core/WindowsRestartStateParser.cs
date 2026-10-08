@@ -11,11 +11,14 @@ public static class WindowsRestartStateParser
         if (indicators is null)
             return new(null, 0, 3, []);
 
+        bool? hasPendingFileRenames = indicators.PendingFileRenameCount is { } count && count >= 0
+            ? count > 0
+            : null;
         var sources = new (string Name, bool? Pending)[]
         {
             ("Component-Based Servicing", indicators.ComponentServicing),
             ("Windows Update", indicators.WindowsUpdate),
-            ("renomeações pendentes de arquivo", indicators.PendingFileRenames)
+            ("renomeações pendentes de arquivo", hasPendingFileRenames)
         };
         var checkedCount = sources.Count(source => source.Pending.HasValue);
         var detected = sources.Where(source => source.Pending == true).Select(source => source.Name).ToArray();

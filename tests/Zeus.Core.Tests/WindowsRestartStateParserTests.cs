@@ -7,7 +7,7 @@ public sealed class WindowsRestartStateParserTests
     [Fact]
     public void ReportsNoIndicatorOnlyWhenEverySourceWasRead()
     {
-        var state = WindowsRestartStateParser.Evaluate(new(false, false, false));
+        var state = WindowsRestartStateParser.Evaluate(new(false, false, 0));
 
         Assert.False(state.IsPending);
         Assert.Equal(3, state.CheckedSourceCount);
@@ -28,14 +28,33 @@ public sealed class WindowsRestartStateParserTests
     [InlineData(false, false, null, 2)]
     [InlineData(null, null, null, 0)]
     public void IncompleteSourcesRemainUnknownWhenNoPositiveIndicatorExists(
-        bool? componentServicing, bool? windowsUpdate, bool? pendingFileRenames, int checkedSources)
+        bool? componentServicing, bool? windowsUpdate, int? pendingFileRenameCount, int checkedSources)
     {
         var state = WindowsRestartStateParser.Evaluate(
-            new(componentServicing, windowsUpdate, pendingFileRenames));
+            new(componentServicing, windowsUpdate, pendingFileRenameCount));
 
         Assert.Null(state.IsPending);
         Assert.Equal(checkedSources, state.CheckedSourceCount);
         Assert.Equal(3, state.TotalSourceCount);
+    }
+
+    [Fact]
+    public void EmptyPendingRenameValueDoesNotCountAsAnIndicator()
+    {
+        var state = WindowsRestartStateParser.Evaluate(new(null, null, 0));
+
+        Assert.Null(state.IsPending);
+        Assert.Equal(1, state.CheckedSourceCount);
+        Assert.Empty(state.Sources);
+    }
+
+    [Fact]
+    public void InvalidNegativeRenameCountRemainsUnknown()
+    {
+        var state = WindowsRestartStateParser.Evaluate(new(false, false, -1));
+
+        Assert.Null(state.IsPending);
+        Assert.Equal(2, state.CheckedSourceCount);
     }
 
     [Fact]

@@ -66,6 +66,6 @@ public sealed record InstalledSoftwareInfo(string Name, string Version, string P
 public sealed record WindowsEventInfo(DateTimeOffset Time, string Log, string Provider, int Id, string Level, string Message);
 public sealed record WindowsSecurityState(bool? SecureBootEnabled, bool? TpmPresent, bool? TpmReady);
 public sealed record WindowsUpdateState(int? PendingCount, string Source);
-public sealed record WindowsRestartIndicators(bool? ComponentServicing, bool? WindowsUpdate, bool? PendingFileRenames);
+public sealed record WindowsRestartIndicators(bool? ComponentServicing, bool? WindowsUpdate, int? PendingFileRenameCount);
 public sealed record WindowsRestartState(bool? IsPending, int CheckedSourceCount, int TotalSourceCount,
     IReadOnlyList<string> Sources);
