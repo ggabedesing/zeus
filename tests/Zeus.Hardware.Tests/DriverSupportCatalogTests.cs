@@ -8,7 +8,13 @@ public sealed class DriverSupportCatalogTests
     [InlineData("NVIDIA Corporation", "www.nvidia.com")]
     [InlineData("Advanced Micro Devices, Inc.", "www.amd.com")]
     [InlineData("Intel(R) Corporation", "www.intel.com")]
-    public void RecognizedChipVendorsHaveFixedOfficialHttpsLookup(string provider, string host)
+    [InlineData("Dell Inc.", "www.dell.com")]
+    [InlineData("Hewlett-Packard", "support.hp.com")]
+    [InlineData("LENOVO", "pcsupport.lenovo.com")]
+    [InlineData("ASUSTeK COMPUTER INC.", "www.asus.com")]
+    [InlineData("Acer Incorporated", "www.acer.com")]
+    [InlineData("Micro-Star International", "us.msi.com")]
+    public void RecognizedVendorsHaveFixedOfficialHttpsLookup(string provider, string host)
     {
         var source = Assert.IsType<DriverSupportSource>(DriverSupportCatalog.Find(provider));
         Assert.Equal("https", source.Uri.Scheme);
