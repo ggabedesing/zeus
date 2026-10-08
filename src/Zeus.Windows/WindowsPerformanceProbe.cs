@@ -92,7 +92,8 @@ public sealed class WindowsPerformanceProbe
             }
             observations.Add(new ProcessObservation(last.Id, last.Name, processCpu, last.WorkingSetBytes));
         }
-        var top = observations.OrderByDescending(process => process.CpuPercent.HasValue)
+        var allObservedProcesses = observations.ToArray();
+        var top = allObservedProcesses.OrderByDescending(process => process.CpuPercent.HasValue)
             .ThenByDescending(process => process.CpuPercent)
             .ThenByDescending(process => process.WorkingSetBytes).ThenBy(process => process.Id).Take(50).ToArray();
 
@@ -105,14 +106,14 @@ public sealed class WindowsPerformanceProbe
             available = memory.AvailablePhysical;
         }
         else warnings.Add("Memória física indisponível via GlobalMemoryStatusEx; zero neste relatório indica ausência de leitura.");
-        var gpuEngines = MapGpuEnginesToProcesses(ReadGpuCounters(token, warnings), top);
+        var gpuEngines = MapGpuEnginesToProcesses(ReadGpuCounters(token, warnings), allObservedProcesses);
         var gpuMemory = ReadGpuMemoryCounters(token, warnings);
         var disks = ReadDiskCounters(token, warnings);
         var networks = ReadNetworkCounters(token, warnings);
-        var activityContext = ActivityContextDetector.Detect(top);
+        var activityContext = ActivityContextDetector.Detect(allObservedProcesses, gpuEngines);
         warnings.Add("GPU: utilização por instância/engine não é uso total. Ocupação de memória dedicada compara uso reportado com capacidade DXGI correspondente e, sozinha, não diagnostica pressão ou gargalo; sensores ausentes permanecem desconhecidos.");
         warnings.Add("Disco e rede: contadores são taxas locais; tráfego não mede latência ou qualidade da Internet e erros são contagens reportadas pelo adaptador.");
-        warnings.Add("Detecção de jogos/OBS usa somente os 50 processos com maior CPU/RAM observados; ausência nessa lista não confirma que o programa esteja fechado.");
+        warnings.Add("A lista de processos exibida é limitada aos 50 maiores por CPU/RAM. Heurísticas de jogo/OBS consultam todos os processos acessíveis nesta amostra; processos inacessíveis e engines GPU não informadas permanecem desconhecidos. VideoEncode associado ao PID do OBS não confirma transmissão ao vivo.");
         warnings.Add("A amostra reflete a carga atual. Compare tarefas e condições equivalentes; CPU/RAM livres não medem FPS ou garantem melhorias.");
         return new PerformanceObservation(DateTimeOffset.UtcNow, Stopwatch.GetElapsedTime(start, cpuEnd),
             cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks, activityContext, gpuMemory);

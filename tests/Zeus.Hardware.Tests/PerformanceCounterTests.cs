@@ -176,12 +176,39 @@ public sealed class PerformanceCounterTests
         Assert.True(obsAndGame.ObsProcessDetected);
         Assert.True(obsAndGame.KnownGameProcessDetected);
         Assert.Equal(DetectionConfidence.Medium, obsAndGame.Confidence);
-        Assert.Contains("não confirmados", obsAndGame.Summary);
+        Assert.Contains("não confirma transmissão ao vivo", obsAndGame.Summary);
 
         var java = ActivityContextDetector.Detect([new(300, "javaw", null, 30)]);
         Assert.False(java.KnownGameProcessDetected);
         Assert.False(java.ObsProcessDetected);
         Assert.Equal(DetectionConfidence.Low, java.Confidence);
+    }
+
+    [Fact]
+    public void ActivityContextUsesAllAccessibleProcessesAndReportsMatchingObsVideoEncodeEngine()
+    {
+        var context = ActivityContextDetector.Detect(
+            [new(10, "idle", null, 10), new(20, "obs64", 1, 20), new(30, "FortniteClient-Win64-Shipping", null, 30)],
+            [new("pid_20_eng_0_engtype_VideoEncode", 20, "VideoEncode", 12.5)]);
+
+        Assert.True(context.ObsProcessDetected);
+        Assert.True(context.KnownGameProcessDetected);
+        Assert.True(context.ObsVideoEncodeEngineActive);
+        Assert.Equal(12.5, context.ObsVideoEncodeEnginePercent);
+        Assert.Contains("não confirma transmissão ao vivo", context.Summary);
+    }
+
+    [Fact]
+    public void ActivityContextKeepsEncoderUnknownWhenNoMatchingObsEngineIsReported()
+    {
+        var context = ActivityContextDetector.Detect(
+            [new(20, "obs64", null, 20)],
+            [new("pid_99_eng_0_engtype_VideoEncode", 99, "VideoEncode", 75)]);
+
+        Assert.True(context.ObsProcessDetected);
+        Assert.Null(context.ObsVideoEncodeEngineActive);
+        Assert.Null(context.ObsVideoEncodeEnginePercent);
+        Assert.Contains("indisponível", context.Summary);
     }
 
     private static PerformanceObservation Sample(double? cpu) =>

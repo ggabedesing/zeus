@@ -27,6 +27,7 @@ try
         throw new InvalidOperationException("No real Windows process observation was collected.");
     Console.WriteLine("PASS: real operating system, CPU, memory, volume and native performance data collected.");
     Console.WriteLine($"GPU memory counters: adapters={performance.GpuMemory?.Count ?? 0}; dedicated usage={performance.GpuMemory?.Count(item => item.DedicatedUsageBytes.HasValue) ?? 0}; capacity={performance.GpuMemory?.Count(item => item.DedicatedCapacityBytes.HasValue) ?? 0}; occupancy={performance.GpuMemory?.Count(item => item.DedicatedOccupancyPercent.HasValue) ?? 0}; occupancy is descriptive and not a standalone pressure diagnosis.");
+    Console.WriteLine($"Activity context: {performance.ActivityContext?.Summary ?? "unavailable"}");
     foreach (var warning in performance.Warnings.Where(warning => warning.Contains("Memória GPU", StringComparison.OrdinalIgnoreCase)))
         Console.WriteLine($"GPU memory detail: {warning}");
     Console.WriteLine($"Optional inventory: board={snapshot.Board is not null}; BIOS={snapshot.Bios is not null}; physicalDisks={snapshot.PhysicalDisks?.Count ?? 0}.");
