@@ -82,20 +82,38 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
     public string DriverClass => string.IsNullOrWhiteSpace(Candidate.DriverClass) ? "indisponível" : Candidate.DriverClass;
     public string DriverDate => Candidate.DriverDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "indisponível";
     public string ProviderCategory => ClassifyProvider(Candidate.DriverProvider, Candidate.Manufacturer);
-    public string DriverSource => "Windows Update · origem configurada no sistema";
+    public string DriverSource => Candidate.UpdateServerSelection switch
+    {
+        0 => "Windows Update Agent · servidor padrão (origem efetiva desconhecida)",
+        1 => "Windows Update Agent · servidor gerenciado",
+        2 => "Windows Update · serviço público",
+        3 when MaintenanceRequestProtocol.TryParseUpdateServiceId(Candidate.UpdateServiceId) => $"Windows Update Agent · outro serviço ({Candidate.UpdateServiceId})",
+        _ => "Windows Update Agent · origem indisponível"
+    };
     public bool RequiresEula => Candidate.RequiresEula;
     public string EulaText => Candidate.EulaText ?? "A licença não está disponível. Instale este candidato pelo Windows Update para revisar os termos.";
     public bool LicenseReady => !RequiresEula || (EulaAccepted && !string.IsNullOrWhiteSpace(Candidate.EulaText));
-    public bool CanSelectForInstall => HasTargetIdentity && HasUsableDate;
-    public string InstallabilityReason => !HasTargetIdentity
-        ? "Instalação bloqueada: o Windows Update não identificou fabricante e modelo do dispositivo."
-        : !HasUsableDate
-            ? "Instalação bloqueada: a data do driver está ausente, inválida ou futura."
-            : "Fabricante, modelo e data informados pelo Windows Update.";
+    public bool CanSelectForInstall => HasTargetIdentity && HasUsableDate && HasUsableSource;
+    public string InstallabilityReason
+    {
+        get
+        {
+            var missing = new List<string>();
+            if (!HasTargetIdentity) missing.Add("fabricante e modelo ausentes");
+            if (!HasUsableDate) missing.Add("data ausente, inválida ou futura");
+            if (!HasUsableSource) missing.Add("origem do Windows Update indisponível ou inválida");
+            return missing.Count == 0 ? "Fabricante, modelo, data e origem informados pelo Windows Update."
+                : "Instalação bloqueada: " + string.Join("; ", missing) + ".";
+        }
+    }
     public bool EulaAccepted { get => _eulaAccepted; set { if (_eulaAccepted == value) return; _eulaAccepted = value; Raise(nameof(EulaAccepted)); Raise(nameof(LicenseReady)); } }
 
     private bool HasTargetIdentity => !string.IsNullOrWhiteSpace(Candidate.Manufacturer) && !string.IsNullOrWhiteSpace(Candidate.DeviceName);
     private bool HasUsableDate => Candidate.DriverDate is { Year: >= 1980 } date && date <= DateOnly.FromDateTime(DateTime.Today);
+    private bool HasUsableSource => Candidate.UpdateServerSelection is 0 or 1 or 2 or 3 &&
+        (Candidate.UpdateServerSelection == 3
+            ? Zeus.Core.MaintenanceRequestProtocol.TryParseUpdateServiceId(Candidate.UpdateServiceId)
+            : Candidate.UpdateServiceId is null);
 
     private static string ClassifyProvider(string? provider, string? manufacturer)
     {

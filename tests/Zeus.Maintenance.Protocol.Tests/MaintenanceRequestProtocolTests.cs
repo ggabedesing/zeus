@@ -26,30 +26,36 @@ public sealed class MaintenanceRequestProtocolTests
     {
         MaintenanceRequest[] selected = [
             new(MaintenanceActionId.DefenderOfflineScan),
-            new(MaintenanceActionId.InstallDriverUpdate, DriverId, true),
             new(MaintenanceActionId.UpdateDefenderSignatures)];
         var encoded = MaintenanceRequestProtocol.Encode(selected);
 
         Assert.True(MaintenanceRequestProtocol.TryReadArguments(["--session", SessionId, "--requests", encoded],
             out var session, out var requests));
         Assert.Equal(Guid.Parse(SessionId), session);
-        Assert.Equal(new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, DriverId, true), requests[0]);
-        Assert.Equal(MaintenanceActionId.UpdateDefenderSignatures, requests[1].Action);
+        Assert.Equal(MaintenanceActionId.UpdateDefenderSignatures, requests[0].Action);
         Assert.Equal(MaintenanceActionId.DefenderOfflineScan, requests[^1].Action);
     }
 
     [Fact]
-    public void MultipleDifferentDriverIdentitiesShareAPlanAndRetainSelectionOrder()
+    public void DriverInstallationIsExclusiveAndCannotContainMultipleCandidates()
     {
         MaintenanceRequest[] selected = [
-            new(MaintenanceActionId.InstallDriverUpdate, DriverId, true),
-            new(MaintenanceActionId.InstallDriverUpdate, SessionId + ":2", false)];
-        var encoded = MaintenanceRequestProtocol.Encode(selected);
-        Assert.True(MaintenanceRequestProtocol.TryReadArguments(["--session", SessionId, "--requests", encoded],
-            out _, out var requests));
-        Assert.Equal(selected, requests);
+            new(MaintenanceActionId.InstallDriverUpdate, DriverId, true, 2),
+            new(MaintenanceActionId.InstallDriverUpdate, SessionId + ":2", false, 2)];
+        Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateRequests(selected));
         Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateRequests([
-            selected[0], new(MaintenanceActionId.InstallDriverUpdate, DriverId.ToUpperInvariant(), false)]));
+            selected[0], new(MaintenanceActionId.UpdateDefenderSignatures)]));
+    }
+
+    [Fact]
+    public void DriverInstallRequestPreservesExactWindowsUpdateServerSelection()
+    {
+        var serviceId = "12345678-1234-1234-1234-123456789abc";
+        var selected = new[] { new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, DriverId, false, 3, serviceId) };
+        var encoded = MaintenanceRequestProtocol.Encode(selected);
+
+        Assert.True(MaintenanceRequestProtocol.TryReadArguments(["--session", SessionId, "--requests", encoded], out _, out var requests));
+        Assert.Equal(selected, requests);
     }
 
     [Theory]
@@ -195,8 +201,8 @@ public sealed class MaintenanceRequestProtocolTests
     {
         Assert.All(Enum.GetValues<MaintenanceActionId>(), action => Assert.Equal(action, MaintenanceCatalog.Get(action).Id));
         var requests = Enum.GetValues<MaintenanceActionId>()
-            .Where(action => action is not MaintenanceActionId.ScanWindowsImage and not MaintenanceActionId.VerifySystemFiles and not MaintenanceActionId.RollbackDriver)
-            .Select(action => new MaintenanceRequest(action, action == MaintenanceActionId.InstallDriverUpdate ? DriverId : null)).ToArray();
+            .Where(action => action is not MaintenanceActionId.ScanWindowsImage and not MaintenanceActionId.VerifySystemFiles and not MaintenanceActionId.RollbackDriver and not MaintenanceActionId.InstallDriverUpdate)
+            .Select(action => new MaintenanceRequest(action)).ToArray();
         var ordered = MaintenancePolicy.ValidateRequests(requests);
         Assert.Equal(requests.Length, ordered.Count);
         Assert.Equal(MaintenanceActionId.DefenderOfflineScan, ordered[^1].Action);

@@ -15,7 +15,8 @@ public static class MaintenanceRequestProtocol
         var validated = MaintenancePolicy.ValidateRequests(requests);
         var payload = JsonSerializer.SerializeToUtf8Bytes(validated.Select(request => new
         {
-            Action = request.Action.ToString(), request.TargetId, request.EulaAccepted
+            Action = request.Action.ToString(), request.TargetId, request.EulaAccepted,
+            request.UpdateServerSelection, request.UpdateServiceId
         }));
         if (payload.Length > MaximumPayloadBytes)
             throw new ArgumentException("O plano excede o tamanho permitido.", nameof(requests));
@@ -48,6 +49,8 @@ public static class MaintenanceRequestProtocol
                 if (element.ValueKind != JsonValueKind.Object) return false;
                 string? actionName = null;
                 string? target = null;
+                int? serverSelection = null;
+                string? serviceId = null;
                 var accepted = false;
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in element.EnumerateObject())
@@ -64,12 +67,20 @@ public static class MaintenanceRequestProtocol
                         case "EulaAccepted" when property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False:
                             accepted = property.Value.GetBoolean();
                             break;
+                        case "UpdateServerSelection" when property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out var selection):
+                            serverSelection = selection;
+                            break;
+                        case "UpdateServerSelection" when property.Value.ValueKind == JsonValueKind.Null:
+                            break;
+                        case "UpdateServiceId" when property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Null:
+                            serviceId = property.Value.GetString();
+                            break;
                         default:
                             return false;
                     }
                 }
                 if (!TryParseAction(actionName, out var action)) return false;
-                selected.Add(new MaintenanceRequest(action, target, accepted));
+                selected.Add(new MaintenanceRequest(action, target, accepted, serverSelection, serviceId));
             }
             requests = MaintenancePolicy.ValidateRequests(selected);
             return true;
@@ -92,6 +103,9 @@ public static class MaintenanceRequestProtocol
             revisionText.All(char.IsAsciiDigit) &&
             int.TryParse(revisionText, NumberStyles.None, CultureInfo.InvariantCulture, out revision) && revision > 0;
     }
+
+    public static bool TryParseUpdateServiceId(string? serviceId) =>
+        serviceId is not null && Guid.TryParseExact(serviceId, "D", out var id) && id != Guid.Empty;
 
     public static bool TryParsePnpInstanceId(string? target)
     {

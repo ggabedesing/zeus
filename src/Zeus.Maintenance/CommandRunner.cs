@@ -201,9 +201,12 @@ internal static class CommandRunner
             ConfirmedDriverBackups.Add(sessionId);
         }
 
-        // The interpolated data has already been parsed to a GUID, an integer and a boolean.
-        // Installation re-queries the exact immutable WUA identity; titles and version strings are never matched.
-        var script = $"$expectedId = '{updateId:D}'; $expectedRevision = {revision}; $acceptEula = " +
+        // The interpolated data has already been parsed to GUIDs, integers and a boolean.
+        // Installation re-queries the exact WUA identity and server selection; titles are never matched.
+        var expectedServerSelection = request.UpdateServerSelection!.Value;
+        var expectedServiceId = request.UpdateServiceId is null ? string.Empty : Guid.Parse(request.UpdateServiceId).ToString("D");
+        var script = $"$expectedId = '{updateId:D}'; $expectedRevision = {revision}; $expectedServerSelection = {expectedServerSelection}; " +
+            $"$expectedServiceId = '{expectedServiceId}'; $acceptEula = " +
             (request.EulaAccepted ? "$true; " : "$false; ") + DriverInstallScript;
         var result = await RunAsync(sessionId, $"driver-{updateId:N}-{revision}.log",
             TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility), Timeout.InfiniteTimeSpan);
@@ -268,7 +271,14 @@ internal static class CommandRunner
         $installer = $session.CreateUpdateInstaller();
         if ($installer.IsBusy) { throw 'Windows Update ocupado com outra instalação. Nenhum driver foi solicitado.' };
         $query = "IsInstalled=0 and Type='Driver' and IsHidden=0 and UpdateID='" + $expectedId + "' and RevisionNumber=" + $expectedRevision;
-        $search = $session.CreateUpdateSearcher().Search($query);
+        $searcher = $session.CreateUpdateSearcher();
+        $actualServerSelection = [int]$searcher.ServerSelection;
+        $actualServiceId = if ($actualServerSelection -eq 3) { [string]$searcher.ServiceID } else { '' };
+        if ($actualServerSelection -ne $expectedServerSelection -or
+            ($expectedServerSelection -eq 3 -and [guid]$actualServiceId -ne [guid]$expectedServiceId)) {
+            throw 'A origem configurada do Windows Update mudou desde a busca. Nenhum download ou instalação foi iniciado; faça uma nova consulta.';
+        };
+        $search = $searcher.Search($query);
         if ([int]$search.ResultCode -ne 2) { throw 'A nova consulta da identidade não foi concluída sem erros.' };
         if ($search.Updates.Count -ne 1) { throw 'A oferta selecionada mudou ou não está mais disponível. Faça uma nova busca.' };
         $update = $search.Updates.Item(0);

@@ -7,7 +7,7 @@ public sealed class WindowsUpdateServiceTests
     [Fact]
     public void DriverSearchRetainsWindowsUpdateProviderClassAndDateWithoutInventingVersionOrSignature()
     {
-        var payload = """{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"NVIDIA Display Update","Manufacturer":"NVIDIA","DeviceName":"Graphics Adapter","DriverVersion":null,"RequiresEula":false,"DriverProvider":"NVIDIA","DriverClass":"Display","DriverDate":"2025-11-04"}],"Warnings":[]}""";
+        var payload = """{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"NVIDIA Display Update","Manufacturer":"NVIDIA","DeviceName":"Graphics Adapter","DriverVersion":null,"RequiresEula":false,"DriverProvider":"NVIDIA","DriverClass":"Display","DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":2,"ServiceId":null}""";
 
         var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
 
@@ -15,6 +15,8 @@ public sealed class WindowsUpdateServiceTests
         Assert.Equal("NVIDIA", candidate.DriverProvider);
         Assert.Equal("Display", candidate.DriverClass);
         Assert.Equal(new DateOnly(2025, 11, 4), candidate.DriverDate);
+        Assert.Equal(2, candidate.UpdateServerSelection);
+        Assert.Null(candidate.UpdateServiceId);
         Assert.Null(candidate.DriverVersion);
         Assert.Contains(result.Warnings, warning => warning.Contains("hash/assinatura", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(result.Warnings, warning => warning.Contains("versão numérica", StringComparison.OrdinalIgnoreCase));
@@ -56,6 +58,24 @@ public sealed class WindowsUpdateServiceTests
         Assert.Null(candidate.DeviceName);
         Assert.Null(candidate.DriverDate);
         Assert.Contains(result.Warnings, warning => warning.Contains("não identifica fabricante e modelo", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData(7, null)]
+    [InlineData(3, "bad")]
+    [InlineData(2, "12345678-1234-1234-1234-123456789abc")]
+    public void UnrecognizedWindowsUpdateSourceIsKeptExplicitAndWarned(int selection, string? serviceId)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Updates = new[] { new { Id = "9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2", Title = "Driver", Manufacturer = "Vendor", DeviceName = "Device", RequiresEula = false, DriverDate = "2025-11-04" } },
+            Warnings = Array.Empty<string>(), ServerSelection = selection, ServiceId = serviceId
+        });
+
+        var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
+
+        Assert.Single(result.Updates);
+        Assert.Contains(result.Warnings, warning => warning.Contains("origem reconhecível", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

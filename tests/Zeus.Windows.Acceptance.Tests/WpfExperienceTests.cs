@@ -161,22 +161,31 @@ public sealed class WpfExperienceTests
         Assert.False(window.CanGeneralOptimize);
         // Driver installation is individual; multiple candidates and missing consent both block it.
         var licensed = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":1", "Acceptance fixture", "Fixture", "Fixture", null, true, "Fixture terms",
-            DriverProvider: "NVIDIA", DriverClass: "Display", DriverDate: new DateOnly(2025, 11, 4)));
-        var unlicensed = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":2", "Acceptance fixture", "Fixture", "Fixture", null, false));
+            DriverProvider: "NVIDIA", DriverClass: "Display", DriverDate: new DateOnly(2025, 11, 4), UpdateServerSelection: 2));
+        var unlicensed = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":2", "Acceptance fixture", "Fixture", "Fixture", null, false,
+            UpdateServerSelection: 2));
         Assert.Equal("NVIDIA (heurística pelo nome declarado)", licensed.ProviderCategory);
         Assert.Equal("2025-11-04", licensed.DriverDate);
-        Assert.Equal("Windows Update · origem configurada no sistema", licensed.DriverSource);
+        Assert.Equal("Windows Update · serviço público", licensed.DriverSource);
         Assert.Equal("indisponível", unlicensed.DriverDate);
         Assert.False(unlicensed.CanSelectForInstall);
-        Assert.Contains("data do driver", unlicensed.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data ausente", unlicensed.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
         var unidentified = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":3", "Unidentified device", null, "Fixture adapter", null, false,
-            DriverDate: DateOnly.FromDateTime(DateTime.Today)));
+            DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 2));
         Assert.False(unidentified.CanSelectForInstall);
         Assert.Contains("fabricante e modelo", unidentified.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
         var futureDated = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":4", "Future dated driver", "Fixture", "Fixture adapter", null, false,
-            DriverDate: DateOnly.FromDateTime(DateTime.Today.AddDays(1))));
+            DriverDate: DateOnly.FromDateTime(DateTime.Today.AddDays(1)), UpdateServerSelection: 2));
         Assert.False(futureDated.CanSelectForInstall);
         Assert.Contains("futura", futureDated.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
+        var managedSource = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":5", "Managed source fixture", "Fixture", "Fixture adapter", null, false,
+            DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 1));
+        Assert.Equal("Windows Update Agent · servidor gerenciado", managedSource.DriverSource);
+        Assert.True(managedSource.CanSelectForInstall);
+        var invalidSource = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":6", "Invalid source fixture", "Fixture", "Fixture adapter", null, false,
+            DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 3, UpdateServiceId: "invalid"));
+        Assert.False(invalidSource.CanSelectForInstall);
+        Assert.Contains("origem", invalidSource.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
         licensed.IsSelected = true; unlicensed.IsSelected = true;
         Assert.False(window.CanInstallDriver);

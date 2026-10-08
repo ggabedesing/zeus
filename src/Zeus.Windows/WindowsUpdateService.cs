@@ -6,7 +6,8 @@ namespace Zeus.Windows;
 
 public sealed record DriverUpdateCandidate(string Id, string Title, string? Manufacturer,
     string? DeviceName, string? DriverVersion, bool RequiresEula, string? EulaText = null,
-    string? DriverProvider = null, string? DriverClass = null, DateOnly? DriverDate = null);
+    string? DriverProvider = null, string? DriverClass = null, DateOnly? DriverDate = null,
+    int? UpdateServerSelection = null, string? UpdateServiceId = null);
 
 public sealed record DriverUpdateSearch(DateTimeOffset CheckedAt,
     IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
@@ -43,7 +44,10 @@ public sealed class WindowsUpdateService
         if ($session.CreateUpdateInstaller().IsBusy) {
             $warnings.Add('O Windows Update está ocupado com outra instalação. A busca é somente leitura; aguarde antes de instalar um driver.');
         };
-        $search = $session.CreateUpdateSearcher().Search("IsInstalled=0 and Type='Driver' and IsHidden=0");
+        $searcher = $session.CreateUpdateSearcher();
+        $serverSelection = [int]$searcher.ServerSelection;
+        $serviceId = if ($serverSelection -eq 3) { [string]$searcher.ServiceID } else { $null };
+        $search = $searcher.Search("IsInstalled=0 and Type='Driver' and IsHidden=0");
         if ([int]$search.ResultCode -ne 2) {
             $warnings.Add('O Windows Update retornou resultado parcial ou incompleto na busca (código ' + [int]$search.ResultCode + ').');
         };
@@ -74,7 +78,7 @@ public sealed class WindowsUpdateService
                 DriverDate = $driverDate
             });
         };
-        [pscustomobject]@{ Updates = @($drivers.ToArray()); Warnings = @($warnings.ToArray()) } |
+        [pscustomobject]@{ Updates = @($drivers.ToArray()); Warnings = @($warnings.ToArray()); ServerSelection=$serverSelection; ServiceId=$serviceId } |
             Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 5 -Compress;
         """;
 
@@ -193,7 +197,8 @@ public sealed class WindowsUpdateService
         return output.ToString();
     }
 
-    private sealed record SearchPayload(IReadOnlyList<DriverSearchCandidate>? Updates, IReadOnlyList<string>? Warnings);
+    private sealed record SearchPayload(IReadOnlyList<DriverSearchCandidate>? Updates, IReadOnlyList<string>? Warnings,
+        int? ServerSelection, string? ServiceId);
     private sealed record DriverSearchCandidate(string? Id, string? Title, string? Manufacturer,
         string? DeviceName, string? DriverVersion, bool RequiresEula, string? EulaText,
         string? DriverProvider, string? DriverClass, string? DriverDate);
@@ -206,6 +211,12 @@ public sealed class WindowsUpdateService
         if (result.Updates is null || result.Warnings is null)
             throw new InvalidDataException("Resposta incompleta do Windows Update.");
         var warnings = result.Warnings.ToList();
+        var sourceValid = result.ServerSelection is 0 or 1 or 2 or 3 &&
+            (result.ServerSelection == 3
+                ? MaintenanceRequestProtocol.TryParseUpdateServiceId(result.ServiceId)
+                : result.ServiceId is null);
+        if (!sourceValid)
+            warnings.Add("O Windows Update Agent não retornou uma origem reconhecível; os candidatos ficam bloqueados para instalação pelo ZEUS.");
         var drivers = new List<DriverUpdateCandidate>();
         var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var driver in result.Updates)
@@ -240,7 +251,7 @@ public sealed class WindowsUpdateService
 
             drivers.Add(new DriverUpdateCandidate(driver.Id!, driver.Title.Trim(), Optional(driver.Manufacturer),
                 Optional(driver.DeviceName), Optional(driver.DriverVersion), driver.RequiresEula, Optional(driver.EulaText),
-                Optional(driver.DriverProvider), Optional(driver.DriverClass), driverDate));
+                Optional(driver.DriverProvider), Optional(driver.DriverClass), driverDate, result.ServerSelection, result.ServiceId));
         }
         warnings.Add("As ofertas seguem as fontes configuradas no Windows Update. Em notebooks, confira a recomendação do fabricante antes de instalar.");
         warnings.Add("O Windows Update informa fornecedor, classe e data do driver, mas não uma versão numérica nem hash/assinatura do arquivo nesta busca; esses itens permanecem indisponíveis e não são inferidos do título.");

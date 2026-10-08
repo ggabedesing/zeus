@@ -76,7 +76,9 @@ public sealed record MaintenanceActionDefinition(
 public sealed record MaintenanceRequest(
     MaintenanceActionId Action,
     string? TargetId = null,
-    bool EulaAccepted = false);
+    bool EulaAccepted = false,
+    int? UpdateServerSelection = null,
+    string? UpdateServiceId = null);
 
 public interface IAdvancedMaintenanceExecutor
 {
