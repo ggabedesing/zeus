@@ -309,6 +309,9 @@ public partial class MainWindow
                 : "processo não informado pelo contador";
             PerformanceResourceRows.Add(new($"GPU {engine.EngineType} · {process}", $"Uso desta instância: {engine.UtilizationPercent:0.#}% · não representa uso total da GPU"));
         }
+        foreach (var gpuMemory in observation.GpuMemory ?? [])
+            PerformanceResourceRows.Add(new($"Memória GPU · {gpuMemory.AdapterInstance}",
+                $"Uso dedicado: {FormatBytes(gpuMemory.DedicatedUsageBytes)} · compartilhado: {FormatBytes(gpuMemory.SharedUsageBytes)} · comprometido: {FormatBytes(gpuMemory.TotalCommittedBytes)} · sem orçamento total para inferir pressão"));
         foreach (var disk in observation.Disks ?? [])
             PerformanceResourceRows.Add(new($"Disco · {disk.InstanceName}", $"Transferência: {FormatBytesPerSecond(disk.BytesPerSecond)} · ativo: {(disk.ActivePercent is { } active ? $"{active:0.#}%" : "indisponível")} · leitura: {(disk.AverageReadLatencyMilliseconds is { } latency ? $"{latency:0.##} ms" : "indisponível")}"));
         foreach (var network in observation.Networks ?? [])
@@ -341,6 +344,8 @@ public partial class MainWindow
 
     private static string FormatBytesPerSecond(ulong? bytes) => bytes is { } value
         ? $"{ByteFormatting.Format(value)}/s" : "indisponível";
+
+    private static string FormatBytes(ulong? bytes) => bytes is { } value ? ByteFormatting.Format(value) : "indisponível";
 
     private static string FormatBitsPerSecond(ulong? bits) => bits is not { } value ? "indisponível"
         : value >= 1_000_000_000 ? $"{value / 1_000_000_000d:0.#} Gbps"

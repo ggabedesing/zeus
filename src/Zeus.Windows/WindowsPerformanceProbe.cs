@@ -13,6 +13,7 @@ public sealed record ProcessObservation(int Id, string Name, double? CpuPercent,
 public sealed record GpuEngineObservation(string InstanceName, int? ProcessId, string EngineType, double UtilizationPercent, string? ProcessName = null);
 public sealed record DiskPerformanceObservation(string InstanceName, ulong? BytesPerSecond, double? ActivePercent, double? AverageReadLatencyMilliseconds);
 public sealed record NetworkPerformanceObservation(string Adapter, ulong? BytesPerSecond, ulong? LinkBitsPerSecond, ulong? QueueLength, ulong? ErrorPackets);
+public sealed record GpuMemoryObservation(string AdapterInstance, ulong? DedicatedUsageBytes, ulong? SharedUsageBytes, ulong? TotalCommittedBytes);
 
 public sealed record PerformanceObservation(
     DateTimeOffset CollectedAt,
@@ -25,7 +26,8 @@ public sealed record PerformanceObservation(
     IReadOnlyList<GpuEngineObservation>? GpuEngines = null,
     IReadOnlyList<DiskPerformanceObservation>? Disks = null,
     IReadOnlyList<NetworkPerformanceObservation>? Networks = null,
-    ActivityContextInfo? ActivityContext = null);
+    ActivityContextInfo? ActivityContext = null,
+    IReadOnlyList<GpuMemoryObservation>? GpuMemory = null);
 
 /// <summary>
 /// A bounded, read-only observation, not a benchmark or prediction of performance
@@ -99,15 +101,16 @@ public sealed class WindowsPerformanceProbe
         }
         else warnings.Add("Memória física indisponível via GlobalMemoryStatusEx; zero neste relatório indica ausência de leitura.");
         var gpuEngines = MapGpuEnginesToProcesses(ReadGpuCounters(token, warnings), top);
+        var gpuMemory = ReadGpuMemoryCounters(token, warnings);
         var disks = ReadDiskCounters(token, warnings);
         var networks = ReadNetworkCounters(token, warnings);
         var activityContext = ActivityContextDetector.Detect(top);
-        warnings.Add("GPU: utilização por instância/engine não é uso total nem VRAM; sensores ausentes permanecem desconhecidos.");
+        warnings.Add("GPU: utilização por instância/engine não é uso total. Memória dedicada/compartilhada são contadores de uso por adaptador, sem orçamento total para inferir pressão; sensores ausentes permanecem desconhecidos.");
         warnings.Add("Disco e rede: contadores são taxas locais; tráfego não mede latência ou qualidade da Internet e erros são contagens reportadas pelo adaptador.");
         warnings.Add("Detecção de jogos/OBS usa somente os 50 processos com maior CPU/RAM observados; ausência nessa lista não confirma que o programa esteja fechado.");
         warnings.Add("A amostra reflete a carga atual. Compare tarefas e condições equivalentes; CPU/RAM livres não medem FPS ou garantem melhorias.");
         return new PerformanceObservation(DateTimeOffset.UtcNow, Stopwatch.GetElapsedTime(start, cpuEnd),
-            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks, activityContext);
+            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks, activityContext, gpuMemory);
     }
 
     internal readonly record struct SystemCpuTimes(ulong Idle, ulong Kernel, ulong User);
@@ -161,6 +164,16 @@ public sealed class WindowsPerformanceProbe
                 return new GpuEngineObservation(instance,
                     processMatch.Success && int.TryParse(processMatch.Groups[1].Value, out var pid) ? pid : null,
                     engineMatch.Success ? engineMatch.Groups[1].Value : "Desconhecido", utilization.Value);
+            });
+
+    private static IReadOnlyList<GpuMemoryObservation> ReadGpuMemoryCounters(CancellationToken token, List<string> warnings) =>
+        ReadCounterRows("Memória GPU", "Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory",
+            "SELECT Name,DedicatedUsage,SharedUsage,TotalCommitted FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory", 128, token, warnings, row =>
+            {
+                var instance = Convert.ToString(row["Name"], System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(instance)) return null;
+                return new GpuMemoryObservation(instance, CounterUInt64(row, "DedicatedUsage"),
+                    CounterUInt64(row, "SharedUsage"), CounterUInt64(row, "TotalCommitted"));
             });
 
     private static IReadOnlyList<DiskPerformanceObservation> ReadDiskCounters(CancellationToken token, List<string> warnings) =>

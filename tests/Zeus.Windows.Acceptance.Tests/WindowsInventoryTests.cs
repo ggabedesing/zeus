@@ -17,6 +17,7 @@ public sealed class WindowsInventoryTests
         Assert.True(observation.SamplingDuration >= TimeSpan.FromSeconds(2));
         Assert.InRange(observation.Processes.Count, 1, 50);
         Assert.NotNull(observation.GpuEngines);
+        Assert.NotNull(observation.GpuMemory);
         Assert.NotNull(observation.Disks);
         Assert.NotNull(observation.Networks);
         Assert.NotNull(observation.ActivityContext);
@@ -26,6 +27,7 @@ public sealed class WindowsInventoryTests
             Assert.True(double.IsFinite(engine.UtilizationPercent));
             Assert.True(engine.UtilizationPercent >= 0);
         });
+        Assert.All(observation.GpuMemory, adapter => Assert.False(string.IsNullOrWhiteSpace(adapter.AdapterInstance)));
         Assert.All(observation.Disks, disk =>
         {
             if (disk.BytesPerSecond is { } rate) Assert.True(rate >= 0);

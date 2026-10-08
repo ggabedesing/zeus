@@ -97,6 +97,33 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void ComparisonAveragesGpuDedicatedUsageByAdapterAndKeepsMissingSamplesUnavailable()
+    {
+        var reference = new[]
+        {
+            Sample(20) with { GpuMemory = [new("luid_gpu_a", 100, 200, 300)] },
+            Sample(30) with { GpuMemory = [new("luid_gpu_a", 300, 400, 700), new("luid_gpu_b", 50, 60, 110)] }
+        };
+        var later = new[]
+        {
+            Sample(40) with { GpuMemory = [new("luid_gpu_a", 500, 600, 1100)] },
+            Sample(50) with { GpuMemory = [] }
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+
+        var gpuA = Assert.Single(comparison.GpuMemoryUsage!, item => item.AdapterInstance == "luid_gpu_a");
+        Assert.Equal(200, gpuA.ReferenceDedicatedBytes);
+        Assert.Equal(500, gpuA.LaterDedicatedBytes);
+        Assert.Equal(2, gpuA.ReferenceAvailableSamples);
+        Assert.Equal(1, gpuA.LaterAvailableSamples);
+        var gpuB = Assert.Single(comparison.GpuMemoryUsage!, item => item.AdapterInstance == "luid_gpu_b");
+        Assert.Equal(50, gpuB.ReferenceDedicatedBytes);
+        Assert.Null(gpuB.LaterDedicatedBytes);
+        Assert.Equal(0, gpuB.LaterAvailableSamples);
+    }
+
+    [Fact]
     public void ComparisonKeepsUnavailableCountersUnknown()
     {
         var unavailable = Sample(null) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 };

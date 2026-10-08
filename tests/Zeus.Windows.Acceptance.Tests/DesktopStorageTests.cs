@@ -56,7 +56,8 @@ public sealed class DesktopStorageTests : IDisposable
             [new(42, "game.exe", 12.5, 2_000)], ["source warning"],
             [new("pid_42_engtype_3D", 42, "3D", 31.0)],
             [new("0 C:", 1200, 4, 1.2)],
-            [new("Ethernet", 800, 1_000_000_000, 0, 3)]);
+            [new("Ethernet", 800, 1_000_000_000, 0, 3)],
+            GpuMemory: [new("luid_0x1_phys_0", 1_024, 2_048, 3_072)]);
         await storage.StartPerformanceSessionAsync(id, "Referência", observation.CollectedAt.AddSeconds(-2));
         await storage.AppendPerformanceObservationAsync(id, 0, observation);
         await storage.MarkPerformanceReferenceAsync(id);
@@ -69,6 +70,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal("game.exe", Assert.Single(restored.Processes).Name);
         Assert.Equal(31.0, Assert.Single(restored.GpuEngines!).UtilizationPercent);
         Assert.Equal("Ethernet", Assert.Single(restored.Networks!).Adapter);
+        Assert.Equal(1_024UL, Assert.Single(restored.GpuMemory!).DedicatedUsageBytes);
         Assert.Equal(21.5, sample.CpuPercent!.Value);
     }
 

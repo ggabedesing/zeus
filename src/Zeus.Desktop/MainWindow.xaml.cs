@@ -98,9 +98,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanSetPerformanceBaseline => !_isBusy && _performanceHistory.Snapshot().Count >= 3;
     public bool CanComparePerformance => !_isBusy && _performanceBaseline.Length >= 3 &&
         _performanceHistory.Snapshot().Count(entry => entry.Observation.CollectedAt > _performanceBaseline[^1].CollectedAt) >= 3;
-    public string PerformanceComparisonSummary => _performanceComparison is not { } comparison
-        ? "Defina uma referência com pelo menos três amostras e colete outras três para comparar."
-        : $"CPU média: {FormatMetric(comparison.ReferenceCpuPercent)} → {FormatMetric(comparison.LaterCpuPercent)} · RAM em uso: {FormatMetric(comparison.ReferenceUsedMemoryPercent)} → {FormatMetric(comparison.LaterUsedMemoryPercent)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}. Engines individuais não são uso total da GPU; comparação descritiva, sem atribuir causa ou ganho.";
+    public string PerformanceComparisonSummary
+    {
+        get
+        {
+            if (_performanceComparison is not { } comparison)
+                return "Defina uma referência com pelo menos três amostras e colete outras três para comparar.";
+            var gpuMemory = comparison.GpuMemoryUsage is { Count: > 0 } memory
+                ? " · uso dedicado por adaptador: " + string.Join("; ", memory.Select(item =>
+                    $"{item.AdapterInstance} {FormatGpuMemory(item.ReferenceDedicatedBytes)} ({item.ReferenceAvailableSamples}) → {FormatGpuMemory(item.LaterDedicatedBytes)} ({item.LaterAvailableSamples})"))
+                : " · uso de memória GPU: indisponível";
+            return $"CPU média: {FormatMetric(comparison.ReferenceCpuPercent)} → {FormatMetric(comparison.LaterCpuPercent)} · RAM em uso: {FormatMetric(comparison.ReferenceUsedMemoryPercent)} → {FormatMetric(comparison.LaterUsedMemoryPercent)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}{gpuMemory}. Engines individuais não são uso total da GPU; memória dedicada é uso, não pressão sem orçamento total. Comparação descritiva, sem atribuir causa ou ganho.";
+        }
+    }
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
     public ObservableCollection<DeviceRow> GraphicsRows { get; } = [];
@@ -489,6 +499,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or DbException;
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "Indisponível" : value;
     private static string FormatMetric(double? value) => value is { } number ? $"{number:0.#}%" : "indisponível";
+    private static string FormatGpuMemory(double? bytes) => bytes is { } value && double.IsFinite(value) && value >= 0
+        ? $"{value / (1024d * 1024 * 1024):0.##} GiB" : "indisponível";
     private static string FormatMetricCoverage(PerformanceMetricComparison? metric, int referenceTotal, int laterTotal) => metric is null
         ? "indisponível"
         : $"{FormatMetric(metric.ReferencePercent)} ({metric.ReferenceAvailableSamples}/{referenceTotal}) → {FormatMetric(metric.LaterPercent)} ({metric.LaterAvailableSamples}/{laterTotal})";

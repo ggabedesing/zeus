@@ -12,11 +12,19 @@ public sealed record PerformanceComparison(
     DateTimeOffset ReferenceEndedAt,
     DateTimeOffset LaterEndedAt,
     PerformanceMetricComparison? GpuEnginePeak = null,
-    PerformanceMetricComparison? DiskActivityPeak = null);
+    PerformanceMetricComparison? DiskActivityPeak = null,
+    IReadOnlyList<PerformanceGpuMemoryComparison>? GpuMemoryUsage = null);
 
 public sealed record PerformanceMetricComparison(
     double? ReferencePercent,
     double? LaterPercent,
+    int ReferenceAvailableSamples,
+    int LaterAvailableSamples);
+
+public sealed record PerformanceGpuMemoryComparison(
+    string AdapterInstance,
+    double? ReferenceDedicatedBytes,
+    double? LaterDedicatedBytes,
     int ReferenceAvailableSamples,
     int LaterAvailableSamples);
 
@@ -115,11 +123,29 @@ public static class PerformanceComparisonBuilder
         var disk = CompareSamplePeaks(reference, later,
             sample => (sample.Disks ?? []).Select(device => device.ActivePercent));
 
+        var adapterInstances = reference.Concat(later).SelectMany(sample => sample.GpuMemory ?? [])
+            .Select(memory => memory.AdapterInstance).Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var gpuMemory = adapterInstances.Select(adapter =>
+        {
+            static (double? Average, int Count) Summarize(IReadOnlyList<PerformanceObservation> samples, string adapterName)
+            {
+                var values = samples.SelectMany(sample => sample.GpuMemory ?? [])
+                    .Where(memory => string.Equals(memory.AdapterInstance, adapterName, StringComparison.OrdinalIgnoreCase))
+                    .Select(memory => memory.DedicatedUsageBytes).Where(value => value.HasValue).Select(value => (double)value!.Value).ToArray();
+                return (values.Length == 0 ? null : values.Average(), values.Length);
+            }
+
+            var left = Summarize(reference, adapter);
+            var right = Summarize(later, adapter);
+            return new PerformanceGpuMemoryComparison(adapter, left.Average, right.Average, left.Count, right.Count);
+        }).ToArray();
+
         return new(reference.Count, later.Count,
             Average(reference.Select(sample => sample.CpuPercent)),
             Average(later.Select(sample => sample.CpuPercent)),
             Average(reference.Select(UsedMemoryPercent)),
             Average(later.Select(UsedMemoryPercent)),
-            reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk);
+            reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk, gpuMemory);
     }
 }
