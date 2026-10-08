@@ -58,6 +58,11 @@ public sealed class WindowsInventoryTests
         Assert.True(snapshot.Cpu.PhysicalCores > 0);
         Assert.True(snapshot.Cpu.LogicalProcessors >= snapshot.Cpu.PhysicalCores);
         Assert.NotNull(snapshot.Memory);
+        Assert.NotNull(snapshot.WindowsInventory);
+        Assert.NotNull(snapshot.WindowsInventory.RestartIndicators);
+        var restartState = Zeus.Core.WindowsRestartStateParser.Evaluate(snapshot.WindowsInventory.RestartIndicators);
+        Assert.InRange(restartState.CheckedSourceCount, 0, restartState.TotalSourceCount);
+        if (restartState.IsPending == true) Assert.NotEmpty(restartState.Sources);
         Assert.True(snapshot.Memory.TotalBytes > 0);
         Assert.InRange(snapshot.Memory.AvailableBytes, 0UL, snapshot.Memory.TotalBytes);
         Assert.NotEmpty(snapshot.Disks);

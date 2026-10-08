@@ -480,6 +480,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ExtendedHardwareRows.Add(new("Proxy do usuário (HKCU)", FormatProxyConfiguration(inventory.ProxyConfiguration)));
             ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
             ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
+            ExtendedHardwareRows.Add(new("Reinicialização pendente", FormatRestartState(WindowsRestartStateParser.Evaluate(inventory.RestartIndicators))));
             ExtendedHardwareRows.Add(new("Tarefas agendadas", $"{inventory.ScheduledTasks.Count} entradas inventariadas; nomes e estados completos ficam no relatório exportado."));
             ExtendedHardwareRows.Add(new("Serviços", $"{inventory.Services.Count} entradas inventariadas; nenhuma foi alterada."));
             ExtendedHardwareRows.Add(new("Windows Update", inventory.UpdateState?.PendingCount is { } pending ? $"{pending} atualização(ões) pendente(s)" : "Atualizações pendentes não consultadas nesta leitura."));
@@ -727,6 +728,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var bypass = string.IsNullOrWhiteSpace(proxy.BypassList) ? "lista de exceções: não informada" : $"lista de exceções: {proxy.BypassList}";
         return $"{manual} · {pac} · {autodetect} · {bypass}. Fonte: HKCU Internet Settings; WinHTTP e configurações por aplicativo não consultados.";
     }
+
+    private static string FormatRestartState(WindowsRestartState state) => state.IsPending switch
+    {
+        true => $"Indicador detectado: {string.Join(", ", state.Sources)} · {state.CheckedSourceCount}/{state.TotalSourceCount} fontes consultadas; reinicialização indicada, não garantida.",
+        false => $"Nenhum indicador encontrado · {state.CheckedSourceCount}/{state.TotalSourceCount} fontes consultadas; isso não garante ausência de reinicialização necessária.",
+        _ => $"Estado desconhecido · {state.CheckedSourceCount}/{state.TotalSourceCount} fontes consultadas."
+    };
     private static string FormatMetric(double? value) => value is { } number ? $"{number:0.#}%" : "indisponível";
     private static string FormatByteQuantity(double? bytes) => bytes is { } value && double.IsFinite(value) && value >= 0
         ? $"{value / (1024d * 1024 * 1024):0.##} GiB" : "indisponível";

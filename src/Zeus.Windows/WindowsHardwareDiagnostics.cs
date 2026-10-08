@@ -132,6 +132,9 @@ $software = Read-Part 'Software instalado' { foreach($path in @('HKLM:\Software\
 $events = foreach($log in @('System','Application','Microsoft-Windows-WindowsUpdateClient/Operational')) { Read-Part ('Eventos ' + $log) { try { Get-WinEvent -FilterHashtable @{LogName=$log;Level=1,2,3;StartTime=(Get-Date).AddDays(-14)} -MaxEvents 20 -ErrorAction Stop | Select-Object @{n='Time';e={$_.TimeCreated.ToUniversalTime().ToString('o')}},@{n='Log';e={$log}},@{n='Provider';e={$_.ProviderName}},Id,@{n='Level';e={if (![string]::IsNullOrWhiteSpace([string]$_.LevelDisplayName)) { [string]$_.LevelDisplayName } else { switch ([int]$_.Level) { 1 {'Critical'} 2 {'Error'} 3 {'Warning'} default {$null} } } }} } catch { if ($_.FullyQualifiedErrorId -like 'NoMatchingEventsFound*') { return @() }; throw } } }
 $secureBoot = $null; try { $secureBoot = [bool](Confirm-SecureBootUEFI -ErrorAction Stop) } catch { $warnings.Add('Secure Boot: consulta indisponível neste firmware ou nesta sessão.') }
 $tpmPresent = $null; $tpmReady = $null; try { $t=Get-Tpm -ErrorAction Stop; $tpmPresent=[bool]$t.TpmPresent; $tpmReady=[bool]$t.TpmReady } catch { $warnings.Add('TPM: estado indisponível.') }
+$cbsRestart = $null; try { $cbsRestart = Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending' -ErrorAction Stop } catch { $warnings.Add('Reinicialização pendente: fonte Component-Based Servicing indisponível.') }
+$wuRestart = $null; try { $wuRestart = Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired' -ErrorAction Stop } catch { $warnings.Add('Reinicialização pendente: fonte Windows Update indisponível.') }
+$fileRenamesRestart = $null; try { $sessionManager = Get-Item 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -ErrorAction Stop; $fileRenamesRestart = $sessionManager.GetValueNames() -contains 'PendingFileRenameOperations' -and @($sessionManager.GetValue('PendingFileRenameOperations')).Count -gt 0 } catch { $warnings.Add('Reinicialização pendente: fonte Session Manager indisponível.') }
 $updates = $null; $warnings.Add('Windows Update: atualizações pendentes não foram consultadas nesta coleta para evitar busca online ou espera longa.')
 $inventory = [pscustomobject]@{
  NetworkConfiguration=@($network | ForEach-Object { $ifIndex=$_.InterfaceIndex; [pscustomobject]@{Adapter=[string]$_.Adapter;Addresses=@($_.Addresses);DnsServers=@($_.DnsServers);Gateways=@($_.Gateways);Status=[string]$_.Status;Routes=@($routes | Where-Object AdapterIndex -eq $ifIndex | ForEach-Object Route);Proxy=$proxy} });
@@ -144,6 +147,7 @@ $inventory = [pscustomobject]@{
  InstalledSoftware=@($software | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Version=[string]$_.Version;Publisher=[string]$_.Publisher} });
  RecentEvents=@($events | ForEach-Object { [pscustomobject]@{Time=$_.Time;Log=[string]$_.Log;Provider=[string]$_.Provider;Id=[int]$_.Id;Level=[string]$_.Level;Message=''} });
  SecurityState=[pscustomobject]@{SecureBootEnabled=$secureBoot;TpmPresent=$tpmPresent;TpmReady=$tpmReady};
+ RestartIndicators=[pscustomobject]@{ComponentServicing=$cbsRestart;WindowsUpdate=$wuRestart;PendingFileRenames=$fileRenamesRestart};
  UpdateState=[pscustomobject]@{PendingCount=$updates;Source='Não consultado nesta coleta'};
  WindowsImageHealth=$null
 }

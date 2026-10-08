@@ -154,6 +154,7 @@ public sealed class WpfExperienceTests
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Proxy do usuário (HKCU)");
+        Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Reinicialização pendente");
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title.StartsWith("Rede · ", StringComparison.Ordinal));
         Assert.Contains("Win32_PnPSignedDriver", window.DriverInventorySummary, StringComparison.Ordinal);
         Assert.Equal(Math.Min(window.Snapshot.WindowsInventory!.Drivers.Count, 100), window.InstalledDriverRows.Count);
