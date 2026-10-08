@@ -334,6 +334,14 @@ public partial class MainWindow
         foreach (var gpuMemory in observation.GpuMemory ?? [])
             PerformanceResourceRows.Add(new($"Memória GPU · {gpuMemory.AdapterInstance}",
                 $"Uso dedicado reportado: {FormatBytes(gpuMemory.DedicatedUsageBytes)} de {FormatBytes(gpuMemory.DedicatedCapacityBytes)} · ocupação: {FormatMetric(gpuMemory.DedicatedOccupancyPercent)} · compartilhado: {FormatBytes(gpuMemory.SharedUsageBytes)} · comprometido: {FormatBytes(gpuMemory.TotalCommittedBytes)}"));
+        foreach (var gpuMemory in (observation.GpuProcessMemory ?? [])
+                     .OrderByDescending(memory => memory.DedicatedUsageBytes ?? 0)
+                     .ThenByDescending(memory => memory.SharedUsageBytes ?? 0).Take(20))
+        {
+            var process = gpuMemory.ProcessName is { Length: > 0 } name ? $"{name} · PID {gpuMemory.ProcessId}" : $"PID {gpuMemory.ProcessId} · nome não mapeado";
+            PerformanceResourceRows.Add(new($"Memória GPU · {gpuMemory.AdapterInstance} · {process}",
+                $"Alocações reportadas: dedicada {FormatBytes(gpuMemory.DedicatedUsageBytes)} · compartilhada {FormatBytes(gpuMemory.SharedUsageBytes)} · local {FormatBytes(gpuMemory.LocalUsageBytes)} · não local {FormatBytes(gpuMemory.NonLocalUsageBytes)} · comprometida {FormatBytes(gpuMemory.TotalCommittedBytes)}. Isso não informa o orçamento do processo nem confirma pressão."));
+        }
         var sessionSamples = _performanceHistory.Snapshot().Where(entry => entry.SessionId == _performanceSessionId)
             .TakeLast(20).Select(entry => entry.Observation).ToArray();
         foreach (var assessment in GpuMemoryOccupancyAnalyzer.Assess(sessionSamples))
@@ -350,8 +358,8 @@ public partial class MainWindow
     private static string FormatGpuOccupancyAssessment(GpuMemoryOccupancyAssessment assessment) => assessment.State switch
     {
         GpuMemoryOccupancyState.InsufficientEvidence => $"Evidência insuficiente: {assessment.ValidSamples} leitura(s) válida(s) em {assessment.Window.TotalSeconds:0.#} s; exigidos {GpuMemoryOccupancyAnalyzer.MinimumSamples} leituras e pelo menos {GpuMemoryOccupancyAnalyzer.MinimumWindow.TotalSeconds:0} s.",
-        GpuMemoryOccupancyState.SustainedHighOccupancy => $"Ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% em {assessment.HighOccupancySamples}/{assessment.ValidSamples} leituras; média {assessment.AverageOccupancyPercent:0.#}%. Sinal para investigar. Pressão de VRAM permanece desconhecida: os contadores atuais são agregados por adaptador e não incluem o orçamento do processo nem evidência de paginação.",
-        _ => $"Sem ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% sustentada nesta janela ({assessment.ValidSamples} leituras). Pressão de VRAM permanece desconhecida: os contadores atuais não mostram o orçamento do processo nem evidência de paginação."
+        GpuMemoryOccupancyState.SustainedHighOccupancy => $"Ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% em {assessment.HighOccupancySamples}/{assessment.ValidSamples} leituras; média {assessment.AverageOccupancyPercent:0.#}%. Sinal para investigar. Pressão de VRAM permanece desconhecida: há alocações agregadas e por processo, mas sem orçamento por processo ou evidência de paginação.",
+        _ => $"Sem ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% sustentada nesta janela ({assessment.ValidSamples} leituras). Pressão de VRAM permanece desconhecida: não há orçamento por processo nem evidência de paginação."
     };
 
     private async void SetPerformanceBaseline_Click(object sender, RoutedEventArgs e)

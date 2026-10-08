@@ -25,6 +25,28 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void ParsesPerProcessGpuMemoryAndKeepsUnknownProcessNameExplicit()
+    {
+        var processNames = new Dictionary<int, string> { [42] = "game" };
+        var known = WindowsPerformanceProbe.ParseGpuProcessMemoryCounter(
+            "pid_42_luid_0x00000000_0x0001057F_phys_0", 100, 20, 15, 80, 120, processNames);
+        var unknown = WindowsPerformanceProbe.ParseGpuProcessMemoryCounter(
+            "pid_99_luid_0x00000000_0x0001057F_phys_0", 50, 10, 8, 40, 60, processNames);
+
+        Assert.NotNull(known);
+        Assert.Equal("luid_0x00000000_0x0001057F_phys_0", known.AdapterInstance);
+        Assert.Equal(42, known.ProcessId);
+        Assert.Equal("game", known.ProcessName);
+        Assert.Equal((ulong)100, known.DedicatedUsageBytes);
+        Assert.Equal((ulong)120, known.TotalCommittedBytes);
+        Assert.NotNull(unknown);
+        Assert.Equal(99, unknown.ProcessId);
+        Assert.Null(unknown.ProcessName);
+        Assert.Null(WindowsPerformanceProbe.ParseGpuProcessMemoryCounter(
+            "invalid-instance", 10, 0, 0, 10, 10, processNames));
+    }
+
+    [Fact]
     public void InterruptedCounterReadPreservesValidRowsAndMarksTheListPartial()
     {
         var rows = new[] { new ProcessObservation(1, "process", 10, 1024) };
