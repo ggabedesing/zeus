@@ -99,6 +99,7 @@ public sealed class ZeusDatabase
     {
         ValidateKey(key);
         ArgumentNullException.ThrowIfNull(jsonValue);
+        ValidateJson(jsonValue, nameof(jsonValue));
         await InitializeAsync(cancellationToken);
         await using var connection = await OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
@@ -118,6 +119,7 @@ public sealed class ZeusDatabase
         ValidateKey(key);
         ValidateKey(migrationKey);
         ArgumentNullException.ThrowIfNull(jsonValue);
+        ValidateJson(jsonValue, nameof(jsonValue));
         await InitializeAsync(cancellationToken);
         await using var connection = await OpenAsync(cancellationToken);
         using var transaction = connection.BeginTransaction();
@@ -313,7 +315,7 @@ public sealed class ZeusDatabase
         command.Transaction = transaction;
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied_utc TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS app_settings(setting_key TEXT PRIMARY KEY, json_value TEXT NOT NULL, updated_utc TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS app_settings(setting_key TEXT PRIMARY KEY, json_value TEXT NOT NULL CHECK(json_valid(json_value)), updated_utc TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS app_metadata(metadata_key TEXT PRIMARY KEY, metadata_value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS activity_entries(
                 id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_utc TEXT NOT NULL, category TEXT NOT NULL,
@@ -420,6 +422,11 @@ public sealed class ZeusDatabase
     private static string Utc(DateTimeOffset value) => value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
     private static DateTimeOffset ParseUtc(string value) => DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
     private static void ValidateKey(string value) => ValidateText(value, 120, nameof(value));
+    private static void ValidateJson(string value, string parameter)
+    {
+        try { using var _ = JsonDocument.Parse(value); }
+        catch (JsonException error) { throw new ArgumentException("O valor deve conter JSON válido.", parameter, error); }
+    }
     private static void ValidateText(string value, int maxLength, string parameter)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > maxLength) throw new ArgumentOutOfRangeException(parameter);

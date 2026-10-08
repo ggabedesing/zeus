@@ -32,6 +32,14 @@ public sealed class ZeusDatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task SettingsRejectMalformedJson()
+    {
+        var database = CreateDatabase();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => database.WriteSettingAsync("preferences", "{not-json}"));
+    }
+
+    [Fact]
     public async Task ActivityIsStructuredAndReadNewestFirst()
     {
         var database = CreateDatabase();
