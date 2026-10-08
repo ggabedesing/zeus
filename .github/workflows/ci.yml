@@ -69,22 +69,9 @@ jobs:
       - name: Exercise all tests on the actual Windows runner
         id: windowsTests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        shell: pwsh
+        shell: powershell
         run: |
-          $failed = $false
-          $projects = @(Get-ChildItem tests -Recurse -Filter '*.csproj' | Sort-Object FullName)
-          if ($projects.Count -lt 6) { throw 'The Windows test suite is incomplete.' }
-          foreach ($project in $projects) {
-            $resultDirectory = Join-Path $env:ZEUS_TEST_RESULTS $project.BaseName
-            dotnet test $project.FullName -c Release --no-build --results-directory $resultDirectory --logger 'trx;LogFileName=results.trx'
-            if ($LASTEXITCODE -ne 0) { $failed = $true }
-            $resultFile = Join-Path $resultDirectory 'results.trx'
-            if (!(Test-Path $resultFile)) { $failed = $true; continue }
-            [xml]$trx = Get-Content $resultFile
-            $counters = $trx.SelectSingleNode("//*[local-name()='Counters']")
-            if ($null -eq $counters -or [int]$counters.total -le 0 -or [int]$counters.passed -ne [int]$counters.total -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0) { $failed = $true }
-          }
-          if ($failed) { exit 1 }
+          ./scripts/test-on-windows.ps1 -OutputDirectory $env:ZEUS_TEST_RESULTS -SkipBuild -NonInteractive
       - name: Exercise read-only Windows diagnostic
         id: smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -93,7 +80,9 @@ jobs:
         id: publish
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: pwsh
-        run: ./scripts/publish-windows.ps1
+        run: |
+          ./scripts/publish-windows.ps1
+          ./scripts/package-windows-tests.ps1
       - name: Upload portable package
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
         uses: actions/upload-artifact@v4
@@ -102,6 +91,15 @@ jobs:
           path: |
             artifacts/zeus-win-x64.zip
             artifacts/zeus-win-x64.zip.sha256
+          if-no-files-found: error
+      - name: Upload tests for the user's Windows PC
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeus-tests-windows
+          path: |
+            artifacts/zeus-testes-windows.zip
+            artifacts/zeus-testes-windows.zip.sha256
           if-no-files-found: error
       - name: Save sanitized acceptance evidence
         id: evidence
@@ -148,6 +146,17 @@ jobs:
           $verified = ($outcomes.Values | Where-Object { $_ -ne 'success' }).Count -eq 0 `
             -and $totals.total -gt 0 -and $totals.passed -eq $totals.total -and $totals.failed -eq 0 -and $totals.skipped -eq 0 `
             -and $projects.Count -ge 6 -and $screenshots.Count -ge 11
+          $localRunner = $null
+          $localReportPath = Join-Path $env:ZEUS_TEST_RESULTS 'relatorio.json'
+          if (Test-Path $localReportPath -PathType Leaf) {
+            $localReport = Get-Content $localReportPath -Raw -Encoding utf8 | ConvertFrom-Json
+            $localRunner = [ordered]@{
+              accepted = $localReport.accepted
+              sourceCommit = $localReport.sourceCommit
+              stages = $localReport.stages
+              failures = $localReport.failures
+            }
+          }
           $report = [ordered]@{
             schemaVersion = 1
             sourceCommit = $env:ZEUS_SOURCE_SHA
@@ -161,6 +170,7 @@ jobs:
             outcomes = $outcomes
             testCounts = $totals
             testProjects = $projects
+            localRunner = $localRunner
             failures = @(
               if (Test-Path $env:ZEUS_TEST_RESULTS) {
                 foreach ($file in @(Get-ChildItem $env:ZEUS_TEST_RESULTS -Recurse -Filter '*.trx')) {

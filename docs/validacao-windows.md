@@ -51,6 +51,10 @@ Para falhas do Windows após reparo/driver, use as opções de Recuperação do 
 
 ## Conferência no computador principal
 
+O pacote `zeus-testes-windows.zip` permite executar a suíte automatizada no próprio computador: extraia a pasta inteira e abra `INICIAR-TESTES.cmd`. Autorize o pedido de administrador e aguarde o relatório em `artifacts/TestResults/<sessão>/relatorio.json`. Se necessário, o iniciador baixa o SDK oficial e verifica SHA-512. Ele testa arquivos e entradas próprios e restaura as preferências visuais ao final. Os resultados ficam locais.
+
+Para conferir também o uso normal da interface:
+
 1. Extraia a pasta inteira do pacote e abra `Zeus.Desktop.exe` com seu usuário comum.
 2. Aguarde “Diagnóstico concluído”. Confira CPU, memória, GPU e volumes; leituras ausentes devem trazer avisos.
 3. Em Hardware e carga, use “Medir carga por 5 segundos” durante a tarefa que está lenta.
@@ -58,4 +62,4 @@ Para falhas do Windows após reparo/driver, use as opções de Recuperação do 
 5. Teste os três temas e responda às perguntas do perfil; escolher um tema ou responder ao perfil não aplica ajustes ao Windows.
 6. Exporte o JSON e confira os dados localmente. Revise nomes de computador, usuários e processos antes de compartilhar.
 
-Esse roteiro só lê dados e guarda preferências da interface. Reparos, desativação de inicialização, exclusão, efeitos do Windows, instalação de drivers e verificação offline exigem ações separadas e revisão. A conferência no PC principal não substitui os ensaios de recuperação em máquina descartável.
+Esse roteiro da interface só lê dados e guarda preferências da interface. Reparos, desativação de inicialização, exclusão, efeitos do Windows, instalação de drivers e verificação offline exigem ações separadas e revisão. A suíte de fixtures e a conferência no PC principal não confirmam os cenários administrativos ainda pendentes na matriz acima.

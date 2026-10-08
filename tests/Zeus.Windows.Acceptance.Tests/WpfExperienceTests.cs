@@ -145,6 +145,13 @@ public sealed class WpfExperienceTests
             var content = Assert.IsAssignableFrom<FrameworkElement>(tab.Content);
             Assert.True(content.ActualHeight > 0 && content.ActualWidth > 0,
                 $"Workspace {AutomationProperties.GetAutomationId(tab)} must render its real content.");
+            if (AutomationProperties.GetAutomationId(tab) == "ProfileTab")
+            {
+                var profile = Assert.IsType<ScrollViewer>(content);
+                profile.ScrollToEnd();
+                await RenderAsync(window, "zeus-general-plan-review.png");
+                profile.ScrollToTop();
+            }
         }
         Assert.All(window.MaintenanceChoices, choice => Assert.False(choice.IsSelected));
         Assert.False(window.CanExecute);

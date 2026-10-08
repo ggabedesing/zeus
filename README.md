@@ -50,7 +50,11 @@ dotnet run --project src/Zeus.Desktop/Zeus.Desktop.csproj
 pwsh -File scripts/publish-windows.ps1
 ```
 
-O teste que aplica/restaura efeitos visuais exige `ZEUS_WINDOWS_ACCEPTANCE=1` em Windows descartável. Essa opção é definida no workflow e não precisa ser habilitada em PCs pessoais. Os arquivos de publicação ficam em `artifacts/`, incluindo ZIP, SHA-256 e identificação do código-fonte.
+O teste que aplica/restaura efeitos visuais exige `ZEUS_WINDOWS_ACCEPTANCE=1`. Essa opção é definida no workflow e no iniciador de testes local quando o usuário escolhe testar o aplicativo. Os arquivos de publicação ficam em `artifacts/`, incluindo ZIP, SHA-256 e identificação do código-fonte.
+
+Para executar a suíte completa no próprio PC, extraia `zeus-testes-windows.zip` e abra `INICIAR-TESTES.cmd`. O Windows solicitará administrador para verificar as ACLs. O iniciador usa ou baixa o SDK oficial, confere SHA-512 e executa os seis projetos de testes, com relatório JSON, TRX, logs e capturas em `artifacts/TestResults/<sessão>`. Os testes criam arquivos e entradas próprios; o teste de efeitos visuais aplica e restaura o estado anterior. Reparos, drivers e reinícios têm revisão própria e não integram essa suíte automática.
+
+No checkout, use `scripts/iniciar-testes.cmd` ou `powershell -NoProfile -File scripts/test-on-windows.ps1`. O pacote de fonte/testes é gerado com `pwsh -File scripts/package-windows-tests.ps1` após commitar as alterações.
 
 ```bash
 bash scripts/setup-cloud.sh

@@ -9,7 +9,7 @@ public sealed class WindowsAcceptanceFactAttribute : FactAttribute
     public WindowsAcceptanceFactAttribute()
     {
         if (!OperatingSystem.IsWindows() || Environment.GetEnvironmentVariable("ZEUS_WINDOWS_ACCEPTANCE") != "1")
-            Skip = "Requer runner Windows descartável com ZEUS_WINDOWS_ACCEPTANCE=1; não altera preferências de PCs pessoais.";
+            Skip = "Requer Windows com ZEUS_WINDOWS_ACCEPTANCE=1; o teste aplica e restaura as preferências visuais do usuário.";
     }
 }
 
@@ -65,7 +65,7 @@ public sealed class WindowsVisualPreferencesTests
         }
         finally
         {
-            // The disposable CI fixture restores even when an assertion fails after a partial write.
+            // The fixture restores even when an assertion fails after a partial write.
             try
             {
                 foreach (var journal in await service.ListChangesAsync())
