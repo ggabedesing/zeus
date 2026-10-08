@@ -2,6 +2,14 @@ using Zeus.Windows;
 
 namespace Zeus.Hardware.Tests;
 
+public sealed class WindowsFactAttribute : FactAttribute
+{
+    public WindowsFactAttribute()
+    {
+        if (!OperatingSystem.IsWindows()) Skip = "Este teste requer Windows.";
+    }
+}
+
 public sealed class WindowsUpdateServiceTests
 {
     [Fact]
@@ -33,7 +41,7 @@ public sealed class WindowsUpdateServiceTests
             """{"IsComplete":true,"IsInstalled":true,"SourceMatches":false,"Warnings":[]}"""));
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task PostRestartRecheckRejectsInvalidIdentityBeforeStartingWindowsUpdate()
     {
         var result = await new WindowsUpdateService().VerifyInstalledDriverUpdateAsync("invalid", 2, null, DateTimeOffset.UtcNow);
@@ -43,7 +51,7 @@ public sealed class WindowsUpdateServiceTests
         Assert.Contains(result.Warnings, warning => warning.Contains("inválida", StringComparison.OrdinalIgnoreCase));
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task PostRestartRecheckWaitsUntilWindowsBootTimeIsLaterThanInstallation()
     {
         var result = await new WindowsUpdateService().VerifyInstalledDriverUpdateAsync(
