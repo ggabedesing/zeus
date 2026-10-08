@@ -24,6 +24,23 @@ public sealed class EventPatternAnalyzerTests
     }
 
     [Fact]
+    public void KeepsWindowsUpdateEventsDistinctFromSystemEvents()
+    {
+        var events = new[]
+        {
+            Event("Microsoft-Windows-WindowsUpdateClient/Operational", "WindowsUpdateClient", 20, "Error", DateTimeOffset.Parse("2026-01-01T10:00:00Z")),
+            Event("Microsoft-Windows-WindowsUpdateClient/Operational", "WindowsUpdateClient", 20, "Error", DateTimeOffset.Parse("2026-01-01T10:02:00Z")),
+            Event("System", "WindowsUpdateClient", 20, "Error", DateTimeOffset.Parse("2026-01-01T10:03:00Z"))
+        };
+
+        var report = EventPatternAnalyzer.Analyze(events);
+
+        var finding = Assert.Single(report.Findings);
+        Assert.Contains("Microsoft-Windows-WindowsUpdateClient/Operational", finding.Title);
+        Assert.Contains("2 ocorrências", finding.Detail);
+    }
+
+    [Fact]
     public void EmptyIncompleteSourceRemainsUnknown()
     {
         var report = EventPatternAnalyzer.Analyze([], sourcesComplete: false);

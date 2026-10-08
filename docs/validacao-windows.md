@@ -76,7 +76,9 @@ A tela de Manutenção agora interpreta um catálogo selecionado de códigos PnP
 
 ## Padrões de eventos para investigação
 
-O diagnóstico consulta até 20 eventos recentes de nível crítico, erro ou aviso em cada log System e Application. A tela agrupa repetições pelo log, provedor e ID, mostrando contagem, nível e horário mais recente; não interpreta uma repetição como causa. Mensagens brutas continuam fora da interface/exportação. “Nenhum evento retornado” fica separado de fonte indisponível, e nenhuma ocorrência não é tratada como prova de Windows saudável. Nesta revisão, a compilação Release passou sem avisos/erros, 72 testes do núcleo passaram e os 3 testes focados de inventário/WPF passaram com consulta nativa aos logs.
+O diagnóstico consulta até 20 eventos recentes de nível crítico, erro ou aviso em cada log System e Application e até 20 eventos dos últimos 14 dias em `Microsoft-Windows-WindowsUpdateClient/Operational`. A tela agrupa repetições pelo log, provedor e ID, mostrando contagem, nível e horário mais recente; não interpreta uma repetição como causa. Um canal de Windows Update desativado, ausente ou inacessível deixa a amostra incompleta e o estado desconhecido. Mensagens brutas continuam fora da interface/exportação. “Nenhum evento retornado” fica separado de fonte indisponível, e nenhuma ocorrência não é tratada como prova de Windows saudável. Nesta revisão, a compilação Release passou sem avisos/erros, 72 testes do núcleo passaram e os 3 testes focados de inventário/WPF passaram com consulta nativa aos logs.
+
+A coleta ampliou essa fonte para o canal operacional do Windows Update. Os testes do núcleo passaram em 73 casos e a aceitação Windows passou em 40, com um teste administrativo ignorado; a compilação Release terminou sem avisos ou erros. Uma consulta somente leitura confirmou que o canal existe neste PC e possui evento recente (ID e horário registrados sem conteúdo); isso confirma disponibilidade da fonte, não um problema ou falha de atualização. O teste de agrupamento garante que eventos desse canal não se misturam com eventos System do mesmo provedor e ID.
 
 ## Preparação para redefinição de rede
 
