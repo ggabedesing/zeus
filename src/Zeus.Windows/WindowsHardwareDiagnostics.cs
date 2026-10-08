@@ -71,11 +71,15 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
                 return await Read<IReadOnlyList<PhysicalDiskInfo>>("Discos físicos (Win32_DiskDrive)", token => ReadPhysicalDisksFallback(token, warnings), []);
             }
         }, []);
+        var inventoryTask = ReadAsync<WindowsInventoryInfo?>("Inventário detalhado do Windows", ReadWindowsInventoryAsync, null);
 
         await Task.WhenAll(cpuTask, memoryTask, graphicsTask, disksTask, startupTask, boardTask,
-            biosTask, modulesTask, batteriesTask, networkTask, securityTask, physicalTask);
+            biosTask, modulesTask, batteriesTask, networkTask, securityTask, physicalTask, inventoryTask);
         cancellationToken.ThrowIfCancellationRequested();
         var physical = await physicalTask;
+        var inventory = await inventoryTask;
+        if (inventory is not null)
+            foreach (var warning in inventory.Warnings) warnings.Enqueue(warning);
         warnings.Enqueue(physical.Any(disk => disk.TemperatureCelsius.HasValue)
             ? "Algumas temperaturas de disco foram informadas pelo provedor Storage. Temperaturas de CPU/GPU e consumo não são coletados."
             : "Temperaturas de CPU/GPU e consumo não são coletados; nenhum sensor de temperatura de disco foi disponibilizado pelo provedor.");
@@ -83,7 +87,54 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         return new HardwareSnapshot(DateTimeOffset.UtcNow, Environment.OSVersion.VersionString,
             Environment.MachineName, await cpuTask, await memoryTask, await graphicsTask, await disksTask,
             await startupTask, await securityTask, warnings.ToArray(), await boardTask, await biosTask,
-            await modulesTask, physical, await batteriesTask, await networkTask);
+            await modulesTask, physical, await batteriesTask, await networkTask, inventory);
+    }
+
+    private sealed record WindowsInventoryPayload(WindowsInventoryInfo? Inventory, string[]? Warnings);
+
+    private static async Task<WindowsInventoryInfo?> ReadWindowsInventoryAsync(CancellationToken token)
+    {
+        // Each source fails independently. Never include process command lines, event
+        // XML, user names, or network credentials in this diagnostic export.
+        const string script = @"
+$warnings = [System.Collections.Generic.List[string]]::new()
+function Read-Part([string]$label, [scriptblock]$body) {
+  try { return @(& $body) } catch { $warnings.Add($label + ': fonte indisponível.'); return @() }
+}
+$routes = Read-Part 'Rotas de rede' { Get-NetRoute -ErrorAction Stop | Select-Object -First 300 @{n='AdapterIndex';e={[int]$_.InterfaceIndex}},@{n='Route';e={([string]$_.DestinationPrefix + ' -> ' + [string]$_.NextHop)} } }
+$network = Read-Part 'Rede' { Get-NetIPConfiguration -ErrorAction Stop | Select-Object @{n='Adapter';e={$_.InterfaceAlias}},@{n='InterfaceIndex';e={$_.InterfaceIndex}},@{n='Addresses';e={@($_.IPv4Address.IPAddress + $_.IPv6Address.IPAddress)}},@{n='DnsServers';e={@($_.DNSServer.ServerAddresses)}},@{n='Gateways';e={@($_.IPv4DefaultGateway.NextHop + $_.IPv6DefaultGateway.NextHop)}},@{n='Status';e={[string]$_.NetProfile.NetworkCategory}} }
+$proxy = $null; try { $proxy=[string](Get-ItemPropertyValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyServer -ErrorAction Stop); if([string]::IsNullOrWhiteSpace($proxy)){$proxy=$null} elseif($proxy -match '@'){$proxy=$proxy -replace '(?i)(^|;)[^;]*@','$1[redigido]@'} } catch { }
+$drivers = Read-Part 'Drivers' { Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop | Select-Object DeviceName,DriverProviderName,DriverVersion,@{n='Date';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}else{$null}}},Signer }
+$pnp = Read-Part 'Dispositivos PnP' { Get-CimInstance Win32_PnPEntity -ErrorAction Stop | Select-Object Name,PNPClass,Status,@{n='ProblemCode';e={if($_.ConfigManagerErrorCode -ne 0){[string]$_.ConfigManagerErrorCode}else{$null}}} }
+$processes = Read-Part 'Processos' { Get-Process -ErrorAction Stop | Sort-Object WorkingSet64 -Descending | Select-Object -First 200 @{n='Name';e={$_.ProcessName}},Id,@{n='CpuSeconds';e={if($_.CPU -ne $null){[double]$_.CPU}else{$null}}},@{n='WorkingSetBytes';e={[uint64]$_.WorkingSet64}} }
+$services = Read-Part 'Serviços' { Get-CimInstance Win32_Service -ErrorAction Stop | Select-Object Name,DisplayName,State,StartMode }
+$tasks = Read-Part 'Tarefas agendadas' { Get-ScheduledTask -ErrorAction Stop | Select-Object -First 500 @{n='Name';e={$_.TaskName}},TaskPath,State }
+$software = Read-Part 'Software instalado' { foreach($path in @('HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')) { Get-ItemProperty $path -ErrorAction SilentlyContinue | Where-Object DisplayName | Select-Object @{n='Name';e={$_.DisplayName}},@{n='Version';e={[string]$_.DisplayVersion}},@{n='Publisher';e={[string]$_.Publisher}} } }
+$events = Read-Part 'Eventos recentes' { foreach($log in @('System','Application')) { Get-WinEvent -FilterHashtable @{LogName=$log;Level=1,2,3} -MaxEvents 20 -ErrorAction SilentlyContinue | Select-Object @{n='Time';e={$_.TimeCreated.ToUniversalTime().ToString('o')}},@{n='Log';e={$log}},@{n='Provider';e={$_.ProviderName}},Id,@{n='Level';e={[string]$_.LevelDisplayName}} } }
+$secureBoot = $null; try { $secureBoot = [bool](Confirm-SecureBootUEFI -ErrorAction Stop) } catch { $warnings.Add('Secure Boot: consulta indisponível neste firmware ou nesta sessão.') }
+$tpmPresent = $null; $tpmReady = $null; try { $t=Get-Tpm -ErrorAction Stop; $tpmPresent=[bool]$t.TpmPresent; $tpmReady=[bool]$t.TpmReady } catch { $warnings.Add('TPM: estado indisponível.') }
+$updates = $null; $warnings.Add('Windows Update: atualizações pendentes não foram consultadas nesta coleta para evitar busca online ou espera longa.')
+$inventory = [pscustomobject]@{
+ NetworkConfiguration=@($network | ForEach-Object { $ifIndex=$_.InterfaceIndex; [pscustomobject]@{Adapter=[string]$_.Adapter;Addresses=@($_.Addresses);DnsServers=@($_.DnsServers);Gateways=@($_.Gateways);Status=[string]$_.Status;Routes=@($routes | Where-Object AdapterIndex -eq $ifIndex | ForEach-Object Route);Proxy=$proxy} });
+ Drivers=@($drivers | ForEach-Object { [pscustomobject]@{Device=[string]$_.DeviceName;Provider=[string]$_.DriverProviderName;Version=[string]$_.DriverVersion;Date=$_.Date;Signer=$_.Signer} });
+ PnpDevices=@($pnp | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Class=[string]$_.PNPClass;Status=[string]$_.Status;ProblemCode=$_.ProblemCode} });
+ Processes=@($processes | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Id=[int]$_.Id;CpuSeconds=$_.CpuSeconds;WorkingSetBytes=$_.WorkingSetBytes} });
+ Services=@($services | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;DisplayName=[string]$_.DisplayName;Status=[string]$_.State;StartType=[string]$_.StartMode} });
+ ScheduledTasks=@($tasks | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Path=[string]$_.TaskPath;State=[string]$_.State} });
+ InstalledSoftware=@($software | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Version=[string]$_.Version;Publisher=[string]$_.Publisher} });
+ RecentEvents=@($events | ForEach-Object { [pscustomobject]@{Time=$_.Time;Log=[string]$_.Log;Provider=[string]$_.Provider;Id=[int]$_.Id;Level=[string]$_.Level;Message=''} });
+ SecurityState=[pscustomobject]@{SecureBootEnabled=$secureBoot;TpmPresent=$tpmPresent;TpmReady=$tpmReady};
+ UpdateState=[pscustomobject]@{PendingCount=$updates;Source='Não consultado nesta coleta'};
+ WindowsImageHealth=$null
+}
+[void]$warnings.Add('RAM: canais de memória não são inferidos pela quantidade de módulos. Integridade da imagem do Windows não é medida nesta coleta; use o Centro de Reparos. Proxy de usuário não configurado pode aparecer como indisponível.')
+[pscustomobject]@{Inventory=$inventory;Warnings=@($warnings)} | ConvertTo-Json -Depth 7 -Compress";
+
+        using var json = await RunPowerShellJsonAsync(script, token, WindowsPowerShellModule.Utility);
+        var payload = JsonSerializer.Deserialize<WindowsInventoryPayload>(json.RootElement.GetRawText(),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (payload?.Inventory is not { } inventory) return null;
+        return inventory with { Warnings = payload.Warnings ?? [] };
     }
 
     private static ManagementObjectCollection Query(string query)

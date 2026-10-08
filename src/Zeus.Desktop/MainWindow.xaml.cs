@@ -207,6 +207,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         HardwareCards.Add(new("Armazenamento", $"{snapshot.Disks.Count} volume(s)", "Espaço livre e dispositivos físicos em Hardware."));
         HardwareCards.Add(new("Microsoft Defender", BooleanStatus(snapshot.Security?.DefenderEnabled), snapshot.Security?.Summary ?? "Consulte Segurança do Windows."));
         HardwareCards.Add(new("Placa-mãe", snapshot.Board?.Product ?? "Indisponível", snapshot.Board?.Manufacturer ?? "A placa não foi identificada nesta coleta."));
+        var inventory = snapshot.WindowsInventory;
+        HardwareCards.Add(new("Inventário do Windows", inventory is null ? "Indisponível" : $"{inventory.Processes.Count} processos · {inventory.Services.Count} serviços", inventory is null ? "As fontes do Windows não responderam nesta coleta." : $"{inventory.Drivers.Count} drivers · {inventory.PnpDevices.Count} dispositivos · {inventory.InstalledSoftware.Count} programas"));
         GraphicsRows.Clear(); foreach (var item in snapshot.Graphics) GraphicsRows.Add(new(Available(item.Name), $"Driver {Available(item.DriverVersion)}"));
         DiskRows.Clear(); foreach (var disk in snapshot.Disks) DiskRows.Add(new($"{disk.DriveLetter} · {Available(disk.Name)}", $"{ByteFormatting.Format(disk.FreeBytes)} livres de {ByteFormatting.Format(disk.TotalBytes)} · {Available(disk.FileSystem)}"));
         StartupRows.Clear(); foreach (var entry in snapshot.Startup) StartupRows.Add(new(Available(entry.Name), $"Origem: {Available(entry.Location)} · Usuário: {Available(entry.User)}"));
@@ -217,6 +219,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var disk in snapshot.PhysicalDisks ?? []) ExtendedHardwareRows.Add(new(Available(disk.Name), $"{disk.MediaType} · {disk.BusType} · {ByteFormatting.Format(disk.SizeBytes)} · Estado informado: {Available(disk.HealthStatus)}\nTemperatura: {(disk.TemperatureCelsius.HasValue ? $"{disk.TemperatureCelsius.Value:0.#} °C" : "indisponível")} · Desgaste informado: {disk.Wear?.ToString() ?? "indisponível"}"));
         foreach (var battery in snapshot.Batteries ?? []) ExtendedHardwareRows.Add(new(Available(battery.Name), $"Carga: {battery.ChargePercent?.ToString() ?? "indisponível"}% · {Available(battery.Status)}"));
         foreach (var network in snapshot.NetworkAdapters ?? []) ExtendedHardwareRows.Add(new(Available(network.Name), $"{Available(network.Status)} · Velocidade de enlace: {(network.SpeedBitsPerSecond.HasValue ? $"{network.SpeedBitsPerSecond.Value / 1_000_000d:0.#} Mbps" : "indisponível")}"));
+        if (inventory is not null)
+        {
+            ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
+            ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
+            ExtendedHardwareRows.Add(new("Tarefas agendadas", $"{inventory.ScheduledTasks.Count} entradas inventariadas; nomes e estados completos ficam no relatório exportado."));
+            ExtendedHardwareRows.Add(new("Serviços", $"{inventory.Services.Count} entradas inventariadas; nenhuma foi alterada."));
+            ExtendedHardwareRows.Add(new("Windows Update", inventory.UpdateState?.PendingCount is { } pending ? $"{pending} atualização(ões) pendente(s)" : "Atualizações pendentes não consultadas nesta leitura."));
+            foreach (var device in inventory.PnpDevices.Where(device => !string.IsNullOrWhiteSpace(device.ProblemCode)).Take(20))
+                ExtendedHardwareRows.Add(new($"Dispositivo com código {device.ProblemCode}", $"{Available(device.Name)} · {Available(device.Status)}"));
+        }
         Warnings.Clear(); foreach (var warning in _startupWarnings.Concat(snapshot.Warnings)) Warnings.Add(warning);
         BuildPersonalPlan();
         foreach (var property in new[] { nameof(Snapshot), nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(DevicesEmptyText), nameof(CanExport) }) Notify(property);

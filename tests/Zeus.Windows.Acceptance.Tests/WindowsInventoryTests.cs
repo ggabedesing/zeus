@@ -49,8 +49,18 @@ public sealed class WindowsInventoryTests
             Assert.InRange(disk.FreeBytes, 0UL, disk.TotalBytes);
             Assert.False(string.IsNullOrWhiteSpace(disk.DriveLetter));
         });
-        // Defender, physical sensors and OEM inventory are optional on CI VMs.
-        // The collector must preserve a warning collection when providers are absent.
+        Assert.NotNull(snapshot.WindowsInventory);
+        Assert.NotEmpty(snapshot.WindowsInventory.Processes);
+        Assert.InRange(snapshot.WindowsInventory.Processes.Count, 1, 200);
+        Assert.All(snapshot.WindowsInventory.Processes, process =>
+        {
+            Assert.True(process.Id > 0);
+            if (process.WorkingSetBytes is { } memory) Assert.True(memory > 0);
+        });
+        Assert.NotNull(snapshot.WindowsInventory.SecurityState);
+        Assert.NotNull(snapshot.WindowsInventory.Warnings);
+        // Defender, physical sensors, OEM inventory, Secure Boot and TPM are optional on CI VMs.
+        // The collector must preserve warnings when providers are absent and never invent results.
         Assert.NotNull(snapshot.Warnings);
     }
 }

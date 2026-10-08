@@ -25,3 +25,29 @@ public sealed record BatteryInfo(string Name, int? ChargePercent, string Status)
 
 /// <summary>Reported interface speed is not a measurement of Internet throughput.</summary>
 public sealed record NetworkAdapterInfo(string Name, string Status, ulong? SpeedBitsPerSecond);
+
+/// <summary>Extended Windows inventory. Optional collections remain empty when providers are unavailable.</summary>
+public sealed record WindowsInventoryInfo(
+    IReadOnlyList<NetworkConfigurationInfo> NetworkConfiguration,
+    IReadOnlyList<DriverInfo> Drivers,
+    IReadOnlyList<PnpDeviceInfo> PnpDevices,
+    IReadOnlyList<ProcessInfo> Processes,
+    IReadOnlyList<ServiceInfo> Services,
+    IReadOnlyList<ScheduledTaskInfo> ScheduledTasks,
+    IReadOnlyList<InstalledSoftwareInfo> InstalledSoftware,
+    IReadOnlyList<WindowsEventInfo> RecentEvents,
+    WindowsSecurityState? SecurityState,
+    WindowsUpdateState? UpdateState,
+    string? WindowsImageHealth,
+    IReadOnlyList<string> Warnings);
+
+public sealed record NetworkConfigurationInfo(string Adapter, string[] Addresses, string[] DnsServers, string[] Gateways, string Status, string[]? Routes = null, string? Proxy = null);
+public sealed record DriverInfo(string Device, string Provider, string Version, string? Date, string? Signer);
+public sealed record PnpDeviceInfo(string Name, string Class, string Status, string? ProblemCode);
+public sealed record ProcessInfo(string Name, int Id, double? CpuSeconds, ulong? WorkingSetBytes);
+public sealed record ServiceInfo(string Name, string DisplayName, string Status, string StartType);
+public sealed record ScheduledTaskInfo(string Name, string Path, string State);
+public sealed record InstalledSoftwareInfo(string Name, string Version, string Publisher);
+public sealed record WindowsEventInfo(DateTimeOffset Time, string Log, string Provider, int Id, string Level, string Message);
+public sealed record WindowsSecurityState(bool? SecureBootEnabled, bool? TpmPresent, bool? TpmReady);
+public sealed record WindowsUpdateState(int? PendingCount, string Source);

@@ -12,12 +12,15 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 | Inicialização | Entrada HKCU exclusiva de fixture desativada/restaurada, tipos preservados e conflitos protegidos |
 | Preferências | Efeitos do usuário aplicados/restaurados; perfil não troca energia sozinho |
 | Inventário e carga | CPU, RAM e volumes reais; contadores nativos de CPU/memória/processos |
+| Inventário estendido | drivers, PnP, rede, processos, serviços, tarefas, software, eventos recentes, Secure Boot e TPM; fontes opcionais podem permanecer indisponíveis |
 | Auxiliar | Argumentos inválidos rejeitados antes de operação e armazenamento administrativo protegido |
 | Persistência SQLite | Migrações transacionais, integridade, sessões/etapas, preferências, eventos e importação idempotente sem remover JSON de origem |
 | Interface | Aplicação WPF real com inventário, oito áreas e três temas capturados em PNG |
 | Publicação | Pacote autocontido com interface, auxiliar e dependências |
 
 O relatório de `.validation/status.json` relaciona o commit, execução do Actions, contagens de testes, resultados por etapa e capturas. `accepted=true` refere-se **somente a esta aceitação automatizada**. As limitações de hardware e operações não executadas também constam nesse relatório.
+
+O inventário estendido inclui informações locais de rede (endereços, DNS, gateways, rotas e proxy), nomes de drivers/dispositivos/programas/processos/serviços/tarefas, e metadados de eventos recentes. O texto bruto dos eventos e linhas de comando dos processos são omitidos. A exportação completa pode revelar detalhes do computador; confira antes de compartilhar. Atualizações pendentes e integridade da imagem do Windows não são inferidas: o primeiro diagnóstico não consulta atualizações online nem executa DISM/SFC.
 
 ### Execução local recebida
 
