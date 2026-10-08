@@ -14,8 +14,8 @@ jobs:
     name: Portable rules and cleanup boundaries
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - name: Test rules that run without Windows
@@ -52,7 +52,7 @@ jobs:
               assert int(counters.attrib.get('failed', 0)) == 0, f'Tests failed: {result.parent.name}'
       - name: Upload portable test results and console logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zeus-portable-test-results
           path: ${{ runner.temp }}/zeus-test-results/
@@ -74,8 +74,8 @@ jobs:
       ZEUS_PUBLISH_OUTCOME: pending
       ZEUS_INSTALLER_TEST_OUTCOME: pending
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - name: Configure isolated acceptance directories
@@ -124,7 +124,7 @@ jobs:
           ./scripts/test-installer-windows.ps1 -PreviousInstaller (Join-Path $env:ZEUS_TEST_PREVIOUS_MSI_DIR 'Zeus.Installer.msi') -CurrentInstaller (Join-Path $PWD 'artifacts/Zeus.Installer.msi') -ExpectedVersion $version -LogDirectory $env:ZEUS_INSTALLER_SMOKE_LOGS
       - name: Upload MSI lifecycle logs
         if: always() && steps.installerTest.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zeus-installer-lifecycle-logs
           path: ${{ runner.temp }}/zeus-installer-smoke/
@@ -132,7 +132,7 @@ jobs:
           retention-days: 7
       - name: Upload portable package
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zeus-windows-x64
           path: |
@@ -141,7 +141,7 @@ jobs:
           if-no-files-found: error
       - name: Upload MSI installer
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zeus-installer-windows-x64
           path: |
@@ -150,7 +150,7 @@ jobs:
           if-no-files-found: error
       - name: Upload tests for the user's Windows PC
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zeus-tests-windows
           path: |
@@ -255,7 +255,7 @@ jobs:
           $report | ConvertTo-Json -Depth 8 | Set-Content '.validation/status.json' -Encoding utf8
       - name: Upload sanitized acceptance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: zeus-windows-acceptance
           path: .validation/
