@@ -2,6 +2,10 @@
 
 Esta matriz distingue implementação, teste automatizado e aceitação das alterações administrativas em PCs de teste. Um item implementado não deve ser anunciado como validado em hardware sem evidência correspondente.
 
+### Confirmação da instalação de driver
+
+Depois da instalação, o auxiliar consulta novamente o Windows Update pela identidade e revisão exatas e só trata o pacote como confirmado se a fonte o marcar como instalado. Se houver pedido de reinicialização e a consulta ainda não confirmar o registro, o resultado fica pendente e orienta a não repetir a instalação. Sem confirmação nem reinicialização pendente, exige revisão manual. Isso valida o registro do pacote pelo provedor; não prova que o dispositivo esteja usando o driver ativo, o que ainda precisa ser verificado após reiniciar. A política tem testes automatizados; nenhuma instalação real foi executada nesta revisão.
+
 ## Instalador MSI por máquina
 
 O instalador WiX é construído a partir do diretório autocontido publicado para `win-x64`. A instalação é por máquina em `Program Files`, solicita elevação do Windows, cria atalho no menu Iniciar e registra a desinstalação. A elevação instala os binários; operações administrativas do ZEUS continuam com as confirmações próprias do aplicativo. O banco em `%LOCALAPPDATA%\Zeus` fica fora da pasta instalada e não é removido por atualização ou desinstalação. O MSI inclui SHA-256 ao lado do arquivo. No workflow Windows, um runner descartável instala uma versão anterior, executa uma atualização principal para a versão corrente, confere arquivos, atalho e registro, desinstala e verifica que dados locais não foram removidos. Esse teste do pacote não substitui validar UAC/SmartScreen e interrupções em PCs físicos.

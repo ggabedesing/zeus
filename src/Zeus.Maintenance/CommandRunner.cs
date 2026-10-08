@@ -219,10 +219,15 @@ internal static class CommandRunner
                 $"O Windows Update não confirmou uma instalação bem-sucedida. Origem selecionada: {sourceSummary}. Resultados parciais, códigos e falhas estão no log; um resultado com erros não é apresentado como sucesso.",
                 result.LogFile, request.TargetId, MaintenanceVerificationStatus.ManualReviewRequired);
         var restart = result.Output.Contains("ZEUS_DRIVER_REBOOT_REQUIRED true", StringComparison.Ordinal);
-        return new MaintenanceStepResult(request.Action, StepOutcome.Succeeded,
-            $"O Windows Update confirmou a instalação da identidade selecionada. Origem confirmada: {sourceSummary}. Backup dos drivers anteriores preservado na sessão; valide o dispositivo e seu problema original." +
-            (restart ? " O Windows solicitou reinicialização; salve seu trabalho e reinicie quando conveniente." : ""),
-            result.LogFile, request.TargetId, MaintenanceVerificationStatus.ProviderConfirmed);
+        var exactUpdateMarkedInstalled = result.Output.Contains("ZEUS_DRIVER_STATE_VERIFIED true", StringComparison.Ordinal);
+        var verification = DriverInstallVerificationPolicy.Resolve(
+            result.ExitCode == 0 && result.Output.Contains("ZEUS_DRIVER_INSTALL_SUCCEEDED", StringComparison.Ordinal),
+            exactUpdateMarkedInstalled, restart);
+        var message = $"{verification.Message} Origem confirmada: {sourceSummary}. Backup dos drivers anteriores preservado na sessão." +
+            (restart ? " O Windows solicitou reinicialização; salve seu trabalho e reinicie quando conveniente." : "") +
+            " Confira o dispositivo e o problema original após a operação.";
+        return new MaintenanceStepResult(request.Action, verification.Outcome, message,
+            result.LogFile, request.TargetId, verification.Verification);
     }
 
     private static async Task<MaintenanceStepResult> RollbackDriverAsync(Guid sessionId, MaintenanceRequest request)
@@ -322,6 +327,17 @@ internal static class CommandRunner
         if ([int]$installation.ResultCode -ne 2 -or [int]$installedItem.ResultCode -ne 2) {
             throw 'Windows Update não confirmou sucesso sem erros. Um resultado parcialmente bem-sucedido precisa ser revisado nos registros.';
         };
+        $verifyQuery = "IsInstalled=1 and Type='Driver' and UpdateID='" + $expectedId + "' and RevisionNumber=" + $expectedRevision;
+        $verify = $searcher.Search($verifyQuery);
+        $stateVerified = [int]$verify.ResultCode -eq 2 -and $verify.Updates.Count -eq 1;
+        if ($stateVerified) {
+            $verifiedUpdate = $verify.Updates.Item(0);
+            $stateVerified = [bool]$verifiedUpdate.IsInstalled -and
+                [guid]$verifiedUpdate.Identity.UpdateID -eq [guid]$expectedId -and
+                [int]$verifiedUpdate.Identity.RevisionNumber -eq $expectedRevision;
+        };
+        [Console]::WriteLine('ZEUS_DRIVER_STATE_VERIFIED ' + ([bool]$stateVerified).ToString().ToLowerInvariant() +
+            ' QUERY_RESULT ' + [int]$verify.ResultCode + ' COUNT ' + $verify.Updates.Count);
         [Console]::WriteLine('ZEUS_DRIVER_INSTALL_SUCCEEDED');
         """;
 

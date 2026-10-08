@@ -11,4 +11,5 @@
 - A interface mostra a seleção de servidor WUA e, para serviços adicionais, o `ServiceID`; a instalação permite o ID oficial conhecido do Microsoft Update e bloqueia os demais. O auxiliar confirma modo e ID de serviço novamente antes da consulta exata.
 - A política de origem WUA é centralizada para busca, seleção e transação; o resultado persistido da instalação do driver registra a fonte lógica selecionada/confirmada e seus limites conhecidos.
 - A ficha e a confirmação de instalação explicam que o Windows Update valida hashes e assinaturas antes de instalar; o ZEUS não apresenta essa validação do Windows como verificação criptográfica independente do aplicativo.
+- Após a instalação de um driver, o auxiliar consulta novamente a identidade exata no Windows Update e diferencia pacote confirmado, reinicialização pendente e resultado que precisa de revisão; a confirmação do pacote não declara que o dispositivo já está usando o driver.
 - O pacote portátil inclui este histórico de versões.
