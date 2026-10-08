@@ -31,6 +31,33 @@ public sealed class WindowsUpdateServiceTests
         Assert.Equal(2, result.Warnings.Count(warning => warning.Contains("identidade era inválida ou repetida", StringComparison.OrdinalIgnoreCase)));
     }
 
+    [Theory]
+    [InlineData("not-a-date")]
+    [InlineData("0001-01-01")]
+    public void InvalidDriverDateStaysUnavailableWithoutDiscardingOtherSearchResults(string value)
+    {
+        var payload = $$"""{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"Vendor","DeviceName":"Device","RequiresEula":false,"DriverDate":"{{value}}"}],"Warnings":[]}""";
+
+        var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
+
+        Assert.Null(Assert.Single(result.Updates).DriverDate);
+        Assert.Contains(result.Warnings, warning => warning.Contains("data do driver", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DriverWithMissingTargetAndDateRemainsExplicitButIsNotInstallable()
+    {
+        var payload = """{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"","DeviceName":null,"RequiresEula":false,"DriverDate":null}],"Warnings":[]}""";
+
+        var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
+
+        var candidate = Assert.Single(result.Updates);
+        Assert.Null(candidate.Manufacturer);
+        Assert.Null(candidate.DeviceName);
+        Assert.Null(candidate.DriverDate);
+        Assert.Contains(result.Warnings, warning => warning.Contains("não identifica fabricante e modelo", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void ParsesPendingUpdatesAsDataWithoutInferringDownloadOrInstallation()
     {

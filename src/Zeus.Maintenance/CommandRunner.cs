@@ -278,6 +278,13 @@ internal static class CommandRunner
         if ([string]$update.DriverClass -match '(?i)firmware|bios|uefi' -or [string]$update.Title -match '(?i)firmware|\bbios\b|\buefi\b') {
             throw 'Atualizações de BIOS ou firmware não fazem parte da instalação de drivers do ZEUS.';
         };
+        $manufacturer = [string]$update.DriverManufacturer;
+        $model = [string]$update.DriverModel;
+        $driverDate = [datetime]$update.DriverVerDate;
+        if ([string]::IsNullOrWhiteSpace($manufacturer) -or [string]::IsNullOrWhiteSpace($model) -or
+            $driverDate.Year -lt 1980 -or $driverDate.Date -gt [datetime]::Today) {
+            throw 'Fabricante, modelo ou data do driver ausente, inválido ou futuro na oferta atual. Nenhum download ou instalação foi iniciado.';
+        };
         if (-not [bool]$update.EulaAccepted) {
             if (-not $acceptEula -or [string]::IsNullOrWhiteSpace([string]$update.EulaText)) {
                 throw 'A licença ainda não foi explicitamente aceita após exibição na interface. Use uma nova busca ou o Windows Update.';

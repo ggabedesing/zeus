@@ -167,6 +167,16 @@ public sealed class WpfExperienceTests
         Assert.Equal("2025-11-04", licensed.DriverDate);
         Assert.Equal("Windows Update · origem configurada no sistema", licensed.DriverSource);
         Assert.Equal("indisponível", unlicensed.DriverDate);
+        Assert.False(unlicensed.CanSelectForInstall);
+        Assert.Contains("data do driver", unlicensed.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
+        var unidentified = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":3", "Unidentified device", null, "Fixture adapter", null, false,
+            DriverDate: DateOnly.FromDateTime(DateTime.Today)));
+        Assert.False(unidentified.CanSelectForInstall);
+        Assert.Contains("fabricante e modelo", unidentified.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
+        var futureDated = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":4", "Future dated driver", "Fixture", "Fixture adapter", null, false,
+            DriverDate: DateOnly.FromDateTime(DateTime.Today.AddDays(1))));
+        Assert.False(futureDated.CanSelectForInstall);
+        Assert.Contains("futura", futureDated.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
         licensed.IsSelected = true; unlicensed.IsSelected = true;
         Assert.False(window.CanInstallDriver);

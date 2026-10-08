@@ -86,7 +86,16 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
     public bool RequiresEula => Candidate.RequiresEula;
     public string EulaText => Candidate.EulaText ?? "A licença não está disponível. Instale este candidato pelo Windows Update para revisar os termos.";
     public bool LicenseReady => !RequiresEula || (EulaAccepted && !string.IsNullOrWhiteSpace(Candidate.EulaText));
+    public bool CanSelectForInstall => HasTargetIdentity && HasUsableDate;
+    public string InstallabilityReason => !HasTargetIdentity
+        ? "Instalação bloqueada: o Windows Update não identificou fabricante e modelo do dispositivo."
+        : !HasUsableDate
+            ? "Instalação bloqueada: a data do driver está ausente, inválida ou futura."
+            : "Fabricante, modelo e data informados pelo Windows Update.";
     public bool EulaAccepted { get => _eulaAccepted; set { if (_eulaAccepted == value) return; _eulaAccepted = value; Raise(nameof(EulaAccepted)); Raise(nameof(LicenseReady)); } }
+
+    private bool HasTargetIdentity => !string.IsNullOrWhiteSpace(Candidate.Manufacturer) && !string.IsNullOrWhiteSpace(Candidate.DeviceName);
+    private bool HasUsableDate => Candidate.DriverDate is { Year: >= 1980 } date && date <= DateOnly.FromDateTime(DateTime.Today);
 
     private static string ClassifyProvider(string? provider, string? manufacturer)
     {

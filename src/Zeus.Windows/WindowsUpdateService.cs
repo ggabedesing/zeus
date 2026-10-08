@@ -193,7 +193,10 @@ public sealed class WindowsUpdateService
         return output.ToString();
     }
 
-    private sealed record SearchPayload(IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
+    private sealed record SearchPayload(IReadOnlyList<DriverSearchCandidate>? Updates, IReadOnlyList<string>? Warnings);
+    private sealed record DriverSearchCandidate(string? Id, string? Title, string? Manufacturer,
+        string? DeviceName, string? DriverVersion, bool RequiresEula, string? EulaText,
+        string? DriverProvider, string? DriverClass, string? DriverDate);
     private sealed record PendingSearchPayload(bool IsComplete, IReadOnlyList<PendingWindowsUpdate>? Updates, IReadOnlyList<string>? Warnings);
 
     internal static DriverUpdateSearch ParseDriverUpdatesPayload(string output)
@@ -207,16 +210,42 @@ public sealed class WindowsUpdateService
         var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var driver in result.Updates)
         {
-            if (driver is null || !MaintenanceRequestProtocol.TryParseDriverIdentity(driver.Id, out _, out _) ||
+            if (driver is null || string.IsNullOrWhiteSpace(driver.Id) || !MaintenanceRequestProtocol.TryParseDriverIdentity(driver.Id, out _, out _) ||
                 string.IsNullOrWhiteSpace(driver.Title) || !identities.Add(driver.Id))
             {
                 warnings.Add("Uma oferta de driver foi ignorada porque sua identidade era inválida ou repetida.");
                 continue;
             }
-            drivers.Add(driver);
+            DateOnly? driverDate = null;
+            if (!string.IsNullOrWhiteSpace(driver.DriverDate))
+            {
+                if (DateOnly.TryParseExact(driver.DriverDate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out var parsedDate) && parsedDate.Year >= 1980)
+                {
+                    driverDate = parsedDate;
+                    if (parsedDate > DateOnly.FromDateTime(DateTime.Today))
+                        warnings.Add($"A oferta '{driver.Title.Trim()}' informa uma data futura; a instalação pelo ZEUS ficará bloqueada.");
+                }
+                else
+                {
+                    warnings.Add($"A data do driver da oferta '{driver.Title.Trim()}' é inválida ou sentinela e foi mantida como indisponível.");
+                }
+            }
+            else
+            {
+                warnings.Add($"A oferta '{driver.Title.Trim()}' não informou a data do driver; a instalação pelo ZEUS ficará bloqueada.");
+            }
+            if (string.IsNullOrWhiteSpace(driver.Manufacturer) || string.IsNullOrWhiteSpace(driver.DeviceName))
+                warnings.Add($"A oferta '{driver.Title.Trim()}' não identifica fabricante e modelo do dispositivo; ela não poderá ser instalada pelo ZEUS.");
+
+            drivers.Add(new DriverUpdateCandidate(driver.Id!, driver.Title.Trim(), Optional(driver.Manufacturer),
+                Optional(driver.DeviceName), Optional(driver.DriverVersion), driver.RequiresEula, Optional(driver.EulaText),
+                Optional(driver.DriverProvider), Optional(driver.DriverClass), driverDate));
         }
         warnings.Add("As ofertas seguem as fontes configuradas no Windows Update. Em notebooks, confira a recomendação do fabricante antes de instalar.");
         warnings.Add("O Windows Update informa fornecedor, classe e data do driver, mas não uma versão numérica nem hash/assinatura do arquivo nesta busca; esses itens permanecem indisponíveis e não são inferidos do título.");
         return new(DateTimeOffset.UtcNow, drivers.AsReadOnly(), warnings.AsReadOnly());
     }
+
+    private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
