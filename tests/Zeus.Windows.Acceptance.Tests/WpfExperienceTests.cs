@@ -82,6 +82,8 @@ public sealed class WpfExperienceTests
         Assert.NotEmpty(window.HardwareCards);
         Assert.NotNull(window.Snapshot);
         Assert.NotEmpty(window.DeviceRepairSummary);
+        Assert.NotEmpty(window.EventDiagnosticSummary);
+        Assert.All(window.EventDiagnosticRows, row => Assert.False(string.IsNullOrWhiteSpace(row.Detail)));
         Assert.All(window.DeviceRepairRows, row =>
         {
             Assert.False(string.IsNullOrWhiteSpace(row.Title));

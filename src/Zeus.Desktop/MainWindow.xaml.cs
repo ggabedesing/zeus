@@ -123,6 +123,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<DeviceRow> StartupRows { get; } = [];
     public ObservableCollection<DeviceRow> ServiceDependencyRows { get; } = [];
     public ObservableCollection<DeviceRow> DeviceRepairRows { get; } = [];
+    public ObservableCollection<DeviceRow> EventDiagnosticRows { get; } = [];
     public ObservableCollection<string> Warnings { get; } = [];
     public ObservableCollection<MaintenanceChoice> MaintenanceChoices { get; } = [];
     public ObservableCollection<HistoryRow> HistoryRows { get; } = [];
@@ -155,6 +156,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string ExecutionLog { get => _executionLog; private set => Set(ref _executionLog, value); }
     public string ServiceDependencySummary { get; private set; } = "Leia o inventário do Windows para consultar as dependências declaradas dos serviços.";
     public string DeviceRepairSummary { get; private set; } = "Leia o inventário do Windows para consultar os códigos de problema PnP.";
+    public string EventDiagnosticSummary { get; private set; } = "Leia os logs locais para procurar assinaturas repetidas de eventos.";
     public string MaintenanceResultSummary { get => _maintenanceResultSummary; private set => Set(ref _maintenanceResultSummary, value); }
     public string CleanupSummary { get => _cleanupSummary; private set => Set(ref _cleanupSummary, value); }
     public string StartupSummary { get => _startupSummary; private set => Set(ref _startupSummary, value); }
@@ -322,6 +324,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     (deviceProblems.Length > 100 ? " Exibindo os primeiros 100; o relatório contém o inventário coletado." : string.Empty);
         }
         Notify(nameof(DeviceRepairSummary));
+        EventDiagnosticRows.Clear();
+        if (inventory is null)
+            EventDiagnosticSummary = "Inventário de eventos indisponível nesta coleta; padrões desconhecidos.";
+        else
+        {
+            var eventSourcesComplete = !inventory.Warnings.Any(warning =>
+                warning.StartsWith("Eventos System:", StringComparison.OrdinalIgnoreCase) ||
+                warning.StartsWith("Eventos Application:", StringComparison.OrdinalIgnoreCase));
+            var eventReport = EventPatternAnalyzer.Analyze(inventory.RecentEvents, eventSourcesComplete);
+            foreach (var finding in eventReport.Findings.Take(20)) EventDiagnosticRows.Add(new(finding.Title, finding.Detail));
+            EventDiagnosticSummary = eventReport.Findings.Count > 20
+                ? $"{eventReport.Summary} Exibindo os primeiros 20 padrões."
+                : eventReport.Summary;
+        }
+        Notify(nameof(EventDiagnosticSummary));
         HardwareCards.Add(new("Inventário do Windows", inventory is null ? "Indisponível" : $"{inventory.Processes.Count} processos · {inventory.Services.Count} serviços", inventory is null ? "As fontes do Windows não responderam nesta coleta." : $"{inventory.Drivers.Count} drivers · {inventory.PnpDevices.Count} dispositivos · {inventory.InstalledSoftware.Count} programas"));
         GraphicsRows.Clear(); foreach (var item in snapshot.Graphics) GraphicsRows.Add(new(Available(item.Name), $"Driver {Available(item.DriverVersion)}"));
         DiskRows.Clear(); foreach (var disk in snapshot.Disks) DiskRows.Add(new($"{disk.DriveLetter} · {Available(disk.Name)}", $"{ByteFormatting.Format(disk.FreeBytes)} livres de {ByteFormatting.Format(disk.TotalBytes)} · {Available(disk.FileSystem)}"));

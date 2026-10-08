@@ -78,6 +78,15 @@ public sealed class WindowsInventoryTests
         Assert.NotNull(snapshot.WindowsInventory.SecurityState);
         Assert.NotNull(snapshot.WindowsInventory.Warnings);
         Assert.NotNull(snapshot.WindowsInventory.ProxyConfiguration);
+        Assert.NotNull(snapshot.WindowsInventory.RecentEvents);
+        Assert.All(snapshot.WindowsInventory.RecentEvents, item =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(item.Log));
+            Assert.False(string.IsNullOrWhiteSpace(item.Provider));
+            Assert.InRange(item.Id, 0, int.MaxValue);
+            Assert.False(string.IsNullOrWhiteSpace(item.Level));
+            Assert.Empty(item.Message);
+        });
         Assert.NotEmpty(snapshot.WindowsInventory.Services);
         Assert.All(snapshot.WindowsInventory.Services, service =>
         {

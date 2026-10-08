@@ -62,6 +62,10 @@ O inventário mantém separados o estado/partida consultados por `Win32_Service`
 
 A tela de Manutenção agora interpreta um catálogo selecionado de códigos PnP documentados pela Microsoft, com orientação de consulta segura para o dispositivo. Códigos que não estão no catálogo, valores inválidos e inventário indisponível permanecem explícitos, sem inferir causa física. O código, o estado retornado pelo Windows e o nome do dispositivo continuam visíveis. Nada habilita dispositivos, altera Registro/firmware ou instala drivers. A compilação Release passou sem avisos/erros; 68 testes do núcleo e 3 testes focados de inventário/WPF passaram. Os testes cobrem códigos 10, 28, 43 e 52, além de códigos desconhecidos e indisponíveis.
 
+## Padrões de eventos para investigação
+
+O diagnóstico consulta até 20 eventos recentes de nível crítico, erro ou aviso em cada log System e Application. A tela agrupa repetições pelo log, provedor e ID, mostrando contagem, nível e horário mais recente; não interpreta uma repetição como causa. Mensagens brutas continuam fora da interface/exportação. “Nenhum evento retornado” fica separado de fonte indisponível, e nenhuma ocorrência não é tratada como prova de Windows saudável. Nesta revisão, a compilação Release passou sem avisos/erros, 72 testes do núcleo passaram e os 3 testes focados de inventário/WPF passaram com consulta nativa aos logs.
+
 ## Aceitação administrativa em máquinas de teste
 
 Use Windows 11 suportado, snapshots quando disponíveis e backups independentes. Guarde a versão/commit, ação, relatório e resultado após reiniciar. Execute cada cenário separadamente.
