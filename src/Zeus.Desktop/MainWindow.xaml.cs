@@ -109,7 +109,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 return "Defina uma referência com pelo menos três amostras e colete outras três para comparar.";
             var gpuMemory = comparison.GpuMemoryUsage is { Count: > 0 } memory
                 ? " · uso dedicado por adaptador: " + string.Join("; ", memory.Select(item =>
-                    $"{item.AdapterInstance} {FormatGpuMemory(item.ReferenceDedicatedBytes)} / {FormatMetric(item.ReferenceOccupancyPercent)} ({item.ReferenceAvailableSamples}) → {FormatGpuMemory(item.LaterDedicatedBytes)} / {FormatMetric(item.LaterOccupancyPercent)} ({item.LaterAvailableSamples})"))
+                    $"{item.AdapterInstance} {FormatByteQuantity(item.ReferenceDedicatedBytes)} / {FormatMetric(item.ReferenceOccupancyPercent)} ({item.ReferenceAvailableSamples}) → {FormatByteQuantity(item.LaterDedicatedBytes)} / {FormatMetric(item.LaterOccupancyPercent)} ({item.LaterAvailableSamples})"))
                 : " · uso de memória GPU: indisponível";
             var network = comparison.NetworkTraffic is { Count: > 0 } adapters
                 ? " · rede por adaptador: " + string.Join("; ", adapters.Select(item =>
@@ -122,7 +122,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             var context = comparison.ActivityContext is { } activity
                 ? $" · contexto observado: jogo {activity.ReferenceGameDetectedSamples}/{activity.ReferenceAvailableSamples} → {activity.LaterGameDetectedSamples}/{activity.LaterAvailableSamples}; OBS {activity.ReferenceObsDetectedSamples}/{activity.ReferenceAvailableSamples} → {activity.LaterObsDetectedSamples}/{activity.LaterAvailableSamples}; encoder do OBS {activity.ReferenceObsEncoderActiveSamples}/{activity.ReferenceObsEncoderKnownSamples} → {activity.LaterObsEncoderActiveSamples}/{activity.LaterObsEncoderKnownSamples}"
                 : " · contexto de jogo/OBS: indisponível";
-            return $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}{diskIo}{gpuMemory}{network}{context}. Cobertura mostra amostras válidas sobre o total; engines individuais não são uso total da GPU, e ocupação não comprova um gargalo sozinha. Contexto é heurístico e não confirma partida ou transmissão ao vivo. Comparação descritiva, sem atribuir causa ou ganho.";
+            var processes = comparison.ProcessUsage is { Count: > 0 } processUsage
+                ? " · até cinco processos acompanhados por PID/início: " + string.Join("; ", processUsage
+                    .OrderByDescending(item => Math.Max(item.LaterCpuPercent ?? -1, item.ReferenceCpuPercent ?? -1))
+                    .Take(5).Select(item =>
+                        $"{item.Name} · PID {item.ProcessId}: CPU {FormatMetric(item.ReferenceCpuPercent)} ({item.ReferenceCpuSamples}/{comparison.ReferenceSampleCount}) → {FormatMetric(item.LaterCpuPercent)} ({item.LaterCpuSamples}/{comparison.LaterSampleCount}); memória {FormatByteQuantity(item.ReferenceWorkingSetBytes)} ({item.ReferenceWorkingSetSamples}/{comparison.ReferenceSampleCount}) → {FormatByteQuantity(item.LaterWorkingSetBytes)} ({item.LaterWorkingSetSamples}/{comparison.LaterSampleCount})"))
+                : " · comparação por processo: indisponível (identidade do processo não confirmada nos dois períodos)";
+            return $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}{diskIo}{gpuMemory}{network}{context}{processes}. Cobertura mostra amostras válidas sobre o total; engines individuais não são uso total da GPU, e ocupação não comprova um gargalo sozinha. Contexto é heurístico e não confirma partida ou transmissão ao vivo. Comparação descritiva, sem atribuir causa ou ganho.";
         }
     }
 
@@ -618,7 +624,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return $"{manual} · {pac} · {autodetect} · {bypass}. Fonte: HKCU Internet Settings; WinHTTP e configurações por aplicativo não consultados.";
     }
     private static string FormatMetric(double? value) => value is { } number ? $"{number:0.#}%" : "indisponível";
-    private static string FormatGpuMemory(double? bytes) => bytes is { } value && double.IsFinite(value) && value >= 0
+    private static string FormatByteQuantity(double? bytes) => bytes is { } value && double.IsFinite(value) && value >= 0
         ? $"{value / (1024d * 1024 * 1024):0.##} GiB" : "indisponível";
     private static string FormatMetricCoverage(PerformanceMetricComparison? metric, int referenceTotal, int laterTotal) => metric is null
         ? "indisponível"

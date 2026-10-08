@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 
 namespace Zeus.Windows;
 
-public sealed record ProcessObservation(int Id, string Name, double? CpuPercent, ulong WorkingSetBytes);
+public sealed record ProcessObservation(int Id, string Name, double? CpuPercent, ulong WorkingSetBytes, long? StartTimeUtcTicks = null);
 public sealed record GpuEngineObservation(string InstanceName, int? ProcessId, string EngineType, double UtilizationPercent, string? ProcessName = null);
 public sealed record DiskPerformanceObservation(string InstanceName, ulong? BytesPerSecond, double? ActivePercent, double? AverageReadLatencyMilliseconds);
 public sealed record NetworkPerformanceObservation(string Adapter, ulong? BytesPerSecond, ulong? LinkBitsPerSecond, ulong? QueueLength, ulong? ErrorPackets);
@@ -90,7 +90,7 @@ public sealed class WindowsPerformanceProbe
                 processCpu = CalculateProcessCpuPercent(priorTicks, ticks,
                     Stopwatch.GetElapsedTime(firstProcess.ObservedAt, last.ObservedAt), logicalProcessors);
             }
-            observations.Add(new ProcessObservation(last.Id, last.Name, processCpu, last.WorkingSetBytes));
+            observations.Add(new ProcessObservation(last.Id, last.Name, processCpu, last.WorkingSetBytes, last.StartTicks));
         }
         var allObservedProcesses = observations.ToArray();
         var top = allObservedProcesses.OrderByDescending(process => process.CpuPercent.HasValue)

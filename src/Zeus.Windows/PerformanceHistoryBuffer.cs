@@ -18,7 +18,8 @@ public sealed record PerformanceComparison(
     PerformanceMetricComparison? MemoryUsage = null,
     IReadOnlyList<PerformanceNetworkComparison>? NetworkTraffic = null,
     IReadOnlyList<PerformanceDiskComparison>? DiskIo = null,
-    PerformanceActivityContextComparison? ActivityContext = null);
+    PerformanceActivityContextComparison? ActivityContext = null,
+    IReadOnlyList<PerformanceProcessComparison>? ProcessUsage = null);
 
 public sealed record PerformanceMetricComparison(
     double? ReferencePercent,
@@ -64,6 +65,19 @@ public sealed record PerformanceActivityContextComparison(
     int LaterObsEncoderKnownSamples,
     int ReferenceObsEncoderActiveSamples,
     int LaterObsEncoderActiveSamples);
+
+public sealed record PerformanceProcessComparison(
+    int ProcessId,
+    string Name,
+    long StartTimeUtcTicks,
+    double? ReferenceCpuPercent,
+    double? LaterCpuPercent,
+    int ReferenceCpuSamples,
+    int LaterCpuSamples,
+    double? ReferenceWorkingSetBytes,
+    double? LaterWorkingSetBytes,
+    int ReferenceWorkingSetSamples,
+    int LaterWorkingSetSamples);
 
 /// <summary>A process-local, bounded history that preserves observations until exported.</summary>
 public sealed class PerformanceHistoryBuffer
@@ -288,10 +302,38 @@ public static class PerformanceComparisonBuilder
                 referenceContext.EncoderKnown, laterContext.EncoderKnown,
                 referenceContext.EncoderActive, laterContext.EncoderActive);
 
+        var processKeys = reference.Concat(later).SelectMany(sample => sample.Processes)
+            .Where(process => process.StartTimeUtcTicks is > 0)
+            .Select(process => (process.Id, StartTime: process.StartTimeUtcTicks!.Value))
+            .Distinct().ToArray();
+        var processUsage = processKeys.Select(key =>
+        {
+            static (double? Cpu, int CpuCount, double? WorkingSet, int WorkingSetCount, string? Name)
+                Summarize(IReadOnlyList<PerformanceObservation> samples, (int Id, long StartTime) identity)
+            {
+                var values = samples.SelectMany(sample => sample.Processes)
+                    .Where(process => process.Id == identity.Id && process.StartTimeUtcTicks == identity.StartTime)
+                    .ToArray();
+                var cpu = values.Select(process => process.CpuPercent)
+                    .Where(value => value is { } percent && double.IsFinite(percent) && percent is >= 0 and <= 100)
+                    .Select(value => value!.Value).ToArray();
+                var workingSet = values.Select(process => (double)process.WorkingSetBytes).ToArray();
+                return (cpu.Length == 0 ? null : cpu.Average(), cpu.Length,
+                    workingSet.Length == 0 ? null : workingSet.Average(), workingSet.Length,
+                    values.LastOrDefault()?.Name);
+            }
+
+            var left = Summarize(reference, key);
+            var right = Summarize(later, key);
+            return new PerformanceProcessComparison(key.Id, right.Name ?? left.Name ?? "processo desconhecido", key.StartTime,
+                left.Cpu, right.Cpu, left.CpuCount, right.CpuCount,
+                left.WorkingSet, right.WorkingSet, left.WorkingSetCount, right.WorkingSetCount);
+        }).ToArray();
+
         return new(reference.Count, later.Count,
             cpuUsage.ReferencePercent, cpuUsage.LaterPercent,
             memoryUsage.ReferencePercent, memoryUsage.LaterPercent,
             reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk, gpuMemory,
-            cpuUsage, memoryUsage, networkTraffic, diskIo, activityContext);
+            cpuUsage, memoryUsage, networkTraffic, diskIo, activityContext, processUsage);
     }
 }

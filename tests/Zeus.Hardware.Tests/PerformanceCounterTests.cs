@@ -351,6 +351,36 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void ComparisonMatchesProcessUsageByPidAndStartTimeWithoutMixingReusedPid()
+    {
+        const long firstStartTime = 638_900_000_000_000_000;
+        const long reusedPidStartTime = firstStartTime + 10_000_000;
+        var reference = new[]
+        {
+            Sample(20) with { Processes = [new(42, "game", 20, 1_000, firstStartTime)] },
+            Sample(30) with { Processes = [new(42, "game", 40, 3_000, firstStartTime)] }
+        };
+        var later = new[]
+        {
+            Sample(40) with { Processes = [new(42, "game", 50, 5_000, firstStartTime), new(42, "game", 99, 9_000, reusedPidStartTime)] },
+            Sample(50) with { Processes = [new(42, "game", null, 7_000, firstStartTime)] }
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+
+        var continued = Assert.Single(comparison.ProcessUsage!, process => process.StartTimeUtcTicks == firstStartTime);
+        Assert.Equal(30, continued.ReferenceCpuPercent);
+        Assert.Equal(50, continued.LaterCpuPercent);
+        Assert.Equal(2, continued.ReferenceCpuSamples);
+        Assert.Equal(1, continued.LaterCpuSamples);
+        Assert.Equal(2_000, continued.ReferenceWorkingSetBytes);
+        Assert.Equal(6_000, continued.LaterWorkingSetBytes);
+        var reused = Assert.Single(comparison.ProcessUsage!, process => process.StartTimeUtcTicks == reusedPidStartTime);
+        Assert.Null(reused.ReferenceCpuPercent);
+        Assert.Equal(99, reused.LaterCpuPercent);
+    }
+
+    [Fact]
     public void ComparisonKeepsUnavailableCountersUnknown()
     {
         var unavailable = Sample(null) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 };
@@ -379,6 +409,7 @@ public sealed class PerformanceCounterTests
         Assert.Null(comparison.NetworkTraffic);
         Assert.Null(comparison.DiskIo);
         Assert.Null(comparison.ActivityContext);
+        Assert.Null(comparison.ProcessUsage);
     }
 
     [Fact]
