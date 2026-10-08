@@ -36,7 +36,7 @@ O banco local fica em `%LOCALAPPDATA%\Zeus\zeus.db`. A primeira abertura cria o 
 - Autorização de administrador via UAC para manutenção; a interface e as alterações do próprio usuário usam permissões comuns.
 - Conexão para consultar/baixar drivers e, quando necessário, fontes de reparo do Windows.
 
-Extraia a pasta inteira de `zeus-win-x64.zip` e execute `Zeus.Desktop.exe`. O pacote autocontido inclui o runtime e `Zeus.Maintenance.exe`; não copie apenas um executável. Builds atuais são distribuições de desenvolvimento sem assinatura Authenticode de produção. ARM64 é um alvo de publicação ainda sem aceitação em hardware.
+No ZIP portátil, extraia a pasta inteira e execute `Zeus.Desktop.exe`. O pacote autocontido inclui o runtime e `Zeus.Maintenance.exe`; não copie apenas um executável. O MSI de desenvolvimento instala em `Program Files`, registra a desinstalação do Windows e cria um atalho no menu Iniciar. A instalação solicita elevação do Windows; isso permite instalar os binários, não autoriza as ações administrativas do ZEUS. Atualizações preservam `%LOCALAPPDATA%\Zeus`; desinstalar remove os binários/atalho, não o banco, backups ou preferências locais. Builds atuais são distribuições de desenvolvimento sem assinatura Authenticode de produção; o Windows pode exibir avisos de editor desconhecido. A instalação real e o ciclo atualizar/desinstalar ainda precisam de validação em uma máquina isolada antes de recomendar o MSI a usuários. ARM64 é um alvo de publicação ainda sem aceitação em hardware.
 
 O ZEUS usa as ferramentas do Windows; não constitui um novo motor antivírus. Atualizações de BIOS/firmware, overclock, limpeza de registro e desativação de segurança ficam fora deste produto. Um comando concluído não comprova correção de todos os erros ou aumento de desempenho.
 
@@ -53,6 +53,8 @@ Get-ChildItem tests -Recurse -Filter *.csproj | ForEach-Object {
 }
 dotnet run --project src/Zeus.Desktop/Zeus.Desktop.csproj
 pwsh -File scripts/publish-windows.ps1
+$payload = Get-ChildItem artifacts -Directory -Filter 'zeus-win-x64-*' | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+pwsh -File scripts/build-installer.ps1 -PayloadDirectory $payload.FullName
 ```
 
 O teste que aplica/restaura efeitos visuais exige `ZEUS_WINDOWS_ACCEPTANCE=1`. Essa opção é definida no workflow e no iniciador de testes local quando o usuário escolhe testar o aplicativo. Os arquivos de publicação ficam em `artifacts/`, incluindo ZIP, SHA-256 e identificação do código-fonte.

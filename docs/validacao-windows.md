@@ -2,6 +2,14 @@
 
 Esta matriz distingue implementação, teste automatizado e aceitação das alterações administrativas em PCs de teste. Um item implementado não deve ser anunciado como validado em hardware sem evidência correspondente.
 
+## Instalador MSI por máquina
+
+O instalador WiX é construído a partir do diretório autocontido publicado para `win-x64`. A instalação é por máquina em `Program Files`, solicita elevação do Windows, cria atalho no menu Iniciar e registra a desinstalação. A elevação instala os binários; operações administrativas do ZEUS continuam com as confirmações próprias do aplicativo. O banco em `%LOCALAPPDATA%\Zeus` fica fora da pasta instalada e não é removido por atualização ou desinstalação. O MSI inclui SHA-256 ao lado do arquivo.
+
+Verificação local em 2026-10-08: a captura automática inicial compilou de forma incremental, mas após limpeza WiX sinalizou erros de validação do modelo per-user. Esse pacote foi descartado. O MSI corrigido para instalação por máquina compilou após limpeza com zero erros e um aviso ICE60 sobre metadados de idioma de um recurso localizado; a extração administrativa isolada contém os 423 arquivos publicados com SHA-256 idêntico. Não foi realizada instalação com elevação nesta sessão.
+
+Esta evidência valida o MSI de desenvolvimento neste Windows x64. Não valida atualização de versões já instaladas, todas as edições do Windows, assinatura Authenticode, SmartScreen, recuperação de interrupção ou instalação assistida visual. Não publique o MSI como versão de produção até essas verificações e a assinatura do fornecedor serem concluídas.
+
 ## Testes automatizados
 
 | Área | Evidência exigida pelo workflow |

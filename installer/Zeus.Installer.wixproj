@@ -1,0 +1,10 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <ProductVersion>1.0.0</ProductVersion>
+    <PayloadDirectory Condition="'$(PayloadDirectory)' == ''">$(MSBuildThisFileDirectory)..\artifacts\zeus-win-x64</PayloadDirectory>
+    <DefineConstants>ProductVersion=$(ProductVersion);PayloadDirectory=$(PayloadDirectory)</DefineConstants>
+    <OutputPath>$(MSBuildThisFileDirectory)..\artifacts\</OutputPath>
+  </PropertyGroup>
+</Project>

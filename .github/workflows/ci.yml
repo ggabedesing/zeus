@@ -83,6 +83,9 @@ jobs:
         run: |
           ./scripts/publish-windows.ps1
           ./scripts/package-windows-tests.ps1
+          $payload = Get-ChildItem artifacts -Directory -Filter 'zeus-win-x64-*' | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+          if ($null -eq $payload) { throw 'Published x64 application payload not found.' }
+          ./scripts/build-installer.ps1 -PayloadDirectory $payload.FullName -ProductVersion "1.0.$env:GITHUB_RUN_NUMBER"
       - name: Upload portable package
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
         uses: actions/upload-artifact@v4
@@ -91,6 +94,15 @@ jobs:
           path: |
             artifacts/zeus-win-x64.zip
             artifacts/zeus-win-x64.zip.sha256
+          if-no-files-found: error
+      - name: Upload MSI installer
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeus-installer-windows-x64
+          path: |
+            artifacts/Zeus.Installer.msi
+            artifacts/Zeus.Installer.msi.sha256
           if-no-files-found: error
       - name: Upload tests for the user's Windows PC
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}

@@ -1,0 +1,24 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="ZEUS" Manufacturer="ZEUS" Version="$(var.ProductVersion)" UpgradeCode="61D4D4D8-5267-4F91-8EC8-5BD199CF282C" Scope="perMachine" InstallerVersion="500" Compressed="yes">
+    <MajorUpgrade DowngradeErrorMessage="Uma versão mais nova do ZEUS já está instalada." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="ZEUS" />
+    </StandardDirectory>
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="CommonProgramsFolder" Name="Microsoft\Windows\Start Menu\Programs">
+        <Directory Id="ApplicationProgramsFolder" Name="ZEUS" />
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="ZEUS" Level="1">
+      <Files Directory="INSTALLFOLDER" Include="$(var.PayloadDirectory)\**" />
+      <Component Directory="ApplicationProgramsFolder" Id="StartMenuShortcut">
+        <Shortcut Id="ZEUSShortcut" Name="ZEUS" Target="[INSTALLFOLDER]Zeus.Desktop.exe" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM" Key="Software\ZEUS" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveFolder On="uninstall" />
+      </Component>
+    </Feature>
+  </Package>
+</Wix>
