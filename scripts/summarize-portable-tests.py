@@ -10,6 +10,10 @@ import sys
 import xml.etree.ElementTree as ET
 
 
+def command_escape(value: str) -> str:
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A").replace(":", "%3A").replace(",", "%2C")
+
+
 def append_summary(result_dir: pathlib.Path, project: str, summary_path: pathlib.Path) -> None:
     report = result_dir / "results.trx"
     summary = [f"### Portable test failure: `{html.escape(project)}`", ""]
@@ -36,6 +40,8 @@ def append_summary(result_dir: pathlib.Path, project: str, summary_path: pathlib
             message = result.findtext(".//{*}ErrorInfo/{*}Message") or "No failure message was recorded."
             message = " ".join(message.split())[:400]
             summary.append(f"- `{html.escape(name)}`: {html.escape(message)}")
+            annotation = command_escape(f"{name}: {message}")
+            print(f"::error title=Portable test failure ({command_escape(project)})::{annotation}", flush=True)
         if len(failures) > 20:
             summary.append(f"- {len(failures) - 20} additional failures are in the uploaded test artifact.")
         if not failures:
@@ -49,7 +55,12 @@ def append_summary(result_dir: pathlib.Path, project: str, summary_path: pathlib
                 for line in console.read_text(encoding="utf-8", errors="replace").splitlines()
                 if re.search(r"error|failed|exception", line, re.IGNORECASE)
             ]
-            summary.extend(f"- {html.escape(line)}" for line in errors[-15:])
+            for line in errors[-15:]:
+                summary.append(f"- {html.escape(line)}")
+                print(
+                    f"::error title=Portable test failure ({command_escape(project)})::{command_escape(line)}",
+                    flush=True,
+                )
 
     with summary_path.open("a", encoding="utf-8") as output:
         output.write("\n".join(summary) + "\n")
