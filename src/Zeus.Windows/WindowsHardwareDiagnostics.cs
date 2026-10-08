@@ -72,13 +72,14 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
                 return await Read<IReadOnlyList<PhysicalDiskInfo>>("Discos físicos (Win32_DiskDrive)", token => ReadPhysicalDisksFallback(token, warnings), []);
             }
         }, []);
-        var inventoryTask = ReadAsync<WindowsInventoryInfo?>("Inventário detalhado do Windows", ReadWindowsInventoryAsync, null);
-
         await Task.WhenAll(cpuTask, memoryTask, graphicsTask, disksTask, startupTask, boardTask,
-            biosTask, modulesTask, memorySlotsTask, batteriesTask, networkTask, securityTask, physicalTask, inventoryTask);
+            biosTask, modulesTask, memorySlotsTask, batteriesTask, networkTask, securityTask, physicalTask);
         cancellationToken.ThrowIfCancellationRequested();
         var physical = await physicalTask;
-        var inventory = await inventoryTask;
+        // Run the broad, optional inventory after the focused hardware providers. Starting
+        // another large PowerShell query alongside every WMI/PowerShell probe can starve it
+        // and turn one slow source into a missing inventory for the whole diagnostic.
+        var inventory = await ReadAsync<WindowsInventoryInfo?>("Inventário detalhado do Windows", ReadWindowsInventoryAsync, null);
         if (inventory is not null)
             foreach (var warning in inventory.Warnings) warnings.Enqueue(warning);
         warnings.Enqueue(physical.Any(disk => disk.TemperatureCelsius.HasValue)
@@ -147,7 +148,7 @@ $inventory = [pscustomobject]@{
 [void]$warnings.Add('RAM: canais de memória não são inferidos pela quantidade de módulos. Integridade da imagem do Windows não é medida nesta coleta; use o Centro de Reparos. O proxy aqui cobre apenas valores observados em HKCU Internet Settings; auto-detecção ausente no Registro e configurações WinHTTP ou por aplicativo permanecem desconhecidas ou fora desta fonte.')
 [pscustomobject]@{Inventory=$inventory;Warnings=@($warnings)} | ConvertTo-Json -Depth 7 -Compress";
 
-        using var json = await RunPowerShellJsonAsync(script, token, WindowsPowerShellModule.Utility);
+        using var json = await RunPowerShellJsonAsync(script, token, TimeSpan.FromSeconds(45), WindowsPowerShellModule.Utility);
         var payload = JsonSerializer.Deserialize<WindowsInventoryPayload>(json.RootElement.GetRawText(),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (payload?.Inventory is not { } inventory) return null;
@@ -479,11 +480,15 @@ $inventory = [pscustomobject]@{
             root.GetProperty("Summary").GetString() ?? "Estado consultado no Defender");
     }
 
+    private static Task<JsonDocument> RunPowerShellJsonAsync(string script, CancellationToken token,
+        params WindowsPowerShellModule[] modules) =>
+        RunPowerShellJsonAsync(script, token, TimeSpan.FromSeconds(25), modules);
+
     private static async Task<JsonDocument> RunPowerShellJsonAsync(string script, CancellationToken token,
-        params WindowsPowerShellModule[] modules)
+        TimeSpan timeout, params WindowsPowerShellModule[] modules)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
-        deadline.CancelAfter(TimeSpan.FromSeconds(25));
+        deadline.CancelAfter(timeout);
         var start = TrustedPowerShell.Create(script, modules);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("PowerShell não iniciou.");
         var outputTask = process.StandardOutput.ReadToEndAsync(deadline.Token);
@@ -499,7 +504,7 @@ $inventory = [pscustomobject]@{
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
-            throw new TimeoutException("O provedor PowerShell excedeu 25 segundos.");
+            throw new TimeoutException($"O provedor PowerShell excedeu {timeout.TotalSeconds:0} segundos.");
         }
         finally
         {
