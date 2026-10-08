@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "dded3192c03b781529c7ab2154815ffc7aebec79",
+  "sourceBranch": "feat/zeus-windows-mvp",
+  "runId": "37722292156",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37722292156",
+  "recordedAtUtc": "2026-10-08T03:22:41.4213155+00:00",
+  "runner": "windows-latest",
+  "accepted": false,
+  "outcomes": {
+    "build": "success",
+    "windowsTests": "failure",
+    "smoke": "success",
+    "publish": "success"
+  },
+  "testCounts": {
+    "total": 202,
+    "skipped": 0,
+    "failed": 24,
+    "passed": 178
+  },
+  "testProjects": [
+    {
+      "project": "Zeus.Cleanup.Tests",
+      "total": 41,
+      "passed": 18,
+      "failed": 23,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Core.Tests",
+      "total": 31,
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Hardware.Tests",
+      "total": 34,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Maintenance.Protocol.Tests",
+      "total": 49,
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.UserOptimization.Tests",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Windows.Acceptance.Tests",
+      "total": 27,
+      "passed": 26,
+      "failed": 1,
+      "skipped": 0
+    }
+  ],
+  "failures": [
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.InterruptedDeletionIsNotCountedTwice",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.InterruptedDeletionIsNotCountedTwice() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 243\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.CompleteJournalRecordWithUnknownIdentifierIsRejected",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.CompleteJournalRecordWithUnknownIdentifierIsRejected() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 280\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.ReplacedSessionDirectoryIsNeverUsedForRestoreOrPurge",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.ReplacedSessionDirectoryIsNeverUsedForRestoreOrPurge() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 362\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.RestoreNeverOverwritesANewDestinationFile",
+      "message": "System.IO.IOException : Não foi possível acessar exclusivamente o arquivo ou diretório.\r\n---- System.ComponentModel.Win32Exception : The system cannot find the file specified.",
+      "stackTrace": "   at Zeus.Cleanup.CleanupFileLease.OpenWindows(String path, UInt32 access, UInt32 sharing, UInt32 flags, UInt32 disposition) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 229\r\n   at Zeus.Cleanup.CleanupFileLease..ctor(String path) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 36\r\n   at Zeus.Cleanup.CleanupFileLease.Open(String path) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 59\r\n   at Zeus.Cleanup.TemporaryFileCleanup.LoadAsync(Guid sessionId, CancellationToken cancellationToken) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\TemporaryFileCleanup.cs:line 396\r\n   at Zeus.Cleanup.TemporaryFileCleanup.RestoreAsync(Guid sessionId, CancellationToken cancellationToken) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\TemporaryFileCleanup.cs:line 286\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.RestoreNeverOverwritesANewDestinationFile() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 131\r\n--- End of stack trace from previous location ---\r\n----- Inner Stack Trace -----\r\n"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(relativePath: \"CON.txt\")",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-0d9e16bbc9984e5cae1e44f86e6d7cef\\recovery\\74043d106a1646d19c7b31c488fe8943\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(String relativePath) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 175\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(relativePath: \"folder/./bad.txt\")",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-95eeb8f55e4542739a34b145cc986239\\recovery\\0b718bc84bde4e6ca46dcb74019ba916\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(String relativePath) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 175\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.CorruptQuarantineIsNeitherRestoredNorDeleted",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.CorruptQuarantineIsNeitherRestoredNorDeleted() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 146\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.LockedFileIsSkippedWhileAnotherSelectedFileIsStillQuarantined",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.LockedFileIsSkippedWhileAnotherSelectedFileIsStillQuarantined() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 392\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.InterruptedIntentBeforeMoveLeavesOriginalFileUntouched",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.InterruptedIntentBeforeMoveLeavesOriginalFileUntouched() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 400\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.CorruptInterruptedEntryDoesNotBlockOtherRecoverableFiles",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-b58505c106ec44b89904875395e595eb\\recovery\\c091b1247d3b408488c2d53d619d818a\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.CorruptInterruptedEntryDoesNotBlockOtherRecoverableFiles() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 458\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.SessionCannotBeReboundToAnArbitrarySourceRoot",
+      "message": "Assert.Throws() Failure: Exception type was not an exact match\r\nExpected: typeof(System.IO.InvalidDataException)\r\nActual:   typeof(System.IO.IOException)\r\n---- System.IO.IOException : Não foi possível acessar exclusivamente o arquivo ou diretório.\r\n-------- System.ComponentModel.Win32Exception : The system cannot find the file specified.",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.SessionCannotBeReboundToAnArbitrarySourceRoot() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 193\r\n--- End of stack trace from previous location ---\r\n----- Inner Stack Trace -----\r\n   at Zeus.Cleanup.CleanupFileLease.OpenWindows(String path, UInt32 access, UInt32 sharing, UInt32 flags, UInt32 disposition) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 229\r\n   at Zeus.Cleanup.CleanupFileLease..ctor(String path) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 36\r\n   at Zeus.Cleanup.CleanupFileLease.Open(String path) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 59\r\n   at Zeus.Cleanup.TemporaryFileCleanup.LoadAsync(Guid sessionId, CancellationToken cancellationToken) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\TemporaryFileCleanup.cs:line 396\r\n   at Zeus.Cleanup.TemporaryFileCleanup.RestoreAsync(Guid sessionId, CancellationToken cancellationToken) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\TemporaryFileCleanup.cs:line 286\r\n----- Inner Stack Trace -----\r\n"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(relativePath: \"folder/bad.txt.\")",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-068443f1b2e5406b9f7cec643bb22fb9\\recovery\\4a9625f1698c454fae611e42bb62113d\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(String relativePath) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 175\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.PermanentDeletionReportsOnlyActualBytesAndLeavesUnownedFilesAlone",
+      "message": "System.IO.IOException : Não foi possível acessar exclusivamente o arquivo ou diretório.\r\n---- System.ComponentModel.Win32Exception : The system cannot find the file specified.",
+      "stackTrace": "   at Zeus.Cleanup.CleanupFileLease.OpenWindows(String path, UInt32 access, UInt32 sharing, UInt32 flags, UInt32 disposition) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 229\r\n   at Zeus.Cleanup.CleanupFileLease..ctor(String path) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 36\r\n   at Zeus.Cleanup.CleanupFileLease.Open(String path) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 59\r\n   at Zeus.Cleanup.TemporaryFileCleanup.LoadAsync(Guid sessionId, CancellationToken cancellationToken) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\TemporaryFileCleanup.cs:line 396\r\n   at Zeus.Cleanup.TemporaryFileCleanup.PermanentlyDeleteAsync(Guid sessionId, CancellationToken cancellationToken) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\TemporaryFileCleanup.cs:line 338\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.PermanentDeletionReportsOnlyActualBytesAndLeavesUnownedFilesAlone() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 68\r\n--- End of stack trace from previous location ---\r\n----- Inner Stack Trace -----\r\n"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.LockedInterruptedEntryDoesNotHideOrBlockOtherRecoverableFiles",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-efb42d397e034d73aae3499233a6f9ac\\recovery\\52a719fbcfaf4439968f2e27b2f95fa2\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.LockedInterruptedEntryDoesNotHideOrBlockOtherRecoverableFiles() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 430\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(relativePath: \"/outside.txt\")",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-784edb4d54ac45e098542930e9ecc039\\recovery\\1a3d24c200aa4ef79bbe7e7b1e2488ab\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(String relativePath) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 175\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(relativePath: \"folder/LPT1\")",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-868356758a894e5caf12bedeb5bf9a7f\\recovery\\08655319cb0a4e208e4378b7c9a949a0\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(String relativePath) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 175\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.InterruptedRestoreIntentIsReconciledWithoutMovingOrDeletingRestoredFile",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.InterruptedRestoreIntentIsReconciledWithoutMovingOrDeletingRestoredFile() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 228\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.QuarantinePreservesBytesAndFreshInstanceCanRestoreNestedFile",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.QuarantinePreservesBytesAndFreshInstanceCanRestoreNestedFile() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 46\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.CorruptAndUnknownManifestFieldsAreRejected",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-b574ec4ae19b44aa86414bfe548bbb45\\recovery\\8cca4b22418b46379d4d3a56694fc84e\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.CorruptAndUnknownManifestFieldsAreRejected() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 204\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.RestoreDoesNotFollowASymlinkDestinationDirectory",
+      "message": "System.IO.IOException : Não foi possível acessar exclusivamente o arquivo ou diretório.\r\n---- System.ComponentModel.Win32Exception : The system cannot find the file specified.",
+      "stackTrace": "   at Zeus.Cleanup.CleanupFileLease.OpenWindows(String path, UInt32 access, UInt32 sharing, UInt32 flags, UInt32 disposition) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 229\r\n   at Zeus.Cleanup.CleanupFileLease..ctor(String path) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 36\r\n   at Zeus.Cleanup.CleanupFileLease.Open(String path) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\CleanupFileLease.cs:line 59\r\n   at Zeus.Cleanup.TemporaryFileCleanup.LoadAsync(Guid sessionId, CancellationToken cancellationToken) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\TemporaryFileCleanup.cs:line 396\r\n   at Zeus.Cleanup.TemporaryFileCleanup.RestoreAsync(Guid sessionId, CancellationToken cancellationToken) in D:\\a\\zeus\\zeus\\src\\Zeus.Cleanup\\TemporaryFileCleanup.cs:line 286\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.RestoreDoesNotFollowASymlinkDestinationDirectory() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 341\r\n--- End of stack trace from previous location ---\r\n----- Inner Stack Trace -----\r\n"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.InterruptedMoveIntentIsReconciledAndRemainsRecoverable",
+      "message": "Assert.Equal() Failure: Strings differ\r\n           ↓ (pos 0)\r\nExpected: \"Quarantined\"\r\nActual:   \"Restored\"\r\n           ↑ (pos 0)",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.InterruptedMoveIntentIsReconciledAndRemainsRecoverable() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 218\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.IncompleteLastJournalRecordIsDiscardedWhileEarlierRecordsRemainRecoverable",
+      "message": "Assert.Single() Failure: The collection was empty",
+      "stackTrace": "   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.IncompleteLastJournalRecordIsDiscardedWhileEarlierRecordsRemainRecoverable() in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 261\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(relativePath: \"folder/../../outside.txt\")",
+      "message": "System.IO.FileNotFoundException : Could not find file 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\zeus-cleanup-tests-f261eaf454bf442b80a157f134ba93d3\\recovery\\f939b6de8b8641f28b68f3aa01f4aa08\\manifest.json'.",
+      "stackTrace": "   at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)\r\n   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, Int64 preallocationSize)\r\n   at System.IO.File.AsyncStreamReader(String path, Encoding encoding)\r\n   at System.IO.File.InternalReadAllTextAsync(String path, Encoding encoding, CancellationToken cancellationToken)\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.EditManifest(Guid sessionId, Action`1 edit) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 589\r\n   at Zeus.Cleanup.Tests.TemporaryFileCleanupTests.UnsafePersistedRelativePathIsRejected(String relativePath) in D:\\a\\zeus\\zeus\\tests\\Zeus.Cleanup.Tests\\TemporaryFileCleanupTests.cs:line 175\r\n--- End of stack trace from previous location ---"
+    },
+    {
+      "test": "Zeus.Windows.Acceptance.Tests.ProtectedSessionStoreTests.RealProtectedSessionSupportsAtomicProgressWithoutUserWriteAccess",
+      "message": "System.UnauthorizedAccessException : Access to the path is denied.",
+      "stackTrace": "   at System.IO.FileSystem.MoveFile(String sourceFullPath, String destFullPath, Boolean overwrite)\r\n   at Zeus.Windows.SessionStore.WriteReportCoreAsync(Guid sessionId, MaintenanceReport report, Boolean replaceExisting) in D:\\a\\zeus\\zeus\\src\\Zeus.Windows\\SessionStore.cs:line 103\r\n   at Zeus.Windows.SessionStore.WriteReportAsync(Guid sessionId, MaintenanceReport report) in D:\\a\\zeus\\zeus\\src\\Zeus.Windows\\SessionStore.cs:line 73\r\n   at Zeus.Windows.Acceptance.Tests.ProtectedSessionStoreTests.RealProtectedSessionSupportsAtomicProgressWithoutUserWriteAccess() in D:\\a\\zeus\\zeus\\tests\\Zeus.Windows.Acceptance.Tests\\ProtectedSessionStoreTests.cs:line 37\r\n   at Zeus.Windows.Acceptance.Tests.ProtectedSessionStoreTests.RealProtectedSessionSupportsAtomicProgressWithoutUserWriteAccess() in D:\\a\\zeus\\zeus\\tests\\Zeus.Windows.Acceptance.Tests\\ProtectedSessionStoreTests.cs:line 40\r\n--- End of stack trace from previous location ---"
+    }
+  ],
+  "screenshots": [
+    "zeus-complete-overview.png",
+    "zeus-mac-inspired-overview.png",
+    "zeus-minimal-overview.png",
+    "zeus-workspace-CleanupTab.png",
+    "zeus-workspace-DriverTab.png",
+    "zeus-workspace-HardwareTab.png",
+    "zeus-workspace-HistoryTab.png",
+    "zeus-workspace-MaintenanceTab.png",
+    "zeus-workspace-OverviewTab.png",
+    "zeus-workspace-ProfileTab.png",
+    "zeus-workspace-StartupTab.png"
+  ],
+  "limitations": [
+    "Acceptance runs on a Windows CI virtual machine, not on every physical hardware configuration.",
+    "Repair, restore-point creation, driver installation, offline scan and reboot are not executed by CI.",
+    "CI does not establish measured performance gains or production code-signing status."
+  ]
+}
