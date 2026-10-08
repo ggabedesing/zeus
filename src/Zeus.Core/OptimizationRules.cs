@@ -13,7 +13,7 @@ public enum OptimizationProfile
 
 public enum OptimizationBenefit { MemoryCapacity, MemoryPressure, StorageCapacity, StartupReview, SecurityReview, DataQuality }
 public enum RuleConfidence { Low, Medium, High }
-public enum OptimizationPlanStatus { RecommendationsAvailable, NoOptimizationRequired, NeedsMoreData }
+public enum OptimizationPlanStatus { RecommendationsAvailable, NoOptimizationRequired, NeedsMoreData, PrerequisitesNotMet }
 
 public sealed record OptimizationRuleDefinition(
     string Id,
@@ -24,7 +24,8 @@ public sealed record OptimizationRuleDefinition(
     string EvidenceRequired,
     string TestPlan,
     IReadOnlyList<string> DependsOn,
-    bool IsReviewOnly);
+    bool IsReviewOnly,
+    IReadOnlyList<string>? ConflictsWith = null);
 
 public sealed record OptimizationRuleResult(
     OptimizationRuleDefinition Rule,
@@ -48,7 +49,7 @@ public sealed class OptimizationRuleEngine
 {
     private static readonly IReadOnlySet<OptimizationProfile> AllProfiles = new HashSet<OptimizationProfile>(Enum.GetValues<OptimizationProfile>());
 
-    private static readonly OptimizationRuleDefinition[] Definitions =
+    private static readonly OptimizationRuleDefinition[] DefaultDefinitions =
     [
         new("memory.pressure", "Observar pressão de memória", OptimizationBenefit.MemoryPressure, RuleConfidence.Medium, AllProfiles,
             "TotalBytes e AvailableBytes válidos; leitura pontual não comprova pressão durante uma tarefa.",
@@ -71,8 +72,18 @@ public sealed class OptimizationRuleEngine
     ];
 
     private readonly OptimizationPlanner planner = new();
+    private readonly OptimizationRuleDefinition[] definitions;
 
-    public IReadOnlyList<OptimizationRuleDefinition> GetDefinitions() => Array.AsReadOnly(Definitions);
+    public OptimizationRuleEngine() : this(DefaultDefinitions) { }
+
+    public OptimizationRuleEngine(IEnumerable<OptimizationRuleDefinition> definitions)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        this.definitions = definitions.ToArray();
+        ValidateDefinitions(this.definitions);
+    }
+
+    public IReadOnlyList<OptimizationRuleDefinition> GetDefinitions() => Array.AsReadOnly(definitions);
 
     public OptimizationPlan Evaluate(HardwareSnapshot snapshot, OptimizationProfile profile)
     {
@@ -80,8 +91,8 @@ public sealed class OptimizationRuleEngine
         if (!Enum.IsDefined(profile)) throw new ArgumentOutOfRangeException(nameof(profile));
 
         var recommendations = planner.Build(snapshot);
-        var results = new List<OptimizationRuleResult>(Definitions.Length);
-        foreach (var definition in Definitions)
+        var results = new List<OptimizationRuleResult>(definitions.Length);
+        foreach (var definition in definitions)
         {
             var matches = recommendations.Where(recommendation => Matches(definition.Id, recommendation)).ToArray();
             var evidenceAvailable = HasEvidence(snapshot, definition.Id);
@@ -92,13 +103,96 @@ public sealed class OptimizationRuleEngine
         }
 
         var applicable = results.Where(result => result.Rule.CompatibleProfiles.Contains(profile)).ToArray();
-        var hasRecommendations = applicable.Any(result => result.Triggered);
-        var missingEvidence = applicable.Any(result => !result.EvidenceAvailable && result.Rule.Benefit != OptimizationBenefit.DataQuality);
+        var (resolved, conflicts, unmetDependencies) = Resolve(applicable, profile);
+        var hasRecommendations = resolved.Any(result => result.Triggered);
+        var missingEvidence = resolved.Any(result => !result.EvidenceAvailable && result.Rule.Benefit != OptimizationBenefit.DataQuality);
         var status = missingEvidence
             ? OptimizationPlanStatus.NeedsMoreData
+            : unmetDependencies.Length > 0 ? OptimizationPlanStatus.PrerequisitesNotMet
             : hasRecommendations ? OptimizationPlanStatus.RecommendationsAvailable : OptimizationPlanStatus.NoOptimizationRequired;
 
-        return new OptimizationPlan(profile, status, Array.AsReadOnly(results.ToArray()), Array.Empty<string>(), Array.Empty<string>());
+        return new OptimizationPlan(profile, status, Array.AsReadOnly(resolved), Array.AsReadOnly(conflicts), Array.AsReadOnly(unmetDependencies));
+    }
+
+    private (OptimizationRuleResult[] Results, string[] Conflicts, string[] UnmetDependencies) Resolve(
+        OptimizationRuleResult[] applicable, OptimizationProfile profile)
+    {
+        var resolved = applicable.ToDictionary(result => result.Rule.Id, StringComparer.Ordinal);
+        var unmet = new List<string>();
+        var conflicts = new List<string>();
+
+        // Resolve prerequisites to a fixed point so a blocked prerequisite also blocks its dependents.
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var rule in resolved.Values.Where(result => result.Triggered).ToArray())
+            {
+                foreach (var dependencyId in rule.Rule.DependsOn)
+                {
+                    if (!resolved.TryGetValue(dependencyId, out var dependency) || !dependency.Triggered || !dependency.EvidenceAvailable)
+                    {
+                        var detail = $"{rule.Rule.Id} depende de {dependencyId}, que não foi atendida para o perfil {profile}.";
+                        if (!unmet.Contains(detail, StringComparer.Ordinal)) unmet.Add(detail);
+                        resolved[rule.Rule.Id] = rule with
+                        {
+                            Triggered = false,
+                            Action = null,
+                            Reason = rule.Reason + $" Esta sugestão ficou pendente porque falta o pré-requisito {dependencyId}."
+                        };
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+        } while (changed);
+
+        var handledPairs = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rule in resolved.Values.Where(result => result.Triggered).OrderBy(result => result.Rule.Id, StringComparer.Ordinal).ToArray())
+        {
+            foreach (var conflictId in rule.Rule.ConflictsWith ?? [])
+            {
+                if (!resolved.TryGetValue(conflictId, out var other) || !other.Triggered) continue;
+                var pair = string.CompareOrdinal(rule.Rule.Id, conflictId) < 0 ? $"{rule.Rule.Id}|{conflictId}" : $"{conflictId}|{rule.Rule.Id}";
+                if (!handledPairs.Add(pair)) continue;
+
+                var winner = ComparePriority(rule, other) >= 0 ? rule : other;
+                var loser = winner.Rule.Id == rule.Rule.Id ? other : rule;
+                var detail = $"Conflito entre {rule.Rule.Id} e {other.Rule.Id}: mantida {winner.Rule.Id} pela confiança {winner.Rule.Confidence}; {loser.Rule.Id} foi suprimida.";
+                conflicts.Add(detail);
+                resolved[loser.Rule.Id] = loser with
+                {
+                    Triggered = false,
+                    Action = null,
+                    Reason = loser.Reason + $" Sugestão suprimida por conflito com {winner.Rule.Id}."
+                };
+            }
+        }
+
+        return (definitions.Select(definition => resolved.TryGetValue(definition.Id, out var result) ? result : null)
+            .Where(result => result is not null).Cast<OptimizationRuleResult>().ToArray(), conflicts.ToArray(), unmet.ToArray());
+    }
+
+    private static int ComparePriority(OptimizationRuleResult left, OptimizationRuleResult right)
+    {
+        var confidence = left.Rule.Confidence.CompareTo(right.Rule.Confidence);
+        return confidence != 0 ? confidence : -string.CompareOrdinal(left.Rule.Id, right.Rule.Id);
+    }
+
+    private static void ValidateDefinitions(IReadOnlyList<OptimizationRuleDefinition> definitions)
+    {
+        if (definitions.Any(definition => string.IsNullOrWhiteSpace(definition.Id)) ||
+            definitions.Select(definition => definition.Id).Distinct(StringComparer.Ordinal).Count() != definitions.Count)
+            throw new ArgumentException("As regras precisam ter IDs únicos e não vazios.", nameof(definitions));
+
+        var ids = definitions.Select(definition => definition.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var definition in definitions)
+        {
+            if (definition.DependsOn is null || definition.CompatibleProfiles is null || definition.ConflictsWith?.Contains(definition.Id, StringComparer.Ordinal) == true ||
+                definition.DependsOn.Contains(definition.Id, StringComparer.Ordinal) ||
+                definition.DependsOn.Concat(definition.ConflictsWith ?? []).Any(id => !ids.Contains(id)))
+                throw new ArgumentException($"A regra {definition.Id} contém dependência/conflito próprio ou desconhecido.", nameof(definitions));
+        }
     }
 
     private static bool Matches(string ruleId, Recommendation recommendation) => ruleId switch

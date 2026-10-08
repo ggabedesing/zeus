@@ -139,6 +139,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string FormalPlanSummary => _optimizationPlan?.Status switch
     {
         OptimizationPlanStatus.NeedsMoreData => "Plano preliminar: faltam leituras para avaliar todos os critérios. Os dados indisponíveis aparecem nas recomendações.",
+        OptimizationPlanStatus.PrerequisitesNotMet => "Uma sugestão depende de um pré-requisito que não foi atendido. Consulte os detalhes no plano exportado.",
         OptimizationPlanStatus.NoOptimizationRequired => "Nenhuma otimização necessária pelos critérios avaliados nesta coleta.",
         OptimizationPlanStatus.RecommendationsAvailable => "Há pontos para revisar com base nesta coleta. As sugestões não comprovam um gargalo nem aplicam alterações.",
         _ => "O plano formal aparece depois do diagnóstico."

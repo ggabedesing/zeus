@@ -69,6 +69,38 @@ public sealed class OptimizationPlannerTests
     }
 
     [Fact]
+    public void ConflictingRulesKeepTheHigherConfidenceSuggestionAndRecordResolution()
+    {
+        var rules = ruleEngine.GetDefinitions().Where(rule => rule.Id is "memory.pressure" or "memory.capacity").ToArray();
+        var conflicting = rules.Select(rule => rule with
+        {
+            ConflictsWith = [rule.Id == "memory.pressure" ? "memory.capacity" : "memory.pressure"]
+        }).ToArray();
+        var engine = new OptimizationRuleEngine(conflicting);
+        var snapshot = HealthySnapshot() with { Memory = new MemoryInfo(4 * GiB, 300UL * 1024 * 1024) };
+
+        var plan = engine.Evaluate(snapshot, OptimizationProfile.General);
+
+        Assert.Single(plan.Conflicts);
+        Assert.Contains(plan.Rules, result => result.Rule.Id == "memory.pressure" && result.Triggered);
+        Assert.Contains(plan.Rules, result => result.Rule.Id == "memory.capacity" && !result.Triggered && result.Action is null);
+    }
+
+    [Fact]
+    public void UnmetRuleDependencySuppressesSuggestionAndDoesNotClaimNoOptimizationIsNeeded()
+    {
+        var storage = ruleEngine.GetDefinitions().Single(rule => rule.Id == "storage.free-space") with { DependsOn = ["memory.pressure"] };
+        var engine = new OptimizationRuleEngine([ruleEngine.GetDefinitions().Single(rule => rule.Id == "memory.pressure"), storage]);
+        var snapshot = HealthySnapshot() with { Disks = [new DiskInfo("SSD", "C:", 100 * GiB, 5 * GiB, "NTFS")] };
+
+        var plan = engine.Evaluate(snapshot, OptimizationProfile.General);
+
+        Assert.Equal(OptimizationPlanStatus.PrerequisitesNotMet, plan.Status);
+        Assert.NotEmpty(plan.UnmetDependencies);
+        Assert.Contains(plan.Rules, result => result.Rule.Id == "storage.free-space" && !result.Triggered);
+    }
+
+    [Fact]
     public void HealthySnapshotDoesNotInventProblemsOrPromiseAnUpgrade()
     {
         var recommendations = planner.Build(HealthySnapshot());
