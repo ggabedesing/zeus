@@ -106,13 +106,9 @@ public partial class MainWindow
             var report = await _executor.ExecuteRequestsAsync(ordered, new Progress<string>(AppendLog));
             foreach (var step in report.Steps) AppendLog($"{MaintenanceCatalog.Get(step.Action).Title}: {step.Message}");
             _reports.Insert(0, report); RebuildHistory();
-            var complete = report.IsComplete && report.Error is null && ordered.Count == report.Steps.Count && ordered.All(r => report.Steps.Count(s => s.Action == r.Action && s.TargetId == r.TargetId) == 1);
-            MaintenanceResultSummary = !report.IsComplete ? "A conclusão da sessão não foi confirmada. Consulte os resultados parciais e os logs; o histórico será recuperado na próxima abertura."
-                : !string.IsNullOrWhiteSpace(report.Error) ? report.Error
-                : !complete ? "O relatório não confirma todas as ações do plano. Consulte cada etapa recebida."
-                : report.Steps.Any(s => s.Outcome != StepOutcome.Succeeded) ? "Houve falha, cancelamento ou ação não executada. Consulte as etapas no histórico."
-                : "As operações terminaram. Consulte seus resultados e reinicie se o Windows solicitar. Nenhum ganho de desempenho foi medido nesta execução.";
-            StatusTitle = complete && report.Steps.All(s => s.Outcome == StepOutcome.Succeeded) ? "Sessão concluída" : "Sessão encerrada com avisos";
+            var presentation = MaintenanceResultPresentation.From(report, ordered);
+            MaintenanceResultSummary = presentation.Detail;
+            StatusTitle = presentation.Title;
             StatusDetail = MaintenanceResultSummary;
             try
             {
@@ -126,7 +122,7 @@ public partial class MainWindow
             catch (Exception error) when (IsStorageError(error)) { AppendLog($"Não foi possível salvar o histórico: {error.Message}"); StatusDetail += " Exporte o relatório para guardar esta sessão."; }
             foreach (var choice in MaintenanceChoices) choice.IsSelected = false;
             OfflineRestartConfirmed = false; OfflineRecoveryConfirmed = false;
-            return complete && report.Steps.All(s => s.Outcome == StepOutcome.Succeeded);
+            return presentation.IsSuccessful;
     }
 
     private async void OfflineScan_Click(object sender, RoutedEventArgs e)

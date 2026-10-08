@@ -159,6 +159,26 @@ public sealed record WindowsUpdateRow(string Title, string KnowledgeBase, string
 
 public sealed record ChangeRow(Guid Id, string Title, string Detail, bool CanRestore);
 public sealed record CleanupSessionRow(Guid Id, string Title, string Detail, bool CanRestore, bool CanPurge);
+internal sealed record MaintenanceResultPresentation(string Title, string Detail, bool IsSuccessful)
+{
+    public static MaintenanceResultPresentation From(MaintenanceReport report, IReadOnlyList<MaintenanceRequest> requested)
+    {
+        var complete = report.IsComplete && report.Error is null && requested.Count == report.Steps.Count &&
+            requested.All(request => report.Steps.Count(step => step.Action == request.Action && step.TargetId == request.TargetId) == 1);
+        var succeeded = report.Steps.All(step => step.Outcome == StepOutcome.Succeeded);
+        var verificationPending = report.Steps.Any(step => step.Verification == MaintenanceVerificationStatus.Pending);
+        var detail = !report.IsComplete ? "A conclusão da sessão não foi confirmada. Consulte os resultados parciais e os logs; o histórico será recuperado na próxima abertura."
+            : !string.IsNullOrWhiteSpace(report.Error) ? report.Error
+            : !complete ? "O relatório não confirma todas as ações do plano. Consulte cada etapa recebida."
+            : report.Steps.Any(step => step.Outcome != StepOutcome.Succeeded) ? "Houve falha, cancelamento ou ação não executada. Consulte as etapas no histórico."
+            : verificationPending ? "A etapa terminou, mas a verificação ainda está pendente. Reinicie quando solicitado e confira o resultado no histórico antes de repetir a ação."
+            : "As operações terminaram. Consulte seus resultados e reinicie se o Windows solicitar. Nenhum ganho de desempenho foi medido nesta execução.";
+        var title = complete && succeeded && !verificationPending ? "Sessão concluída"
+            : verificationPending ? "Sessão encerrada com verificação pendente" : "Sessão encerrada com avisos";
+        return new(title, detail, complete && succeeded && !verificationPending);
+    }
+}
+
 public sealed record HistoryRow(Guid SessionId, string Title, string Summary, string Protection, IReadOnlyList<string> Steps, string Error, bool HasLogFiles)
 {
     public static HistoryRow From(MaintenanceReport report)

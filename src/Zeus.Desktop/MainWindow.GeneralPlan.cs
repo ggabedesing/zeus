@@ -76,8 +76,11 @@ public partial class MainWindow
             }
             if (ordered.Count > 0) succeeded &= await ExecuteMaintenancePlanAsync(ordered, resetLog: false);
             GeneralApplyVisual = false;
-            StatusTitle = succeeded ? "Plano geral concluído" : "Plano geral encerrado com avisos";
-            StatusDetail = succeeded ? "As ações escolhidas terminaram. Consulte o histórico e os estados anteriores. Nenhum ganho de desempenho foi medido nesta execução." : "Algumas ações não foram concluídas. Consulte os resultados e os logs antes de iniciar outro plano.";
+            var verificationPending = ordered.Count > 0 && _reports.FirstOrDefault()?.Steps.Any(step => step.Verification == MaintenanceVerificationStatus.Pending) == true;
+            StatusTitle = verificationPending ? "Plano geral com verificação pendente" : succeeded ? "Plano geral concluído" : "Plano geral encerrado com avisos";
+            StatusDetail = verificationPending ? "Uma etapa terminou, mas aguarda verificação após reinicialização. Confira o histórico antes de repetir a ação."
+                : succeeded ? "As ações escolhidas terminaram. Consulte o histórico e os estados anteriores. Nenhum ganho de desempenho foi medido nesta execução."
+                : "Algumas ações não foram concluídas. Consulte os resultados e os logs antes de iniciar outro plano.";
         }, mutation: true);
     }
 }

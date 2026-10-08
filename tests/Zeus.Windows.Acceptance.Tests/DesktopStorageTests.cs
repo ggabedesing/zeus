@@ -106,6 +106,23 @@ public sealed class DesktopStorageTests : IDisposable
     }
 
     [Fact]
+    public void PendingDriverVerificationDoesNotCompleteMaintenanceSession()
+    {
+        var request = new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate,
+            "12345678-1234-1234-1234-123456789abc:1", false, 2);
+        var report = new MaintenanceReport(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, true,
+            [new(MaintenanceActionId.InstallDriverUpdate, StepOutcome.Succeeded,
+                "Pacote aguardando conferência após reinício.", TargetId: request.TargetId,
+                Verification: MaintenanceVerificationStatus.Pending)]);
+
+        var result = MaintenanceResultPresentation.From(report, [request]);
+
+        Assert.False(result.IsSuccessful);
+        Assert.Equal("Sessão encerrada com verificação pendente", result.Title);
+        Assert.Contains("antes de repetir", result.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task DriverRollbackTargetIsPersistedAndMalformedTargetIsRejected()
     {
         var storage = new DesktopStorage(_root);
