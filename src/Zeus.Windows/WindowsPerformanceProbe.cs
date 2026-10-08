@@ -20,6 +20,7 @@ public sealed record GpuMemoryObservation(string AdapterInstance, ulong? Dedicat
         ? usage / (double)capacity * 100 : null;
 }
 
+/// <summary>SamplingDuration is the CPU system-counter interval; GPU, disk, and network counters are read afterward.</summary>
 public sealed record PerformanceObservation(
     DateTimeOffset CollectedAt,
     TimeSpan SamplingDuration,
