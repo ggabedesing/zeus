@@ -186,6 +186,9 @@ internal static class CommandRunner
         if (!MaintenanceRequestProtocol.TryParseDriverIdentity(request.TargetId, out var updateId, out var revision))
             throw new ArgumentException("Identidade de driver inválida.", nameof(request));
         var sourceSummary = WindowsUpdateSourcePolicy.Describe(request.UpdateServerSelection, request.UpdateServiceId);
+        MaintenanceStepResult DriverResult(StepOutcome outcome, string message, string? logFile, MaintenanceVerificationStatus verification) =>
+            new(request.Action, outcome, message, logFile, request.TargetId, verification,
+                request.UpdateServerSelection, request.UpdateServiceId);
 
         // Export only through the system PnPUtil to the session's protected, fixed child directory.
         // This never accepts an arbitrary source, destination, INF path or executable from the desktop.
@@ -196,9 +199,9 @@ internal static class CommandRunner
                 Native("pnputil.exe", "/export-driver", "*", backupDirectory), TimeSpan.FromMinutes(45));
             if (backup.ExitCode != 0 || backup.TimedOut || backup.LogError is not null ||
                 !Directory.EnumerateFiles(backupDirectory, "*.inf", SearchOption.AllDirectories).Any())
-                return new MaintenanceStepResult(request.Action, StepOutcome.Failed,
+                return DriverResult(StepOutcome.Failed,
                     $"Instalação bloqueada: a exportação dos drivers existentes não foi confirmada. Origem selecionada: {sourceSummary}. Consulte driver-backup.log. Nenhum novo driver foi solicitado.",
-                    backup.LogFile, request.TargetId, MaintenanceVerificationStatus.NotStarted);
+                    backup.LogFile, MaintenanceVerificationStatus.NotStarted);
             ConfirmedDriverBackups.Add(sessionId);
         }
 
@@ -211,13 +214,13 @@ internal static class CommandRunner
         var result = await RunAsync(sessionId, $"driver-{updateId:N}-{revision}.log",
             TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility), Timeout.InfiniteTimeSpan);
         if (result.LogError is not null)
-            return new MaintenanceStepResult(request.Action, StepOutcome.Failed,
-                $"A instalação terminou com código {result.ExitCode}, mas o log falhou: {result.LogError}. Origem selecionada: {sourceSummary}. Confira o Windows Update e os registros do Windows.", result.LogFile, request.TargetId,
+            return DriverResult(StepOutcome.Failed,
+                $"A instalação terminou com código {result.ExitCode}, mas o log falhou: {result.LogError}. Origem selecionada: {sourceSummary}. Confira o Windows Update e os registros do Windows.", result.LogFile,
                 MaintenanceVerificationStatus.ManualReviewRequired);
         if (result.ExitCode != 0 || !result.Output.Contains("ZEUS_DRIVER_INSTALL_SUCCEEDED", StringComparison.Ordinal))
-            return new MaintenanceStepResult(request.Action, StepOutcome.Failed,
+            return DriverResult(StepOutcome.Failed,
                 $"O Windows Update não confirmou uma instalação bem-sucedida. Origem selecionada: {sourceSummary}. Resultados parciais, códigos e falhas estão no log; um resultado com erros não é apresentado como sucesso.",
-                result.LogFile, request.TargetId, MaintenanceVerificationStatus.ManualReviewRequired);
+                result.LogFile, MaintenanceVerificationStatus.ManualReviewRequired);
         var restart = result.Output.Contains("ZEUS_DRIVER_REBOOT_REQUIRED true", StringComparison.Ordinal);
         var exactUpdateMarkedInstalled = result.Output.Contains("ZEUS_DRIVER_STATE_VERIFIED true", StringComparison.Ordinal);
         var verification = DriverInstallVerificationPolicy.Resolve(
@@ -226,8 +229,7 @@ internal static class CommandRunner
         var message = $"{verification.Message} Origem confirmada: {sourceSummary}. Backup dos drivers anteriores preservado na sessão." +
             (restart ? " O Windows solicitou reinicialização; salve seu trabalho e reinicie quando conveniente." : "") +
             " Confira o dispositivo e o problema original após a operação.";
-        return new MaintenanceStepResult(request.Action, verification.Outcome, message,
-            result.LogFile, request.TargetId, verification.Verification);
+        return DriverResult(verification.Outcome, message, result.LogFile, verification.Verification);
     }
 
     private static async Task<MaintenanceStepResult> RollbackDriverAsync(Guid sessionId, MaintenanceRequest request)

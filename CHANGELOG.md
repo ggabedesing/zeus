@@ -14,4 +14,6 @@
 - Após a instalação de um driver, o auxiliar consulta novamente a identidade exata no Windows Update e diferencia pacote confirmado, reinicialização pendente e resultado que precisa de revisão; a confirmação do pacote não declara que o dispositivo já está usando o driver.
 - A interface de instalação de driver explica os três resultados e o histórico apresenta estado pendente como verificação pendente, sem sugerir que o comando ainda esteja rodando.
 - O resumo da manutenção não apresenta uma sessão com verificação pendente como concluída; orienta conferir o histórico após a reinicialização solicitada.
+- Instalações pendentes guardam a seleção lógica do Windows Update no SQLite versionado. Uma ação explícita pode reconsultar o pacote exato após reiniciar; confirmação atualiza o histórico, enquanto ausência/incompletude mantém a pendência sem reinstalação automática.
+- A reconsulta de driver só começa quando o tempo de inicialização do Windows indica uma reinicialização posterior à sessão de instalação.
 - O pacote portátil inclui este histórico de versões.

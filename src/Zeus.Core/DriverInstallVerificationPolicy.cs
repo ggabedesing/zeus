@@ -28,4 +28,21 @@ public static class DriverInstallVerificationPolicy
         return new(StepOutcome.Failed, MaintenanceVerificationStatus.ManualReviewRequired,
             "O Windows Update concluiu a etapa de instalação, mas a consulta posterior não confirmou o pacote exato como instalado. Revise o log e o estado do dispositivo antes de qualquer nova tentativa.");
     }
+
+    public static DriverInstallVerificationDecision ResolvePostRestart(
+        bool queryComplete,
+        bool sourceSelectionMatches,
+        bool? exactUpdateMarkedInstalled)
+    {
+        if (!queryComplete || !sourceSelectionMatches || exactUpdateMarkedInstalled is null)
+            return new(StepOutcome.Succeeded, MaintenanceVerificationStatus.Pending,
+                "A reconsulta após reinicialização não confirmou o estado do pacote. A pendência foi preservada; confira Windows Update e o dispositivo manualmente. Nenhuma nova instalação foi iniciada.");
+
+        if (exactUpdateMarkedInstalled.Value)
+            return new(StepOutcome.Succeeded, MaintenanceVerificationStatus.ProviderConfirmed,
+                "A reconsulta do Windows Update confirmou o pacote exato como instalado na seleção lógica registrada. Isso não confirma que o dispositivo esteja usando o driver ativo.");
+
+        return new(StepOutcome.Succeeded, MaintenanceVerificationStatus.Pending,
+            "A consulta completa não encontrou o pacote exato como instalado. A pendência foi preservada para revisão; nenhuma nova instalação foi iniciada.");
+    }
 }

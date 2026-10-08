@@ -60,6 +60,12 @@ internal sealed class DesktopStorage
                     throw new InvalidDataException("O histórico contém uma ação inválida ou repetida.");
                 if (step.Action == MaintenanceActionId.InstallDriverUpdate && !MaintenanceRequestProtocol.TryParseDriverIdentity(step.TargetId, out _, out _))
                     throw new InvalidDataException("O histórico contém uma identidade de driver inválida.");
+                if (step.Action == MaintenanceActionId.InstallDriverUpdate &&
+                    (step.UpdateServerSelection is not null || step.UpdateServiceId is not null) &&
+                    !WindowsUpdateSourcePolicy.IsAllowed(step.UpdateServerSelection, step.UpdateServiceId))
+                    throw new InvalidDataException("O histórico contém uma origem de Windows Update inválida para a verificação do driver.");
+                if (step.Action != MaintenanceActionId.InstallDriverUpdate && (step.UpdateServerSelection is not null || step.UpdateServiceId is not null))
+                    throw new InvalidDataException("Somente uma etapa de instalação de driver pode registrar a origem do Windows Update.");
                 if (step.Action == MaintenanceActionId.RollbackDriver && !MaintenanceRequestProtocol.TryParsePnpInstanceId(step.TargetId))
                     throw new InvalidDataException("O histórico contém uma identidade PnP inválida para reversão de driver.");
             }
@@ -127,7 +133,8 @@ internal sealed class DesktopStorage
 
     private static StoredMaintenanceSession ToStored(MaintenanceReport report) => new(
         report.SessionId.ToString("D"), report.StartedAt, report.FinishedAt, report.RestorePointConfirmed, report.IsComplete, report.Error,
-        report.Steps.Select((step, index) => new StoredMaintenanceStep(index, step.Action.ToString(), step.Outcome.ToString(), step.Message, step.LogFile, step.TargetId, step.Verification.ToString())).ToArray());
+        report.Steps.Select((step, index) => new StoredMaintenanceStep(index, step.Action.ToString(), step.Outcome.ToString(), step.Message,
+            step.LogFile, step.TargetId, step.Verification.ToString(), step.UpdateServerSelection, step.UpdateServiceId)).ToArray());
 
     private static MaintenanceReport FromStored(StoredMaintenanceSession session)
     {
@@ -135,7 +142,7 @@ internal sealed class DesktopStorage
             throw new InvalidDataException("O banco contém um identificador de sessão inválido.");
         var steps = session.Steps.OrderBy(step => step.Sequence).Select(step => new MaintenanceStepResult(
             ParseEnum<MaintenanceActionId>(step.Action), ParseEnum<StepOutcome>(step.Outcome), step.Message, step.LogFile, step.TargetId,
-            ParseEnum<MaintenanceVerificationStatus>(step.Verification))).ToArray();
+            ParseEnum<MaintenanceVerificationStatus>(step.Verification), step.UpdateServerSelection, step.UpdateServiceId)).ToArray();
         return new(id, session.StartedAt, session.FinishedAt, session.RestorePointConfirmed, steps, session.Error, session.IsComplete);
     }
 

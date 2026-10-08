@@ -598,6 +598,72 @@ public partial class MainWindow
             StatusTitle = "Consulta de drivers encerrada"; StatusDetail = DriverSummary;
         }, cancellable: true);
     }
+
+    private async void VerifyPendingDriverUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanVerifyPendingDriverUpdates) return;
+        var pending = _reports.SelectMany((report, reportIndex) => report.Steps.Select((step, stepIndex) =>
+                (ReportIndex: reportIndex, StepIndex: stepIndex, SessionId: report.SessionId,
+                    InstallationFinishedAt: report.FinishedAt, Step: step)))
+            .Where(item => item.Step.Action == MaintenanceActionId.InstallDriverUpdate &&
+                item.Step.Verification == MaintenanceVerificationStatus.Pending && item.Step.UpdateServerSelection is not null)
+            .ToArray();
+        if (pending.Length == 0) return;
+
+        await RunOperationAsync("Verificando instalações pendentes", "Consulta somente leitura do pacote exato na seleção lógica de origem registrada; nenhuma instalação ou reinicialização será solicitada.", async token =>
+        {
+            var confirmed = 0;
+            var stillPending = 0;
+            var inconclusive = 0;
+            var updatedReports = _reports.ToArray();
+            foreach (var item in pending)
+            {
+                token.ThrowIfCancellationRequested();
+                var result = await _windowsUpdate.VerifyInstalledDriverUpdateAsync(item.Step.TargetId!,
+                    item.Step.UpdateServerSelection, item.Step.UpdateServiceId, item.InstallationFinishedAt, token);
+                foreach (var warning in result.Warnings) AppendLog(warning);
+                var decision = DriverInstallVerificationPolicy.ResolvePostRestart(result.IsComplete, result.SourceMatches == true, result.IsInstalled);
+
+                if (decision.Verification != MaintenanceVerificationStatus.ProviderConfirmed)
+                {
+                    if (result.IsComplete && result.SourceMatches == true && result.IsInstalled == false) stillPending++;
+                    else inconclusive++;
+                    QueueActivity(new(result.CheckedAt, "windows-update-driver", "post-restart-verification-incomplete", "warning",
+                        decision.Message,
+                        JsonSerializer.Serialize(new { item.Step.TargetId, item.Step.UpdateServerSelection, item.Step.UpdateServiceId, result.SourceMatches, result.Warnings }),
+                        item.SessionId.ToString("D")));
+                    AppendLog(decision.Message);
+                    continue;
+                }
+
+                var steps = updatedReports[item.ReportIndex].Steps.ToArray();
+                steps[item.StepIndex] = item.Step with
+                {
+                    Outcome = decision.Outcome,
+                    Verification = decision.Verification,
+                    Message = item.Step.Message + $" Reconsulta somente leitura em {result.CheckedAt.ToLocalTime():dd/MM/yyyy HH:mm:ss}: {decision.Message} A seleção padrão não revela o servidor efetivo."
+                };
+                updatedReports[item.ReportIndex] = updatedReports[item.ReportIndex] with { Steps = steps };
+                confirmed++;
+                QueueActivity(new(result.CheckedAt, "windows-update-driver", "post-restart-package-confirmed", "info",
+                    decision.Message,
+                    JsonSerializer.Serialize(new { item.Step.TargetId, item.Step.UpdateServerSelection, item.Step.UpdateServiceId, result.CheckedAt }),
+                    item.SessionId.ToString("D")));
+            }
+
+            if (confirmed > 0)
+            {
+                await _storage.SaveHistoryAsync(updatedReports);
+                _reports.Clear();
+                _reports.AddRange(updatedReports);
+                RebuildHistory();
+            }
+            DriverSummary = $"Verificação encerrada: {confirmed} pacote(s) confirmado(s) pelo Windows Update · {stillPending} ainda não confirmado(s) · {inconclusive} consulta(s) inconclusiva(s). O driver ativo no dispositivo precisa ser conferido separadamente.";
+            StatusTitle = inconclusive > 0 || stillPending > 0 ? "Verificação encerrada com pendências" : "Pacotes confirmados pelo Windows Update";
+            StatusDetail = DriverSummary;
+        }, cancellable: true);
+    }
+
     private async void SearchWingetUpdates_Click(object sender, RoutedEventArgs e)
     {
         await RunOperationAsync("Consultando atualizações de programas", "Consulta somente leitura pela fonte winget; nenhuma licença será aceita e nenhum programa será instalado.", async token =>

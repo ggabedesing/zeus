@@ -190,6 +190,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanSetPowerPlan => !_isBusy && SelectedPowerPlan is { IsActive: false };
     public bool CanApplyWallpaper => !_isBusy && !string.IsNullOrWhiteSpace(SelectedWallpaperPath);
     public bool CanInstallDriver => !_isBusy && DriverCandidates.Count(d => d.IsSelected) == 1 && DriverCandidates.Where(d => d.IsSelected).All(d => d.CanSelectForInstall && d.LicenseReady);
+    public bool CanVerifyPendingDriverUpdates => !_isBusy && _historyReadable && _reports.Any(report =>
+        report.Steps.Any(step => step.Action == MaintenanceActionId.InstallDriverUpdate &&
+            step.Verification == MaintenanceVerificationStatus.Pending && step.UpdateServerSelection is not null));
     private DriverRollbackChoice? _selectedRollbackDriver;
     public DriverRollbackChoice? SelectedRollbackDriver { get => _selectedRollbackDriver; set { if (Set(ref _selectedRollbackDriver, value)) NotifyActionState(); } }
     public bool CanRollbackDriver => !_isBusy && SelectedRollbackDriver is not null && MaintenanceRequestProtocol.TryParsePnpInstanceId(SelectedRollbackDriver.InstanceId);
@@ -599,7 +602,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void Cancel_Click(object sender, RoutedEventArgs e) => _readCancellation?.Cancel();
     private void OpenMaintenance_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 1;
     private void OpenProfile_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 4;
-    private void RebuildHistory() { HistoryRows.Clear(); foreach (var report in _reports) HistoryRows.Add(HistoryRow.From(report)); Notify(nameof(HistoryEmptyText)); Notify(nameof(CanExport)); }
+    private void RebuildHistory() { HistoryRows.Clear(); foreach (var report in _reports) HistoryRows.Add(HistoryRow.From(report)); Notify(nameof(HistoryEmptyText)); Notify(nameof(CanExport)); Notify(nameof(CanVerifyPendingDriverUpdates)); }
     private void AppendLog(string message)
     {
         ExecutionLog += $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
@@ -654,7 +657,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SetBusy(bool busy)
     {
         _isBusy = busy;
-        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
+        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanVerifyPendingDriverUpdates), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
     private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanRollbackDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }

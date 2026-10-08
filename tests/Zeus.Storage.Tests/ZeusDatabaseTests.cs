@@ -167,7 +167,8 @@ public sealed class ZeusDatabaseTests : IDisposable
         var database = CreateDatabase();
         var id = Guid.NewGuid().ToString("D");
         var session = new StoredMaintenanceSession(id, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow, true, false,
-            "A conclusão não foi confirmada", [new(0, "InstallDriverUpdate", "Succeeded", "Windows Update confirmou a identidade", "log.txt", "12345678-1234-1234-1234-123456789abc:1", "ProviderConfirmed")]);
+            "A conclusão não foi confirmada", [new(0, "InstallDriverUpdate", "Succeeded", "Windows Update confirmou a identidade", "log.txt",
+                "12345678-1234-1234-1234-123456789abc:1", "ProviderConfirmed", 3, "7971f918-a847-4430-9279-4a52d1efe18d")]);
 
         await database.SaveMaintenanceHistoryAsync([session]);
         var restored = Assert.Single(await database.ReadMaintenanceHistoryAsync());
@@ -178,6 +179,8 @@ public sealed class ZeusDatabaseTests : IDisposable
         Assert.Equal("InstallDriverUpdate", Assert.Single(restored.Steps).Action);
         Assert.Equal("log.txt", restored.Steps[0].LogFile);
         Assert.Equal("ProviderConfirmed", restored.Steps[0].Verification);
+        Assert.Equal(3, restored.Steps[0].UpdateServerSelection);
+        Assert.Equal("7971f918-a847-4430-9279-4a52d1efe18d", restored.Steps[0].UpdateServiceId);
         Assert.Equal(1, (await database.CheckHealthAsync()).MaintenanceSessionCount);
     }
 
@@ -202,7 +205,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         Assert.Equal(42.5, sample.CpuPercent);
         Assert.Equal("{\"gpu\":[]}", sample.DetailsJson);
         var health = await database.CheckHealthAsync();
-        Assert.Equal(3, health.SchemaVersion);
+        Assert.Equal(4, health.SchemaVersion);
         Assert.Equal(1, health.PerformanceSessionCount);
         Assert.Equal(1, health.PerformanceSampleCount);
     }
@@ -225,7 +228,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         var health = await upgraded.CheckHealthAsync();
 
         Assert.True(health.IsHealthy);
-        Assert.Equal(3, health.SchemaVersion);
+        Assert.Equal(4, health.SchemaVersion);
         Assert.Equal("{\"theme\":\"Aurora\"}", await upgraded.ReadSettingAsync("preferences"));
         Assert.Empty(await upgraded.ReadPerformanceSessionsAsync());
     }
@@ -256,7 +259,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         var migrated = Assert.Single(await upgraded.ReadMaintenanceHistoryAsync());
 
         Assert.True(health.IsHealthy);
-        Assert.Equal(3, health.SchemaVersion);
+        Assert.Equal(4, health.SchemaVersion);
         Assert.Equal("NotRecorded", Assert.Single(migrated.Steps).Verification);
         Assert.Equal("Verificação concluída", migrated.Steps[0].Message);
     }

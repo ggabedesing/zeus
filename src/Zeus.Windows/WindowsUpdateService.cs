@@ -15,6 +15,8 @@ public sealed record DriverUpdateSearch(DateTimeOffset CheckedAt,
 public sealed record PendingWindowsUpdate(string Title, IReadOnlyList<string> KnowledgeBaseIds, bool Downloaded, string UpdateId);
 public sealed record PendingWindowsUpdateSearch(DateTimeOffset CheckedAt, bool IsComplete,
     IReadOnlyList<PendingWindowsUpdate> Updates, IReadOnlyList<string> Warnings);
+public sealed record InstalledDriverUpdateVerification(DateTimeOffset CheckedAt, bool IsComplete, bool? IsInstalled,
+    bool? SourceMatches, IReadOnlyList<string> Warnings);
 
 /// <summary>Read-only discovery through the native Windows Update Agent and its configured trusted sources.</summary>
 public sealed class WindowsUpdateService
@@ -35,6 +37,45 @@ public sealed class WindowsUpdateService
         };
         [pscustomobject]@{ IsComplete=([int]$search.ResultCode -eq 2); Updates=@($updates.ToArray()); Warnings=@($warnings.ToArray()) } |
             Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 5 -Compress;
+        """;
+
+    private const string VerifyInstalledDriverScript = """
+        $session = [System.Activator]::CreateInstance([System.Type]::GetTypeFromProgID('Microsoft.Update.Session'));
+        $session.ClientApplicationID = 'ZEUS';
+        $searcher = $session.CreateUpdateSearcher();
+        $searcher.Online = $true;
+        $searcher.CanAutomaticallyUpgradeService = $false;
+        $actualServerSelection = [int]$searcher.ServerSelection;
+        $actualServiceId = if ($actualServerSelection -eq 3) { [string]$searcher.ServiceID } else { '' };
+        $sourceMatches = $actualServerSelection -eq $expectedServerSelection -and
+            ($expectedServerSelection -ne 3 -or [guid]$actualServiceId -eq [guid]$expectedServiceId);
+        $isComplete = $false;
+        $isInstalled = $null;
+        $warnings = [System.Collections.Generic.List[string]]::new();
+        if ($sourceMatches) {
+            $query = "IsInstalled=1 and Type='Driver' and UpdateID='" + $expectedId + "' and RevisionNumber=" + $expectedRevision;
+            $search = $searcher.Search($query);
+            $isComplete = [int]$search.ResultCode -eq 2;
+            if ($isComplete) {
+                $isInstalled = $false;
+                if ($search.Updates.Count -eq 1) {
+                    $update = $search.Updates.Item(0);
+                    $isInstalled = [bool]$update.IsInstalled -and
+                        [guid]$update.Identity.UpdateID -eq [guid]$expectedId -and
+                        [int]$update.Identity.RevisionNumber -eq $expectedRevision;
+                } elseif ($search.Updates.Count -gt 1) {
+                    $warnings.Add('O Windows Update retornou mais de um registro para a identidade exata; a verificação foi considerada incompleta.');
+                    $isComplete = $false;
+                    $isInstalled = $null;
+                }
+            } else {
+                $warnings.Add('A consulta ao Windows Update retornou resultado parcial ou incompleto (código ' + [int]$search.ResultCode + ').');
+            }
+        } else {
+            $warnings.Add('A seleção lógica de origem atualmente configurada no Windows Update difere da seleção registrada na instalação. Nenhuma consulta de pacote foi feita.');
+        }
+        [pscustomobject]@{ IsComplete=$isComplete; IsInstalled=$isInstalled; SourceMatches=$sourceMatches; Warnings=@($warnings.ToArray()) } |
+            Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 4 -Compress;
         """;
 
     private const string SearchScript = """
@@ -119,6 +160,65 @@ public sealed class WindowsUpdateService
         }
     }
 
+    /// <summary>Explicit read-only recheck of one exact installed driver update in its recorded WUA source selection.</summary>
+    public async Task<InstalledDriverUpdateVerification> VerifyInstalledDriverUpdateAsync(
+        string updateIdentity, int? serverSelection, string? serviceId, DateTimeOffset installationFinishedAt,
+        CancellationToken cancellationToken = default)
+    {
+        if (!OperatingSystem.IsWindows()) return FailedDriverVerification("A verificação de drivers requer Windows.");
+        if (!MaintenanceRequestProtocol.TryParseDriverIdentity(updateIdentity, out var updateId, out var revision) ||
+            !WindowsUpdateSourcePolicy.IsAllowed(serverSelection, serviceId))
+            return FailedDriverVerification("A identidade ou a origem registrada do driver é inválida.");
+
+        var estimatedBootTime = DateTimeOffset.UtcNow - TimeSpan.FromMilliseconds(Environment.TickCount64);
+        if (estimatedBootTime <= installationFinishedAt)
+            return new(DateTimeOffset.UtcNow, false, null, null,
+                ["O Windows ainda não registra uma reinicialização posterior à instalação. Nenhuma consulta foi feita; reinicie quando solicitado e tente novamente."]);
+
+        var expectedServiceId = serviceId is null ? Guid.Empty : Guid.Parse(serviceId);
+        var script = $"$expectedId = '{updateId:D}'; $expectedRevision = {revision}; $expectedServerSelection = {serverSelection!.Value}; $expectedServiceId = '{expectedServiceId:D}'; " + VerifyInstalledDriverScript;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(3));
+        using var process = new Process { StartInfo = TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility) };
+        try
+        {
+            if (!process.Start()) return FailedDriverVerification("A consulta ao Windows Update não iniciou.");
+            var outputTask = ReadBoundedAsync(process.StandardOutput, 64 * 1024, timeout.Token);
+            var errorTask = ReadBoundedAsync(process.StandardError, 16 * 1024, timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            var output = await outputTask;
+            var diagnostic = await errorTask;
+            if (process.ExitCode != 0) return FailedDriverVerification("A consulta ao Windows Update falhou. " + diagnostic.Trim());
+            return ParseInstalledDriverVerificationPayload(output);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return FailedDriverVerification("A consulta excedeu três minutos. Estado desconhecido; não repita a instalação com base nesta falha.");
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            return FailedDriverVerification("Não foi possível verificar o driver pelo Windows Update: " + exception.Message);
+        }
+        finally
+        {
+            try { if (process.Id > 0 && !process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) { }
+        }
+    }
+
+    internal static InstalledDriverUpdateVerification ParseInstalledDriverVerificationPayload(string output)
+    {
+        var result = JsonSerializer.Deserialize<InstalledDriverVerificationPayload>(output)
+            ?? throw new InvalidDataException("Resposta vazia do Windows Update.");
+        if (result.Warnings is null) throw new InvalidDataException("Resposta incompleta do Windows Update.");
+        if (result.IsComplete && (!result.SourceMatches || result.IsInstalled is null))
+            throw new InvalidDataException("A resposta do Windows Update contradiz o estado de verificação.");
+        if (!result.IsComplete && result.IsInstalled is not null)
+            throw new InvalidDataException("Uma consulta incompleta não pode confirmar o estado instalado.");
+        return new(DateTimeOffset.UtcNow, result.IsComplete, result.IsInstalled, result.SourceMatches,
+            Array.AsReadOnly(result.Warnings.ToArray()));
+    }
+
     /// <summary>Performs an explicit online, read-only search of configured Windows Update sources; no update is downloaded or installed.</summary>
     public async Task<PendingWindowsUpdateSearch> SearchPendingSoftwareUpdatesAsync(CancellationToken cancellationToken = default)
     {
@@ -184,6 +284,9 @@ public sealed class WindowsUpdateService
     private static PendingWindowsUpdateSearch FailedPending(string message) =>
         new(DateTimeOffset.UtcNow, false, [], [message]);
 
+    private static InstalledDriverUpdateVerification FailedDriverVerification(string message) =>
+        new(DateTimeOffset.UtcNow, false, null, null, [message]);
+
     private static async Task<string> ReadBoundedAsync(StreamReader reader, int maximumCharacters, CancellationToken cancellationToken)
     {
         var output = new System.Text.StringBuilder();
@@ -203,6 +306,7 @@ public sealed class WindowsUpdateService
         string? DeviceName, string? DriverVersion, bool RequiresEula, string? EulaText,
         string? DriverProvider, string? DriverClass, string? DriverDate);
     private sealed record PendingSearchPayload(bool IsComplete, IReadOnlyList<PendingWindowsUpdate>? Updates, IReadOnlyList<string>? Warnings);
+    private sealed record InstalledDriverVerificationPayload(bool IsComplete, bool? IsInstalled, bool SourceMatches, IReadOnlyList<string>? Warnings);
 
     internal static DriverUpdateSearch ParseDriverUpdatesPayload(string output)
     {

@@ -5,6 +5,57 @@ namespace Zeus.Hardware.Tests;
 public sealed class WindowsUpdateServiceTests
 {
     [Fact]
+    public void ExactInstalledDriverRecheckRequiresCompleteMatchingSource()
+    {
+        var installed = WindowsUpdateService.ParseInstalledDriverVerificationPayload(
+            """{"IsComplete":true,"IsInstalled":true,"SourceMatches":true,"Warnings":[]}""");
+        var absent = WindowsUpdateService.ParseInstalledDriverVerificationPayload(
+            """{"IsComplete":true,"IsInstalled":false,"SourceMatches":true,"Warnings":[]}""");
+
+        Assert.True(installed.IsComplete);
+        Assert.True(installed.IsInstalled);
+        Assert.False(absent.IsInstalled);
+    }
+
+    [Fact]
+    public void IncompleteOrDifferentSourceRecheckCannotConfirmInstalledState()
+    {
+        var unavailable = WindowsUpdateService.ParseInstalledDriverVerificationPayload(
+            """{"IsComplete":false,"IsInstalled":null,"SourceMatches":true,"Warnings":["resultado incompleto"]}""");
+        var wrongSource = WindowsUpdateService.ParseInstalledDriverVerificationPayload(
+            """{"IsComplete":false,"IsInstalled":null,"SourceMatches":false,"Warnings":["origem diferente"]}""");
+
+        Assert.Null(unavailable.IsInstalled);
+        Assert.False(unavailable.IsComplete);
+        Assert.Equal(false, wrongSource.SourceMatches);
+        Assert.Null(wrongSource.IsInstalled);
+        Assert.Throws<InvalidDataException>(() => WindowsUpdateService.ParseInstalledDriverVerificationPayload(
+            """{"IsComplete":true,"IsInstalled":true,"SourceMatches":false,"Warnings":[]}"""));
+    }
+
+    [Fact]
+    public async Task PostRestartRecheckRejectsInvalidIdentityBeforeStartingWindowsUpdate()
+    {
+        var result = await new WindowsUpdateService().VerifyInstalledDriverUpdateAsync("invalid", 2, null, DateTimeOffset.UtcNow);
+
+        Assert.False(result.IsComplete);
+        Assert.Null(result.IsInstalled);
+        Assert.Contains(result.Warnings, warning => warning.Contains("inválida", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task PostRestartRecheckWaitsUntilWindowsBootTimeIsLaterThanInstallation()
+    {
+        var result = await new WindowsUpdateService().VerifyInstalledDriverUpdateAsync(
+            "12345678-1234-1234-1234-123456789abc:1", 2, null, DateTimeOffset.UtcNow.AddMinutes(1));
+
+        Assert.False(result.IsComplete);
+        Assert.Null(result.SourceMatches);
+        Assert.Null(result.IsInstalled);
+        Assert.Contains(result.Warnings, warning => warning.Contains("reinicialização posterior", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void DriverSearchRetainsWindowsUpdateProviderClassAndDateWithoutInventingVersionOrSignature()
     {
         var payload = """{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"NVIDIA Display Update","Manufacturer":"NVIDIA","DeviceName":"Graphics Adapter","DriverVersion":null,"RequiresEula":false,"DriverProvider":"NVIDIA","DriverClass":"Display","DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":2,"ServiceId":null}""";

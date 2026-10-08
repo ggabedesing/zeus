@@ -42,7 +42,9 @@ public sealed record MaintenanceStepResult(
     string Message,
     string? LogFile = null,
     string? TargetId = null,
-    MaintenanceVerificationStatus Verification = MaintenanceVerificationStatus.NotRecorded);
+    MaintenanceVerificationStatus Verification = MaintenanceVerificationStatus.NotRecorded,
+    int? UpdateServerSelection = null,
+    string? UpdateServiceId = null);
 
 public sealed record MaintenanceReport(
     Guid SessionId,
