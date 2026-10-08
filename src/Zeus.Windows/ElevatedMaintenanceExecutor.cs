@@ -37,10 +37,12 @@ public sealed class ElevatedMaintenanceExecutor : IMaintenanceExecutor, IAdvance
         start.ArgumentList.Add("--requests");
         start.ArgumentList.Add(MaintenanceRequestProtocol.Encode(selected));
         progress?.Report("Aguardando autorização de administrador no Windows…");
+        var helperStarted = false;
         try
         {
             await new PendingMaintenanceSessions().RememberAsync(id, selected, started, cancellationToken);
             using var process = Process.Start(start) ?? throw new InvalidOperationException("O auxiliar não iniciou.");
+            helperStarted = true;
             progress?.Report("Manutenção em execução. Reparos podem levar bastante tempo; aguarde o relatório antes de fechar o aplicativo.");
             // Killing an elevated DISM/SFC repair is unsafe. Cancellation is honored only before launch.
             await process.WaitForExitAsync(CancellationToken.None);
@@ -56,14 +58,31 @@ public sealed class ElevatedMaintenanceExecutor : IMaintenanceExecutor, IAdvance
                     $"O auxiliar terminou com código {process.ExitCode}, mas o relatório não pôde ser validado: {error.Message}", IsComplete: false);
             }
         }
-        catch (Win32Exception error) when (error.NativeErrorCode == 1223)
+        catch (Win32Exception error) when (!helperStarted && error.NativeErrorCode == 1223)
         {
+            var cleanupError = await TryForgetLaunchReceiptAsync(id);
             return new MaintenanceReport(id, started, DateTimeOffset.UtcNow, false,
-                selected.Select(request => new MaintenanceStepResult(request.Action, StepOutcome.Cancelled, "Autorização de administrador cancelada; nenhuma ação executada.", TargetId: request.TargetId)).ToArray());
+                selected.Select(request => new MaintenanceStepResult(request.Action, StepOutcome.Cancelled,
+                    "Autorização de administrador cancelada; nenhuma ação executada." + cleanupError, TargetId: request.TargetId)).ToArray());
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException or UnauthorizedAccessException)
         {
-            return new MaintenanceReport(id, started, DateTimeOffset.UtcNow, false, [], $"Não foi possível iniciar a manutenção: {error.Message}");
+            var cleanupError = helperStarted ? string.Empty : await TryForgetLaunchReceiptAsync(id);
+            return new MaintenanceReport(id, started, DateTimeOffset.UtcNow, false, [],
+                $"Não foi possível iniciar a manutenção: {error.Message}{cleanupError}");
+        }
+    }
+
+    private static async Task<string> TryForgetLaunchReceiptAsync(Guid sessionId)
+    {
+        try
+        {
+            await new PendingMaintenanceSessions().ForgetAsync(sessionId);
+            return string.Empty;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return $" O registro local da sessão não pôde ser removido: {error.Message}";
         }
     }
 }
