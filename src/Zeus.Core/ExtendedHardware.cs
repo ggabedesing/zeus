@@ -48,7 +48,8 @@ public sealed record ProxyConfigurationInfo(bool? ManualProxyEnabled, string? Ma
 public sealed record DriverInfo(string Device, string Provider, string Version, string? Date, string? Signer);
 public sealed record PnpDeviceInfo(string Name, string Class, string Status, string? ProblemCode);
 public sealed record ProcessInfo(string Name, int Id, double? CpuSeconds, ulong? WorkingSetBytes);
-public sealed record ServiceInfo(string Name, string DisplayName, string Status, string StartType);
+public sealed record ServiceInfo(string Name, string DisplayName, string Status, string StartType,
+    string[]? Dependencies = null, bool? DependenciesAvailable = null);
 public sealed record ScheduledTaskInfo(string Name, string Path, string State);
 public sealed record InstalledSoftwareInfo(string Name, string Version, string Publisher);
 public sealed record WindowsEventInfo(DateTimeOffset Time, string Log, string Provider, int Id, string Level, string Message);

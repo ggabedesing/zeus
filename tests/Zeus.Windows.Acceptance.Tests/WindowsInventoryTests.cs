@@ -67,7 +67,7 @@ public sealed class WindowsInventoryTests
             Assert.InRange(disk.FreeBytes, 0UL, disk.TotalBytes);
             Assert.False(string.IsNullOrWhiteSpace(disk.DriveLetter));
         });
-        Assert.NotNull(snapshot.WindowsInventory);
+        Assert.True(snapshot.WindowsInventory is not null, string.Join(" | ", snapshot.Warnings));
         Assert.NotEmpty(snapshot.WindowsInventory.Processes);
         Assert.InRange(snapshot.WindowsInventory.Processes.Count, 1, 200);
         Assert.All(snapshot.WindowsInventory.Processes, process =>
@@ -78,6 +78,12 @@ public sealed class WindowsInventoryTests
         Assert.NotNull(snapshot.WindowsInventory.SecurityState);
         Assert.NotNull(snapshot.WindowsInventory.Warnings);
         Assert.NotNull(snapshot.WindowsInventory.ProxyConfiguration);
+        Assert.NotEmpty(snapshot.WindowsInventory.Services);
+        Assert.All(snapshot.WindowsInventory.Services, service =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(service.Name));
+            if (service.DependenciesAvailable == true) Assert.NotNull(service.Dependencies);
+        });
         Assert.Contains(snapshot.WindowsInventory.Warnings, warning => warning.Contains("WinHTTP", StringComparison.OrdinalIgnoreCase));
         Assert.All(snapshot.WindowsInventory.NetworkConfiguration, network => Assert.NotNull(network.Addresses));
         // Defender, physical sensors, OEM inventory, Secure Boot and TPM are optional on CI VMs.

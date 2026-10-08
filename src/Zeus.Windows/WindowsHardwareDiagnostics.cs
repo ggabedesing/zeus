@@ -120,7 +120,10 @@ try {
 $drivers = Read-Part 'Drivers' { Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop | Select-Object DeviceName,DriverProviderName,DriverVersion,@{n='Date';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}else{$null}}},Signer }
 $pnp = Read-Part 'Dispositivos PnP' { Get-CimInstance Win32_PnPEntity -ErrorAction Stop | Select-Object Name,PNPClass,Status,@{n='ProblemCode';e={if($_.ConfigManagerErrorCode -ne 0){[string]$_.ConfigManagerErrorCode}else{$null}}} }
 $processes = Read-Part 'Processos' { Get-Process -ErrorAction Stop | Sort-Object WorkingSet64 -Descending | Select-Object -First 200 @{n='Name';e={$_.ProcessName}},Id,@{n='CpuSeconds';e={if($_.CPU -ne $null){[double]$_.CPU}else{$null}}},@{n='WorkingSetBytes';e={[uint64]$_.WorkingSet64}} }
-$services = Read-Part 'Serviços' { Get-CimInstance Win32_Service -ErrorAction Stop | Select-Object Name,DisplayName,State,StartMode }
+ $services = Read-Part 'Serviços' { Get-CimInstance Win32_Service -ErrorAction Stop | Select-Object Name,DisplayName,State,StartMode }
+ $serviceDependencies = Read-Part 'Dependências dos serviços' { Get-Service -ErrorAction Stop | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Dependencies=@($_.ServicesDependedOn | ForEach-Object {[string]$_.Name})} } }
+ $dependencyMap = $null
+ if ($null -ne $serviceDependencies) { $dependencyMap = @{}; foreach ($entry in $serviceDependencies) { $dependencyMap[[string]$entry.Name] = @($entry.Dependencies) } }
 $tasks = Read-Part 'Tarefas agendadas' { Get-ScheduledTask -ErrorAction Stop | Select-Object -First 500 @{n='Name';e={$_.TaskName}},TaskPath,State }
 $software = Read-Part 'Software instalado' { foreach($path in @('HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')) { Get-ItemProperty $path -ErrorAction SilentlyContinue | Where-Object DisplayName | Select-Object @{n='Name';e={$_.DisplayName}},@{n='Version';e={[string]$_.DisplayVersion}},@{n='Publisher';e={[string]$_.Publisher}} } }
 $events = Read-Part 'Eventos recentes' { foreach($log in @('System','Application')) { Get-WinEvent -FilterHashtable @{LogName=$log;Level=1,2,3} -MaxEvents 20 -ErrorAction SilentlyContinue | Select-Object @{n='Time';e={$_.TimeCreated.ToUniversalTime().ToString('o')}},@{n='Log';e={$log}},@{n='Provider';e={$_.ProviderName}},Id,@{n='Level';e={[string]$_.LevelDisplayName}} } }
@@ -133,7 +136,7 @@ $inventory = [pscustomobject]@{
  Drivers=@($drivers | ForEach-Object { [pscustomobject]@{Device=[string]$_.DeviceName;Provider=[string]$_.DriverProviderName;Version=[string]$_.DriverVersion;Date=$_.Date;Signer=$_.Signer} });
  PnpDevices=@($pnp | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Class=[string]$_.PNPClass;Status=[string]$_.Status;ProblemCode=$_.ProblemCode} });
  Processes=@($processes | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Id=[int]$_.Id;CpuSeconds=$_.CpuSeconds;WorkingSetBytes=$_.WorkingSetBytes} });
- Services=@($services | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;DisplayName=[string]$_.DisplayName;Status=[string]$_.State;StartType=[string]$_.StartMode} });
+ Services=@($services | ForEach-Object { $serviceName=[string]$_.Name; $hasDependencies=$null -ne $dependencyMap -and $dependencyMap.ContainsKey($serviceName); $dependencies=[string[]]@(); if ($hasDependencies) { $dependencies=[string[]]$dependencyMap[$serviceName] }; [pscustomobject]@{Name=$serviceName;DisplayName=[string]$_.DisplayName;Status=[string]$_.State;StartType=[string]$_.StartMode;DependenciesAvailable=$hasDependencies;Dependencies=$dependencies} });
  ScheduledTasks=@($tasks | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Path=[string]$_.TaskPath;State=[string]$_.State} });
  InstalledSoftware=@($software | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Version=[string]$_.Version;Publisher=[string]$_.Publisher} });
  RecentEvents=@($events | ForEach-Object { [pscustomobject]@{Time=$_.Time;Log=[string]$_.Log;Provider=[string]$_.Provider;Id=[int]$_.Id;Level=[string]$_.Level;Message=''} });

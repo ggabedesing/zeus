@@ -14,6 +14,27 @@ namespace Zeus.Desktop;
 
 public partial class MainWindow
 {
+    private void AnalyzeServiceDependencies_Click(object sender, RoutedEventArgs e)
+    {
+        var inventory = _snapshot?.WindowsInventory;
+        if (inventory is null)
+        {
+            ServiceDependencySummary = "Inventário de serviços indisponível; atualize o diagnóstico.";
+            ServiceDependencyRows.Clear();
+            Notify(nameof(ServiceDependencySummary));
+            return;
+        }
+
+        var sourceComplete = !inventory.Warnings.Any(warning => warning.StartsWith("Serviços:", StringComparison.OrdinalIgnoreCase));
+        var report = ServiceDependencyAnalyzer.Analyze(inventory.Services, sourceComplete);
+        ServiceDependencyRows.Clear();
+        foreach (var finding in report.Findings.Take(100)) ServiceDependencyRows.Add(new(finding.Name, finding.Detail));
+        ServiceDependencySummary = report.Findings.Count > 100
+            ? $"{report.Summary} Exibindo os primeiros 100 itens."
+            : report.Summary;
+        Notify(nameof(ServiceDependencySummary));
+    }
+
     private async Task LoadLocalSessionsAsync()
     {
         try

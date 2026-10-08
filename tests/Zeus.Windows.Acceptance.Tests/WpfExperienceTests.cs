@@ -81,6 +81,12 @@ public sealed class WpfExperienceTests
         Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);
         Assert.NotEmpty(window.HardwareCards);
         Assert.NotNull(window.Snapshot);
+        var serviceDependencyButton = Assert.IsType<Button>(window.FindName("AnalyzeServiceDependenciesButton"));
+        Assert.Equal("analyze-service-dependencies", AutomationProperties.GetAutomationId(serviceDependencyButton));
+        Assert.True(serviceDependencyButton.IsEnabled);
+        serviceDependencyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, serviceDependencyButton));
+        Assert.NotEmpty(window.ServiceDependencyRows);
+        Assert.Contains("serviço(s)", window.ServiceDependencySummary);
         Assert.NotNull(window.FormalOptimizationPlan);
         Assert.NotEmpty(window.FormalPlanSummary);
         Assert.Contains(window.ProfileOptions, option => option.Value == Zeus.Windows.UsageProfile.GamingStreaming);

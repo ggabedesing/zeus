@@ -54,6 +54,10 @@ O Observador agora resume ocupação dedicada sustentada da GPU apenas com pelo 
 
 A experiência de papel de parede agora tem prévia antes da confirmação, cópia do arquivo anterior com verificação SHA-256, aplicação/validação, registro no histórico e restauração bloqueada se outro app alterar a imagem depois. O fluxo aceita somente arquivo local fixo BMP/JPEG/PNG de até 32 MiB, imagem estática única compartilhada por monitores e sem slideshow configurado; os modos não suportados permanecem intactos. Os testes com plataforma simulada verificaram aplicar/restaurar, alteração externa, extensão enganosa, slideshow e configuração por monitor. O teste Windows de status COM foi somente leitura; não trocou o papel de parede deste PC. Nesta revisão, 27 testes de otimização do usuário passaram e 1 teste de alteração visual real permaneceu ignorado por exigir ativação explícita; o teste WPF passou e a compilação Release terminou sem avisos/erros.
 
+## Diagnóstico de dependências de serviços
+
+O inventário mantém separados o estado/partida consultados por `Win32_Service` e as dependências declaradas pela consulta local `Get-Service`. Se a segunda fonte falhar, dependências ficam desconhecidas sem invalidar o inventário dos serviços. A tela de Manutenção descreve relações, grupos, referências que não foram resolvidas no inventário e estados observados; não inicia, para ou altera serviços. Um serviço parado isoladamente não é classificado como defeito. Nesta revisão, passaram 74 testes de hardware, 3 testes focados de inventário/WPF e a compilação Release sem avisos ou erros; o teste WPF clica no botão e confere a lista produzida. A suíte focal também cobre dados desconhecidos, referências ausentes e grupos.
+
 ## Aceitação administrativa em máquinas de teste
 
 Use Windows 11 suportado, snapshots quando disponíveis e backups independentes. Guarde a versão/commit, ação, relatório e resultado após reiniciar. Execute cada cenário separadamente.

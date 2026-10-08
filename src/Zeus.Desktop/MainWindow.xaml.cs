@@ -121,6 +121,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<DeviceRow> ProcessRows { get; } = [];
     public ObservableCollection<DeviceRow> PerformanceResourceRows { get; } = [];
     public ObservableCollection<DeviceRow> StartupRows { get; } = [];
+    public ObservableCollection<DeviceRow> ServiceDependencyRows { get; } = [];
     public ObservableCollection<string> Warnings { get; } = [];
     public ObservableCollection<MaintenanceChoice> MaintenanceChoices { get; } = [];
     public ObservableCollection<HistoryRow> HistoryRows { get; } = [];
@@ -138,6 +139,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public bool CanRefresh => !_isBusy;
     public bool CanChooseActions => !_isBusy;
+    public bool CanAnalyzeServiceDependencies => !_isBusy && _snapshot?.WindowsInventory is not null;
     public bool CanExecute => !_isBusy && MaintenanceSelectionError() is null && MaintenanceChoices.Any(c => c.IsSelected);
     public bool CanExport => !_isBusy && (_snapshot is not null || _reports.Count > 0);
     public bool CanCancel => _isBusy && _readCancellation is not null;
@@ -150,6 +152,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string StatusTitle { get => _statusTitle; private set => Set(ref _statusTitle, value); }
     public string StatusDetail { get => _statusDetail; private set => Set(ref _statusDetail, value); }
     public string ExecutionLog { get => _executionLog; private set => Set(ref _executionLog, value); }
+    public string ServiceDependencySummary { get; private set; } = "Leia o inventário do Windows para consultar as dependências declaradas dos serviços.";
     public string MaintenanceResultSummary { get => _maintenanceResultSummary; private set => Set(ref _maintenanceResultSummary, value); }
     public string CleanupSummary { get => _cleanupSummary; private set => Set(ref _cleanupSummary, value); }
     public string StartupSummary { get => _startupSummary; private set => Set(ref _startupSummary, value); }
@@ -294,6 +297,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         HardwareCards.Add(new("Microsoft Defender", BooleanStatus(snapshot.Security?.DefenderEnabled), snapshot.Security?.Summary ?? "Consulte Segurança do Windows."));
         HardwareCards.Add(new("Placa-mãe", snapshot.Board?.Product ?? "Indisponível", snapshot.Board?.Manufacturer ?? "A placa não foi identificada nesta coleta."));
         var inventory = snapshot.WindowsInventory;
+        ServiceDependencyRows.Clear();
+        ServiceDependencySummary = inventory is null
+            ? "Inventário de serviços indisponível nesta coleta."
+            : "Use a consulta para descrever as dependências declaradas no inventário.";
+        Notify(nameof(ServiceDependencySummary));
         HardwareCards.Add(new("Inventário do Windows", inventory is null ? "Indisponível" : $"{inventory.Processes.Count} processos · {inventory.Services.Count} serviços", inventory is null ? "As fontes do Windows não responderam nesta coleta." : $"{inventory.Drivers.Count} drivers · {inventory.PnpDevices.Count} dispositivos · {inventory.InstalledSoftware.Count} programas"));
         GraphicsRows.Clear(); foreach (var item in snapshot.Graphics) GraphicsRows.Add(new(Available(item.Name), $"Driver {Available(item.DriverVersion)}"));
         DiskRows.Clear(); foreach (var disk in snapshot.Disks) DiskRows.Add(new($"{disk.DriveLetter} · {Available(disk.Name)}", $"{ByteFormatting.Format(disk.FreeBytes)} livres de {ByteFormatting.Format(disk.TotalBytes)} · {Available(disk.FileSystem)}"));
@@ -327,7 +335,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         Warnings.Clear(); foreach (var warning in _startupWarnings.Concat(snapshot.Warnings)) Warnings.Add(warning);
         BuildPersonalPlan();
-        foreach (var property in new[] { nameof(Snapshot), nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(FormalPlanSummary), nameof(FormalOptimizationPlan), nameof(DevicesEmptyText), nameof(CanExport) }) Notify(property);
+        foreach (var property in new[] { nameof(Snapshot), nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(FormalPlanSummary), nameof(FormalOptimizationPlan), nameof(DevicesEmptyText), nameof(CanExport), nameof(CanAnalyzeServiceDependencies) }) Notify(property);
     }
 
     private void BuildPersonalPlan()
@@ -500,7 +508,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SetBusy(bool busy)
     {
         _isBusy = busy;
-        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
+        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanAnalyzeServiceDependencies), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
     private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); }
