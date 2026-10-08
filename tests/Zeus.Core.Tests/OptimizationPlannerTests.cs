@@ -7,6 +7,52 @@ public sealed class OptimizationPlannerTests
     private const ulong GiB = 1024UL * 1024 * 1024;
     private static readonly DateTimeOffset CollectedAt = new(2026, 10, 7, 12, 0, 0, TimeSpan.Zero);
     private readonly OptimizationPlanner planner = new();
+    private readonly OptimizationRuleEngine ruleEngine = new();
+
+    [Fact]
+    public void FormalPlanDistinguishesNoReviewFromUnavailableEvidence()
+    {
+        var healthy = ruleEngine.Evaluate(HealthySnapshot(), OptimizationProfile.Gaming);
+        var incomplete = ruleEngine.Evaluate(HealthySnapshot() with { Memory = null, Disks = [], Security = null }, OptimizationProfile.Gaming);
+
+        Assert.Equal(OptimizationPlanStatus.NoOptimizationRequired, healthy.Status);
+        Assert.Equal(OptimizationPlanStatus.NeedsMoreData, incomplete.Status);
+        Assert.All(healthy.Rules, result => Assert.Null(result.Action));
+        Assert.Empty(healthy.Conflicts);
+        Assert.Empty(healthy.UnmetDependencies);
+    }
+
+    [Fact]
+    public void FormalDefinitionsExposeProfileMatrixEvidenceConfidenceAndTestPlan()
+    {
+        var definitions = ruleEngine.GetDefinitions();
+
+        Assert.NotEmpty(definitions);
+        Assert.All(definitions, rule =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(rule.Id));
+            Assert.NotEmpty(rule.CompatibleProfiles);
+            Assert.False(string.IsNullOrWhiteSpace(rule.EvidenceRequired));
+            Assert.False(string.IsNullOrWhiteSpace(rule.TestPlan));
+            Assert.True(Enum.IsDefined(rule.Confidence));
+        });
+        Assert.Contains(definitions, rule => rule.CompatibleProfiles.Contains(OptimizationProfile.GamingStreaming));
+    }
+
+    [Fact]
+    public void FormalPlanCarriesReviewEvidenceAndDoesNotPromoteItToAction()
+    {
+        var snapshot = HealthySnapshot() with { Memory = new MemoryInfo(10 * GiB, GiB) };
+
+        var plan = ruleEngine.Evaluate(snapshot, OptimizationProfile.General);
+        var rule = Assert.Single(plan.Rules, result => result.Rule.Id == "memory.pressure");
+
+        Assert.Equal(OptimizationPlanStatus.RecommendationsAvailable, plan.Status);
+        Assert.True(rule.EvidenceAvailable);
+        Assert.True(rule.Triggered);
+        Assert.Null(rule.Action);
+        Assert.Contains("paginação", rule.Rule.TestPlan);
+    }
 
     [Fact]
     public void HealthySnapshotDoesNotInventProblemsOrPromiseAnUpgrade()
