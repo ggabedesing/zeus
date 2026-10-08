@@ -102,13 +102,22 @@ internal static class CommandRunner
                 $"O comando retornou código {result.ExitCode}. Consulte o log para o diagnóstico; não foi confirmada correção.", result.LogFile,
                 Verification: MaintenanceVerificationStatus.ManualReviewRequired);
 
+        var imageScanState = action == MaintenanceActionId.ScanWindowsImage
+            ? WindowsImageHealthParser.ParseScanHealth(result.ExitCode, result.Output)
+            : WindowsImageHealthState.Unknown;
         var message = action switch
         {
             MaintenanceActionId.DefenderQuickScan => "O comando de verificação rápida do Defender terminou. Consulte Segurança do Windows para resultados, ameaças e ações necessárias.",
             MaintenanceActionId.DefenderFullScan => "O comando de verificação completa do Defender terminou. Consulte Segurança do Windows para resultados e ações necessárias; não foi confirmada ausência de ameaças.",
             MaintenanceActionId.DefenderOfflineScan => "O Defender aceitou o comando de verificação offline. O computador pode reiniciar imediatamente; a conclusão da verificação precisa ser consultada na Segurança do Windows após o reinício.",
             MaintenanceActionId.UpdateDefenderSignatures => "O comando de atualização de definições terminou. Consulte no log as versões e datas informadas pelo Defender; este resultado não é uma verificação de ameaças.",
-            MaintenanceActionId.ScanWindowsImage => "DISM concluiu a análise. Consulte o log para saber se encontrou corrupção; o diagnóstico não corrige a imagem.",
+            MaintenanceActionId.ScanWindowsImage => imageScanState switch
+            {
+                WindowsImageHealthState.NoCorruptionDetected => "DISM ScanHealth não detectou corrupção no repositório de componentes. Isso não é uma avaliação de saúde física nem garante que todo problema do Windows esteja ausente.",
+                WindowsImageHealthState.RepairableCorruptionDetected => "DISM ScanHealth detectou corrupção no repositório de componentes que pode ser reparada. A análise não fez reparos; revise o log antes de escolher Reparar imagem do Windows.",
+                WindowsImageHealthState.NonRepairableCorruptionDetected => "DISM ScanHealth informou corrupção no repositório de componentes que não pode ser reparada por esse mecanismo. A análise não alterou a imagem; consulte o log e o suporte oficial antes de qualquer ação.",
+                _ => "DISM concluiu o comando, mas não foi possível reconhecer o estado da imagem na saída. O estado permanece desconhecido; consulte o log. Nenhum reparo foi executado."
+            },
             MaintenanceActionId.RepairWindowsImage => "DISM concluiu o comando de reparo. Consulte os logs e valide o problema original; este resultado não garante que todos os erros foram corrigidos.",
             MaintenanceActionId.VerifySystemFiles => "SFC concluiu a verificação. Código zero não garante ausência de corrupção; consulte a saída e o registro CBS do Windows.",
             MaintenanceActionId.RepairSystemFiles => "SFC concluiu o comando de reparo. Código zero não confirma que todos os arquivos foram corrigidos; consulte a saída e o registro CBS do Windows.",
@@ -120,6 +129,8 @@ internal static class CommandRunner
         var verification = action switch
         {
             MaintenanceActionId.RepairWindowsImage or MaintenanceActionId.RepairSystemFiles or MaintenanceActionId.DefenderOfflineScan or MaintenanceActionId.OptimizeSystemDrive or MaintenanceActionId.DefenderQuickScan or MaintenanceActionId.DefenderFullScan => MaintenanceVerificationStatus.ManualReviewRequired,
+            MaintenanceActionId.ScanWindowsImage when imageScanState != WindowsImageHealthState.Unknown => MaintenanceVerificationStatus.ProviderConfirmed,
+            MaintenanceActionId.ScanWindowsImage => MaintenanceVerificationStatus.ManualReviewRequired,
             _ => MaintenanceVerificationStatus.CommandCompleted
         };
         return new MaintenanceStepResult(action, StepOutcome.Succeeded, message, result.LogFile, Verification: verification);
