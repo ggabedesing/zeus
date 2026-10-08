@@ -137,7 +137,7 @@ public sealed class WindowsPerformanceProbe
 
     private static IReadOnlyList<GpuEngineObservation> ReadGpuCounters(CancellationToken token, List<string> warnings) =>
         ReadCounterRows("GPU", "Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine",
-            "SELECT Name,UtilizationPercentage FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine", 500, token, warnings, row =>
+            "SELECT Name,UtilizationPercentage FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine", 200, token, warnings, row =>
             {
                 var instance = Convert.ToString(row["Name"], System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
                 var utilization = CounterDouble(row, "UtilizationPercentage");

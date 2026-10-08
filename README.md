@@ -10,7 +10,7 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 | --- | --- |
 | Hardware | Lê CPU, RAM, GPU e drivers, placa-mãe, BIOS, módulos RAM, volumes, discos físicos, bateria e rede. Sensores aparecem somente quando o Windows fornece a leitura. |
 | Inventário do Windows | Consulta configuração de rede, drivers, PnP, processos, serviços, tarefas agendadas, programas instalados e eventos recentes; tenta ler Secure Boot e TPM. Endereços e nomes locais podem constar no relatório. Atualizações pendentes e saúde da imagem não são medidos durante a coleta. |
-| Carga real | Observa CPU, RAM e processos, além de engines de GPU e tráfego/atividade local de disco e rede quando os contadores do Windows estão disponíveis. A amostragem adapta o intervalo, guarda até 600 amostras e permite comparar referência de CPU/RAM. Não encerra processos nem esvazia a RAM. |
+| Carga real | Observa CPU, RAM e processos, além de engines de GPU e tráfego/atividade local de disco e rede quando os contadores do Windows estão disponíveis. A amostragem adapta o intervalo, guarda sessões e referência no SQLite, conserva um buffer recente e permite comparar médias de CPU/RAM. Não encerra processos nem esvazia a RAM. |
 | Limpeza | Analisa temporários do usuário com mais de sete dias; permite selecionar, guardar em recuperação, restaurar e excluir definitivamente em operações separadas. |
 | Inicialização | Desativa entradas selecionadas de HKCU Run, preserva comando/tipo anteriores e permite desfazer. Heurísticas protegem entradas de segurança, backup e sincronização. |
 | Perfil | Perguntas de uso orientam recomendações; efeitos visuais e planos de energia existentes têm revisão e recuperação próprias. |
@@ -20,7 +20,7 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 | Plano geral | Reúne preferências visuais explicitamente incluídas e as seleções de limpeza, inicialização e manutenção. Exibe o plano antes de executar sequencialmente. |
 | Aparência | Temas Completo, Mínimo e Aurora, inspirado no macOS, para a interface do ZEUS. |
 | Histórico | Resultados, logs, estados anteriores e recuperação de sessões interrompidas; exportação de relatório JSON. |
-| Persistência local | SQLite versionado para preferências, atividades e sessões/etapas de manutenção; importação dos JSON antigos sem removê-los e verificação rápida de integridade. |
+| Persistência local | SQLite versionado para preferências, atividades, manutenção e sessões/amostras de desempenho; importação dos JSON antigos sem removê-los e verificação rápida de integridade. |
 
 Nenhuma manutenção é selecionada automaticamente. Drivers e Defender offline possuem fluxos de revisão específicos. O tema altera a interface do ZEUS; as preferências de efeitos do Windows são uma operação separada.
 

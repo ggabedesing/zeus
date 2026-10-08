@@ -87,6 +87,55 @@ public sealed class ZeusDatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task PerformanceSessionsSamplesAndReferenceRoundTripInStructuredTables()
+    {
+        var database = CreateDatabase();
+        var id = Guid.NewGuid().ToString("D");
+        var started = DateTimeOffset.UtcNow;
+        await database.StartPerformanceSessionAsync(id, "Medição de teste", started);
+        await database.AppendPerformanceSampleAsync(id, new(0, started.AddSeconds(2), 2000, 42.5, 4096, 2048, "{\"gpu\":[]}"));
+        await database.MarkPerformanceReferenceAsync(id);
+        await database.FinishPerformanceSessionAsync(id, started.AddSeconds(3));
+
+        var session = Assert.Single(await database.ReadPerformanceSessionsAsync());
+        Assert.Equal(id, session.SessionId);
+        Assert.Equal("Medição de teste", session.Label);
+        Assert.True(session.IsReference);
+        Assert.Equal(started.AddSeconds(3), session.FinishedAt);
+        var sample = Assert.Single(session.Samples);
+        Assert.Equal(0, sample.Sequence);
+        Assert.Equal(42.5, sample.CpuPercent);
+        Assert.Equal("{\"gpu\":[]}", sample.DetailsJson);
+        var health = await database.CheckHealthAsync();
+        Assert.Equal(2, health.SchemaVersion);
+        Assert.Equal(1, health.PerformanceSessionCount);
+        Assert.Equal(1, health.PerformanceSampleCount);
+    }
+
+    [Fact]
+    public async Task SchemaV1UpgradesTransactionallyAndPreservesExistingSettings()
+    {
+        var path = Path.Combine(_root, "zeus.db");
+        var initial = new ZeusDatabase(path);
+        await initial.WriteSettingAsync("preferences", "{\"theme\":\"Aurora\"}");
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DROP TABLE performance_samples; DROP TABLE performance_sessions; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1;";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var upgraded = new ZeusDatabase(path);
+        var health = await upgraded.CheckHealthAsync();
+
+        Assert.True(health.IsHealthy);
+        Assert.Equal(2, health.SchemaVersion);
+        Assert.Equal("{\"theme\":\"Aurora\"}", await upgraded.ReadSettingAsync("preferences"));
+        Assert.Empty(await upgraded.ReadPerformanceSessionsAsync());
+    }
+
+    [Fact]
     public async Task LegacyHistoryImportIsIdempotentAndDoesNotOverwriteNewerDatabaseRows()
     {
         var database = CreateDatabase();

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Zeus.Core;
 using Zeus.Storage;
+using Zeus.Windows;
 
 namespace Zeus.Desktop;
 
@@ -92,6 +93,24 @@ internal sealed class DesktopStorage
     public Task AppendActivityAsync(ActivityEntry entry) => _database.AppendActivityAsync(entry);
     public Task<IReadOnlyList<ActivityEntry>> ReadRecentActivityAsync(int limit = 500) => _database.ReadRecentActivityAsync(limit);
     public Task<DatabaseHealth> CheckHealthAsync() => _database.CheckHealthAsync();
+
+    public Task StartPerformanceSessionAsync(Guid sessionId, string label, DateTimeOffset startedAt) =>
+        _database.StartPerformanceSessionAsync(sessionId.ToString("D"), label, startedAt);
+
+    public Task AppendPerformanceObservationAsync(Guid sessionId, int sequence, PerformanceObservation observation) =>
+        _database.AppendPerformanceSampleAsync(sessionId.ToString("D"), new(sequence, observation.CollectedAt,
+            (int)Math.Clamp(observation.SamplingDuration.TotalMilliseconds, 0, 30_000), observation.CpuPercent,
+            observation.TotalMemoryBytes, observation.AvailableMemoryBytes,
+            JsonSerializer.Serialize(observation, JsonOptions)));
+
+    public Task FinishPerformanceSessionAsync(Guid sessionId, DateTimeOffset finishedAt) =>
+        _database.FinishPerformanceSessionAsync(sessionId.ToString("D"), finishedAt);
+
+    public Task MarkPerformanceReferenceAsync(Guid sessionId) =>
+        _database.MarkPerformanceReferenceAsync(sessionId.ToString("D"));
+
+    public Task<IReadOnlyList<StoredPerformanceSession>> ReadPerformanceSessionsAsync() =>
+        _database.ReadPerformanceSessionsAsync();
 
     public static Task ExportAsync(string path, ExportDocument document) => WriteAsync(path, document);
 

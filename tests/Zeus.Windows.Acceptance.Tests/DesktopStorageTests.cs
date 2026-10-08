@@ -2,6 +2,7 @@ using System.Text.Json;
 using Zeus.Core;
 using Zeus.Desktop;
 using Zeus.Storage;
+using Zeus.Windows;
 
 namespace Zeus.Windows.Acceptance.Tests;
 
@@ -41,6 +42,33 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal("ZEUS iniciado.", activity.Summary);
         Assert.True(health.IsHealthy);
         Assert.Equal(1, health.MaintenanceSessionCount);
+    }
+
+    [Fact]
+    public async Task PerformanceObservationAndBaselinePersistAndReloadFromSqlite()
+    {
+        Directory.CreateDirectory(_root);
+        var storage = new DesktopStorage(_root);
+        var id = Guid.NewGuid();
+        var observation = new PerformanceObservation(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(2), 21.5,
+            16_000, 8_000,
+            [new(42, "game.exe", 12.5, 2_000)], ["source warning"],
+            [new("pid_42_engtype_3D", 42, "3D", 31.0)],
+            [new("0 C:", 1200, 4, 1.2)],
+            [new("Ethernet", 800, 1_000_000_000, 0, 3)]);
+        await storage.StartPerformanceSessionAsync(id, "Referência", observation.CollectedAt.AddSeconds(-2));
+        await storage.AppendPerformanceObservationAsync(id, 0, observation);
+        await storage.MarkPerformanceReferenceAsync(id);
+        await storage.FinishPerformanceSessionAsync(id, observation.CollectedAt);
+
+        var session = Assert.Single(await storage.ReadPerformanceSessionsAsync());
+        var sample = Assert.Single(session.Samples);
+        var restored = Assert.IsType<PerformanceObservation>(JsonSerializer.Deserialize<PerformanceObservation>(sample.DetailsJson, DesktopStorage.JsonOptions));
+        Assert.True(session.IsReference);
+        Assert.Equal("game.exe", Assert.Single(restored.Processes).Name);
+        Assert.Equal(31.0, Assert.Single(restored.GpuEngines!).UtilizationPercent);
+        Assert.Equal("Ethernet", Assert.Single(restored.Networks!).Adapter);
+        Assert.Equal(21.5, sample.CpuPercent!.Value);
     }
 
     public void Dispose()

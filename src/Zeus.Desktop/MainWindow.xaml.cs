@@ -34,6 +34,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly List<MaintenanceReport> _reports = [];
     private readonly List<string> _startupWarnings = [];
     private readonly List<Task> _activityWrites = [];
+    private readonly HashSet<Guid> _performanceSessionStartAttempts = [];
+    private readonly HashSet<Guid> _persistedPerformanceSessions = [];
+    private readonly Dictionary<Guid, int> _performanceSessionSequences = [];
     private CancellationTokenSource? _readCancellation;
     private HardwareSnapshot? _snapshot;
     private PerformanceObservation? _performance;

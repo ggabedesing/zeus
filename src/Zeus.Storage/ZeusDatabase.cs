@@ -30,6 +30,12 @@ public sealed record StoredMaintenanceSession(
     string? Error,
     IReadOnlyList<StoredMaintenanceStep> Steps);
 
+public sealed record StoredPerformanceSample(int Sequence, DateTimeOffset CollectedAt, int SamplingMilliseconds,
+    double? CpuPercent, ulong TotalMemoryBytes, ulong AvailableMemoryBytes, string DetailsJson);
+
+public sealed record StoredPerformanceSession(string SessionId, string Label, DateTimeOffset StartedAt,
+    DateTimeOffset? FinishedAt, bool IsReference, IReadOnlyList<StoredPerformanceSample> Samples);
+
 public sealed record DatabaseHealth(
     bool IsHealthy,
     int SchemaVersion,
@@ -38,13 +44,17 @@ public sealed record DatabaseHealth(
     long FileSizeBytes,
     long ActivityCount,
     long MaintenanceSessionCount,
-    string? Error = null);
+    string? Error = null,
+    long PerformanceSessionCount = 0,
+    long PerformanceSampleCount = 0);
 
 /// <summary>Local, versioned SQLite storage for user configuration, activity and maintenance history.</summary>
 public sealed class ZeusDatabase
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
     private const int ActivityRetentionLimit = 10_000;
+    private const int PerformanceSessionRetentionLimit = 200;
+    private const int PerformanceSampleRetentionLimit = 4_000;
     private readonly string _path;
     private readonly string _connectionString;
     private readonly SemaphoreSlim _initializeGate = new(1, 1);
@@ -77,8 +87,19 @@ public sealed class ZeusDatabase
             var version = await ReadSchemaVersionAsync(connection, cancellationToken);
             if (version > CurrentSchemaVersion)
                 throw new InvalidDataException($"O banco usa o esquema {version}, mais novo que esta versão ({CurrentSchemaVersion}). O arquivo foi preservado.");
-            if (version == 0) await CreateSchemaV1Async(connection, cancellationToken);
-            else await ValidateSchemaAsync(connection, cancellationToken);
+            if (version == 0)
+            {
+                await CreateSchemaV1Async(connection, cancellationToken);
+                version = 1;
+            }
+            if (version == 1)
+            {
+                await ValidateSchemaV1Async(connection, cancellationToken);
+                await UpgradeSchemaV2Async(connection, cancellationToken);
+                version = 2;
+            }
+            if (version != CurrentSchemaVersion) throw new InvalidDataException("A versão do esquema do banco não é reconhecida. O arquivo foi preservado.");
+            await ValidateSchemaAsync(connection, cancellationToken);
             _initialized = true;
         }
         finally { _initializeGate.Release(); }
@@ -274,6 +295,125 @@ public sealed class ZeusDatabase
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public async Task StartPerformanceSessionAsync(string sessionId, string label, DateTimeOffset startedAt, CancellationToken cancellationToken = default)
+    {
+        ValidateSessionId(sessionId);
+        ValidateText(label, 120, nameof(label));
+        await InitializeAsync(cancellationToken);
+        await using var connection = await OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "INSERT INTO performance_sessions(session_id,label,started_utc,finished_utc,is_reference) VALUES($id,$label,$started,NULL,0);";
+        command.Parameters.AddWithValue("$id", sessionId);
+        command.Parameters.AddWithValue("$label", label);
+        command.Parameters.AddWithValue("$started", Utc(startedAt));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task AppendPerformanceSampleAsync(string sessionId, StoredPerformanceSample sample, CancellationToken cancellationToken = default)
+    {
+        ValidateSessionId(sessionId);
+        ArgumentNullException.ThrowIfNull(sample);
+        ArgumentNullException.ThrowIfNull(sample.DetailsJson);
+        if (sample.Sequence is < 0 or >= 600) throw new ArgumentOutOfRangeException(nameof(sample));
+        if (sample.SamplingMilliseconds is < 0 or > 30_000) throw new ArgumentOutOfRangeException(nameof(sample));
+        if (sample.CpuPercent is { } cpu && (!double.IsFinite(cpu) || cpu is < 0 or > 100)) throw new ArgumentOutOfRangeException(nameof(sample));
+        if (sample.AvailableMemoryBytes > sample.TotalMemoryBytes && sample.TotalMemoryBytes != 0) throw new ArgumentException("RAM disponível excede o total informado.", nameof(sample));
+        if (sample.DetailsJson.Length > 65_536) throw new ArgumentOutOfRangeException(nameof(sample), "Detalhes da amostra excedem 64 KiB.");
+        ValidateJson(sample.DetailsJson, nameof(sample));
+        await InitializeAsync(cancellationToken);
+        await using var connection = await OpenAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
+        await using (var insert = connection.CreateCommand())
+        {
+            insert.Transaction = transaction;
+            insert.CommandText = "INSERT INTO performance_samples(session_id,sequence,observed_utc,sampling_ms,cpu_percent,total_memory_bytes,available_memory_bytes,details_json) VALUES($id,$sequence,$observed,$sampling,$cpu,$total,$available,$details);";
+            insert.Parameters.AddWithValue("$id", sessionId);
+            insert.Parameters.AddWithValue("$sequence", sample.Sequence);
+            insert.Parameters.AddWithValue("$observed", Utc(sample.CollectedAt));
+            insert.Parameters.AddWithValue("$sampling", sample.SamplingMilliseconds);
+            insert.Parameters.AddWithValue("$cpu", (object?)sample.CpuPercent ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$total", sample.TotalMemoryBytes.ToString(CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("$available", sample.AvailableMemoryBytes.ToString(CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("$details", sample.DetailsJson);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await using (var trim = connection.CreateCommand())
+        {
+            trim.Transaction = transaction;
+            trim.CommandText = "DELETE FROM performance_samples WHERE id NOT IN (SELECT id FROM performance_samples ORDER BY id DESC LIMIT $limit);";
+            trim.Parameters.AddWithValue("$limit", PerformanceSampleRetentionLimit);
+            await trim.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task FinishPerformanceSessionAsync(string sessionId, DateTimeOffset finishedAt, CancellationToken cancellationToken = default)
+    {
+        ValidateSessionId(sessionId);
+        await InitializeAsync(cancellationToken);
+        await using var connection = await OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE performance_sessions SET finished_utc=$finished WHERE session_id=$id AND finished_utc IS NULL;";
+        command.Parameters.AddWithValue("$id", sessionId);
+        command.Parameters.AddWithValue("$finished", Utc(finishedAt));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        await TrimPerformanceSessionsAsync(connection, cancellationToken);
+    }
+
+    public async Task MarkPerformanceReferenceAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        ValidateSessionId(sessionId);
+        await InitializeAsync(cancellationToken);
+        await using var connection = await OpenAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "UPDATE performance_sessions SET is_reference=CASE WHEN session_id=$id THEN 1 ELSE 0 END WHERE EXISTS(SELECT 1 FROM performance_sessions WHERE session_id=$id);";
+        command.Parameters.AddWithValue("$id", sessionId);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+            throw new InvalidOperationException("A sessão de desempenho não existe; nenhuma referência foi alterada.");
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<StoredPerformanceSession>> ReadPerformanceSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using var connection = await OpenAsync(cancellationToken);
+        var sessions = new List<StoredPerformanceSession>();
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT session_id,label,started_utc,finished_utc,is_reference FROM performance_sessions ORDER BY started_utc DESC LIMIT $limit;";
+            command.Parameters.AddWithValue("$limit", PerformanceSessionRetentionLimit + 1);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                sessions.Add(new(reader.GetString(0), reader.GetString(1), ParseUtc(reader.GetString(2)),
+                    reader.IsDBNull(3) ? null : ParseUtc(reader.GetString(3)), reader.GetInt64(4) != 0, []));
+        }
+        for (var index = 0; index < sessions.Count; index++)
+        {
+            var session = sessions[index];
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT sequence,observed_utc,sampling_ms,cpu_percent,total_memory_bytes,available_memory_bytes,details_json FROM performance_samples WHERE session_id=$id ORDER BY sequence;";
+            command.Parameters.AddWithValue("$id", session.SessionId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var samples = new List<StoredPerformanceSample>();
+            while (await reader.ReadAsync(cancellationToken))
+                samples.Add(new(reader.GetInt32(0), ParseUtc(reader.GetString(1)), reader.GetInt32(2),
+                    reader.IsDBNull(3) ? null : reader.GetDouble(3), ulong.Parse(reader.GetString(4), CultureInfo.InvariantCulture),
+                    ulong.Parse(reader.GetString(5), CultureInfo.InvariantCulture), reader.GetString(6)));
+            sessions[index] = session with { Samples = samples };
+        }
+        return sessions;
+    }
+
+    private async Task TrimPerformanceSessionsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM performance_sessions WHERE is_reference=0 AND session_id NOT IN (SELECT session_id FROM performance_sessions WHERE is_reference=0 ORDER BY started_utc DESC LIMIT $limit);";
+        command.Parameters.AddWithValue("$limit", PerformanceSessionRetentionLimit);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<DatabaseHealth> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);
@@ -282,9 +422,12 @@ public sealed class ZeusDatabase
         var sqliteVersion = await ScalarStringAsync(connection, "SELECT sqlite_version();", cancellationToken);
         var activityCount = await ScalarLongAsync(connection, "SELECT COUNT(*) FROM activity_entries;", cancellationToken);
         var sessionCount = await ScalarLongAsync(connection, "SELECT COUNT(*) FROM maintenance_sessions;", cancellationToken);
+        var performanceSessionCount = await ScalarLongAsync(connection, "SELECT COUNT(*) FROM performance_sessions;", cancellationToken);
+        var performanceSampleCount = await ScalarLongAsync(connection, "SELECT COUNT(*) FROM performance_samples;", cancellationToken);
         var size = File.Exists(_path) ? new FileInfo(_path).Length : 0;
         return new(string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase), CurrentSchemaVersion, integrity, sqliteVersion, size, activityCount, sessionCount,
-            string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase) ? null : "A verificação rápida do SQLite encontrou inconsistências.");
+            string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase) ? null : "A verificação rápida do SQLite encontrou inconsistências.",
+            performanceSessionCount, performanceSampleCount);
     }
 
     private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
@@ -339,12 +482,48 @@ public sealed class ZeusDatabase
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private static async Task ValidateSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task UpgradeSchemaV2Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        using var transaction = connection.BeginTransaction();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            CREATE TABLE performance_sessions(
+                session_id TEXT PRIMARY KEY, label TEXT NOT NULL, started_utc TEXT NOT NULL,
+                finished_utc TEXT NULL, is_reference INTEGER NOT NULL CHECK(is_reference IN (0,1)));
+            CREATE TABLE performance_samples(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL REFERENCES performance_sessions(session_id) ON DELETE CASCADE,
+                sequence INTEGER NOT NULL CHECK(sequence >= 0 AND sequence < 600),
+                observed_utc TEXT NOT NULL, sampling_ms INTEGER NOT NULL CHECK(sampling_ms BETWEEN 0 AND 30000),
+                cpu_percent REAL NULL CHECK(cpu_percent IS NULL OR (cpu_percent >= 0 AND cpu_percent <= 100)),
+                total_memory_bytes TEXT NOT NULL, available_memory_bytes TEXT NOT NULL,
+                details_json TEXT NOT NULL CHECK(json_valid(details_json)),
+                UNIQUE(session_id,sequence));
+            CREATE INDEX ix_performance_sessions_started ON performance_sessions(started_utc DESC);
+            CREATE INDEX ix_performance_samples_observed ON performance_samples(observed_utc DESC);
+            INSERT INTO schema_migrations(version,applied_utc) VALUES(2,$applied);
+            PRAGMA user_version=2;
+            """;
+        command.Parameters.AddWithValue("$applied", Utc(DateTimeOffset.UtcNow));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static Task ValidateSchemaV1Async(SqliteConnection connection, CancellationToken cancellationToken) =>
+        ValidateSchemaTablesAsync(connection, cancellationToken,
+            "schema_migrations", "app_settings", "app_metadata", "activity_entries", "maintenance_sessions", "maintenance_steps");
+
+    private static Task ValidateSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken) =>
+        ValidateSchemaTablesAsync(connection, cancellationToken,
+            "schema_migrations", "app_settings", "app_metadata", "activity_entries", "maintenance_sessions", "maintenance_steps", "performance_sessions", "performance_samples");
+
+    private static async Task ValidateSchemaTablesAsync(SqliteConnection connection, CancellationToken cancellationToken, params string[] tables)
     {
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('schema_migrations','app_settings','app_metadata','activity_entries','maintenance_sessions','maintenance_steps');";
+        command.CommandText = $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ({string.Join(",", tables.Select(table => "'" + table + "'"))});";
         var count = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
-        if (count != 6) throw new InvalidDataException("O esquema do banco Zeus está incompleto. O arquivo foi preservado.");
+        if (count != tables.Length) throw new InvalidDataException("O esquema do banco Zeus está incompleto. O arquivo foi preservado.");
     }
 
     private static async Task<bool> HasMigrationAsync(SqliteConnection connection, SqliteTransaction transaction, string key, CancellationToken cancellationToken)
@@ -421,6 +600,11 @@ public sealed class ZeusDatabase
 
     private static string Utc(DateTimeOffset value) => value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
     private static DateTimeOffset ParseUtc(string value) => DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+    private static void ValidateSessionId(string value)
+    {
+        if (!Guid.TryParseExact(value, "D", out var parsed) || parsed == Guid.Empty)
+            throw new ArgumentException("O identificador da sessão deve ser um GUID não vazio no formato D.", nameof(value));
+    }
     private static void ValidateKey(string value) => ValidateText(value, 120, nameof(value));
     private static void ValidateJson(string value, string parameter)
     {

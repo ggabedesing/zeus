@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Windows;
 using Microsoft.Win32;
 using Zeus.Core;
@@ -37,6 +38,8 @@ public partial class MainWindow
         catch (Exception error) { _startupWarnings.Add($"O histórico de preferências não pôde ser lido: {error.Message}"); }
         try { await RefreshPowerPlansAsync(); }
         catch (Exception error) { _startupWarnings.Add($"Os planos de energia não puderam ser lidos: {error.Message}"); }
+        try { await LoadPerformanceSessionsAsync(); }
+        catch (Exception error) { _startupWarnings.Add($"O histórico de desempenho não pôde ser lido: {error.Message}"); }
     }
 
     private async void Execute_Click(object sender, RoutedEventArgs e)
@@ -106,10 +109,18 @@ public partial class MainWindow
         await RunOperationAsync("Medindo carga real", "Amostrando CPU, memória e processos por cinco segundos.", async token =>
         {
             _performanceSessionId = Guid.NewGuid();
-            var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(5), token);
-            DisplayPerformanceObservation(observation);
-            BuildPersonalPlan(); Notify(nameof(Performance));
-            StatusTitle = "Medição concluída"; StatusDetail = "A amostra registra esta carga. Repita durante a tarefa para comparar condições equivalentes.";
+            var id = _performanceSessionId;
+            var started = DateTimeOffset.UtcNow;
+            await BeginPerformanceSessionAsync(id, "Medição manual", started);
+            try
+            {
+                var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(5), token);
+                DisplayPerformanceObservation(observation);
+                await StorePerformanceObservationAsync(id, observation);
+                BuildPersonalPlan(); Notify(nameof(Performance));
+                StatusTitle = "Medição concluída"; StatusDetail = "A amostra registra esta carga. Repita durante a tarefa para comparar condições equivalentes.";
+            }
+            finally { await FinishPerformanceSessionAsync(id); }
         }, cancellable: true);
     }
 
@@ -118,16 +129,128 @@ public partial class MainWindow
         _performanceSessionId = Guid.NewGuid();
         await RunOperationAsync("Observando desempenho", "Amostras adaptativas de CPU, memória e processos. Use Cancelar leitura para encerrar.", async token =>
         {
-            while (true)
+            var id = _performanceSessionId;
+            await BeginPerformanceSessionAsync(id, "Observador adaptativo", DateTimeOffset.UtcNow);
+            try
             {
-                var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(2), token);
-                DisplayPerformanceObservation(observation);
-                var interval = AdaptiveSamplingPolicy.NextInterval(observation);
-                PerformanceSummary += $" · próxima amostra em {interval.TotalSeconds:0} s";
-                StatusDetail = $"Sessão {_performanceSessionId:N} · {_performanceHistory.Snapshot().Count} amostras guardadas em memória. Cancele para encerrar e exporte o relatório para preservar os dados.";
-                await Task.Delay(interval, token);
+                while (true)
+                {
+                    if (_performanceSessionSequences.GetValueOrDefault(id) >= PerformanceHistoryBuffer.DefaultCapacity)
+                    {
+                        await FinishPerformanceSessionAsync(id);
+                        id = _performanceSessionId = Guid.NewGuid();
+                        await BeginPerformanceSessionAsync(id, "Observador adaptativo", DateTimeOffset.UtcNow);
+                    }
+                    var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(2), token);
+                    DisplayPerformanceObservation(observation);
+                    await StorePerformanceObservationAsync(id, observation);
+                    var interval = AdaptiveSamplingPolicy.NextInterval(observation);
+                    PerformanceSummary += $" · próxima amostra em {interval.TotalSeconds:0} s";
+                    StatusDetail = $"Sessão {id:N} · {_performanceHistory.Snapshot().Count} amostras guardadas em memória. Cancele para encerrar.";
+                    await Task.Delay(interval, token);
+                }
             }
+            finally { await FinishPerformanceSessionAsync(id); }
         }, cancellable: true);
+    }
+
+    private async Task BeginPerformanceSessionAsync(Guid id, string label, DateTimeOffset startedAt)
+    {
+        if (!_performanceSessionStartAttempts.Add(id)) return;
+        try
+        {
+            await _storage.StartPerformanceSessionAsync(id, label, startedAt);
+            _persistedPerformanceSessions.Add(id);
+            _performanceSessionSequences[id] = 0;
+        }
+        catch (Exception error) when (IsStorageError(error)) { AddPerformanceStorageWarning(error); }
+    }
+
+    private async Task StorePerformanceObservationAsync(Guid id, PerformanceObservation observation)
+    {
+        if (!_persistedPerformanceSessions.Contains(id)) return;
+        var sequence = _performanceSessionSequences.GetValueOrDefault(id);
+        try
+        {
+            await _storage.AppendPerformanceObservationAsync(id, sequence, observation);
+            _performanceSessionSequences[id] = sequence + 1;
+        }
+        catch (Exception error) when (IsStorageError(error))
+        {
+            _persistedPerformanceSessions.Remove(id);
+            AddPerformanceStorageWarning(error);
+        }
+    }
+
+    private async Task FinishPerformanceSessionAsync(Guid id)
+    {
+        if (!_persistedPerformanceSessions.Contains(id)) return;
+        try { await _storage.FinishPerformanceSessionAsync(id, DateTimeOffset.UtcNow); }
+        catch (Exception error) when (IsStorageError(error)) { AddPerformanceStorageWarning(error); }
+    }
+
+    private void AddPerformanceStorageWarning(Exception error)
+    {
+        const string warning = "O histórico de desempenho desta leitura não pôde ser gravado no SQLite; os dados ainda podem ser exportados enquanto o ZEUS estiver aberto.";
+        if (!Warnings.Contains(warning)) Warnings.Add(warning);
+        AppendLog($"Persistência de desempenho não concluída ({error.GetType().Name}).");
+    }
+
+    private async Task LoadPerformanceSessionsAsync()
+    {
+        var sessions = await _storage.ReadPerformanceSessionsAsync();
+        var all = new List<(bool IsReference, PerformanceObservation Observation)>();
+        foreach (var session in sessions.OrderBy(session => session.StartedAt))
+        {
+            if (!Guid.TryParseExact(session.SessionId, "D", out var id) || id == Guid.Empty)
+            {
+                _startupWarnings.Add("Uma sessão de desempenho com identificador inválido foi ignorada; o banco foi preservado.");
+                continue;
+            }
+            _performanceSessionStartAttempts.Add(id);
+            _persistedPerformanceSessions.Add(id);
+            foreach (var sample in session.Samples.OrderBy(sample => sample.Sequence))
+            {
+                try
+                {
+                    var observation = JsonSerializer.Deserialize<PerformanceObservation>(sample.DetailsJson, DesktopStorage.JsonOptions)
+                        ?? throw new InvalidDataException("A amostra armazenada está vazia.");
+                    if (!session.IsReference) _performanceHistory.Add(new(id, observation));
+                    all.Add((session.IsReference, observation));
+                    _performanceSessionSequences[id] = Math.Max(_performanceSessionSequences.GetValueOrDefault(id), sample.Sequence + 1);
+                }
+                catch (Exception error) when (error is JsonException or InvalidDataException or NotSupportedException)
+                {
+                    _startupWarnings.Add("Uma amostra de desempenho inválida foi ignorada; o registro original permanece no banco.");
+                }
+            }
+            if (session.FinishedAt is null)
+            {
+                if (session.Samples.Count > 0)
+                    _startupWarnings.Add("Uma sessão de desempenho terminou sem fechamento confirmado; as amostras já gravadas foram recuperadas.");
+                try { await _storage.FinishPerformanceSessionAsync(id, DateTimeOffset.UtcNow); }
+                catch (Exception error) when (IsStorageError(error))
+                {
+                    _startupWarnings.Add($"O estado encerrado da sessão de desempenho não foi atualizado ({error.GetType().Name}).");
+                }
+            }
+        }
+
+        _performanceBaseline = all.Where(item => item.IsReference).Select(item => item.Observation).TakeLast(5).ToArray();
+        var last = _performanceHistory.Snapshot().LastOrDefault();
+        if (last is not null)
+        {
+            _performance = last.Observation;
+            PerformanceSummary = $"Histórico recuperado: {_performanceHistory.Snapshot().Count} amostras locais. Última leitura em {last.Observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}.";
+        }
+        if (_performanceBaseline.Length >= 3)
+        {
+            var baselineEnd = _performanceBaseline[^1].CollectedAt;
+            var later = all.Where(item => !item.IsReference && item.Observation.CollectedAt > baselineEnd)
+                .Select(item => item.Observation).TakeLast(5).ToArray();
+            if (later.Length >= 3) _performanceComparison = PerformanceComparisonBuilder.Compare(_performanceBaseline, later);
+        }
+        Notify(nameof(Performance)); Notify(nameof(CanSetPerformanceBaseline)); Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
     }
 
     private void DisplayPerformanceObservation(PerformanceObservation observation)
@@ -153,7 +276,7 @@ public partial class MainWindow
         Notify(nameof(Performance)); Notify(nameof(CanSetPerformanceBaseline)); Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
     }
 
-    private void SetPerformanceBaseline_Click(object sender, RoutedEventArgs e)
+    private async void SetPerformanceBaseline_Click(object sender, RoutedEventArgs e)
     {
         var observations = _performanceHistory.Snapshot().TakeLast(5).Select(entry => entry.Observation).ToArray();
         if (observations.Length < 3) return;
@@ -161,6 +284,17 @@ public partial class MainWindow
         _performanceComparison = null;
         Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
         StatusDetail = $"Referência definida com {observations.Length} amostras. Execute a mesma tarefa em condições semelhantes e colete ao menos três amostras posteriores.";
+
+        var referenceId = Guid.NewGuid();
+        await BeginPerformanceSessionAsync(referenceId, "Referência de desempenho", observations[0].CollectedAt);
+        for (var index = 0; index < observations.Length; index++)
+            await StorePerformanceObservationAsync(referenceId, observations[index]);
+        if (_persistedPerformanceSessions.Contains(referenceId))
+        {
+            try { await _storage.MarkPerformanceReferenceAsync(referenceId); }
+            catch (Exception error) when (IsStorageError(error)) { AddPerformanceStorageWarning(error); }
+        }
+        await FinishPerformanceSessionAsync(referenceId);
     }
 
     private static string FormatBytesPerSecond(ulong? bytes) => bytes is { } value
