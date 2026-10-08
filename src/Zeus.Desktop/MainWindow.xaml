@@ -86,7 +86,7 @@
        </Expander>
       </StackPanel></Border>
      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-     <Button Content="Revisar e instalar drivers selecionados" Click="InstallDriver_Click" IsEnabled="{Binding CanInstallDriver}" HorizontalAlignment="Left" Margin="0,18,0,18"/><TextBlock Text="O auxiliar consulta novamente a identidade escolhida, exige proteção confirmada e exporta os drivers atuais. A instalação pode exigir reinicialização; uma versão mais recente não garante desempenho melhor." Style="{StaticResource MutedText}"/>
+     <Button Content="Revisar e instalar drivers selecionados" Click="InstallDriver_Click" IsEnabled="{Binding CanInstallDriver}" HorizontalAlignment="Left" Margin="0,18,0,18" AutomationProperties.AutomationId="install-selected-drivers"/><TextBlock Text="O auxiliar consulta novamente a identidade escolhida, exige proteção confirmada e exporta os drivers atuais. A instalação pode exigir reinicialização; uma versão mais recente não garante desempenho melhor." Style="{StaticResource MutedText}"/>
     </StackPanel></ScrollViewer>
    </TabItem>
    <TabItem Header="Hardware e carga" AutomationProperties.AutomationId="HardwareTab">

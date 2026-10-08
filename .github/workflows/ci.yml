@@ -47,8 +47,6 @@ jobs:
       contents: write
     env:
       ZEUS_WINDOWS_ACCEPTANCE: '1'
-      ZEUS_VALIDATION_DIR: ${{ runner.temp }}/zeus-validation/screenshots
-      ZEUS_TEST_RESULTS: ${{ runner.temp }}/zeus-test-results
       ZEUS_SOURCE_SHA: ${{ github.sha }}
       ZEUS_SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
       ZEUS_BUILD_OUTCOME: pending
@@ -60,6 +58,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Configure isolated acceptance directories
+        shell: pwsh
+        run: |
+          "ZEUS_VALIDATION_DIR=$env:RUNNER_TEMP/zeus-validation/screenshots" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ZEUS_TEST_RESULTS=$env:RUNNER_TEMP/zeus-test-results" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Build every project
         id: build
         run: dotnet build Zeus.slnx -c Release
