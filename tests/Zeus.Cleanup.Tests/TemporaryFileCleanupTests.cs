@@ -39,6 +39,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
 
         var result = await cleanup.QuarantineAsync(scan, scan.Files.Select(file => file.Id).ToArray());
 
+        AssertSessionFiles(result, scan.Files.Count);
         Assert.Equal(1, result.MovedFiles);
         Assert.Equal(0, result.SkippedFiles);
         Assert.Equal(11UL, result.QuarantinedBytes);
@@ -384,6 +385,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
 
         var result = await cleanup.QuarantineAsync(scan, scan.Files.Select(file => file.Id).ToArray());
 
+        AssertSessionFiles(result, 1);
         Assert.Equal(1, result.SkippedFiles);
         Assert.Equal(1, result.MovedFiles);
         Assert.Equal(9UL, result.QuarantinedBytes);
@@ -564,6 +566,30 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Equal("original document", await File.ReadAllTextAsync(outside));
     }
 
+    [WindowsFact]
+    public async Task WindowsRepeatedCrossDirectoryRenamesPreserveExactLongUnicodeNames()
+    {
+        Directory.CreateDirectory(StorageRoot);
+        for (var index = 0; index < 24; index++)
+        {
+            var original = WriteOld($"source-{index}.tmp", $"contents-{index}");
+            var session = Path.Combine(StorageRoot, Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(session);
+            var destination = Path.Combine(session, Guid.NewGuid().ToString("N") + "-recuperação.bin");
+            using (var lease = CleanupFileLease.Open(original))
+            {
+                Assert.NotEmpty(await lease.HashAsync(CancellationToken.None));
+                lease.MoveTo(destination);
+            }
+
+            Assert.True(File.Exists(destination), $"Destino exato não encontrado: {destination}; observados: " +
+                string.Join(" | ", Directory.EnumerateFileSystemEntries(session)));
+            Assert.Equal($"contents-{index}", await File.ReadAllTextAsync(destination));
+            Assert.Equal(destination, Assert.Single(Directory.EnumerateFiles(session)));
+            Assert.False(File.Exists(original));
+        }
+    }
+
     private TemporaryFileCleanup Create() => new(TemporaryRoot, StorageRoot);
 
     private string WriteOld(string relativePath, string contents)
@@ -575,10 +601,25 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         return path;
     }
 
-    private static async Task<CleanupResult> QuarantineEverything(TemporaryFileCleanup cleanup)
+    private async Task<CleanupResult> QuarantineEverything(TemporaryFileCleanup cleanup)
     {
         var scan = await cleanup.ScanAsync();
-        return await cleanup.QuarantineAsync(scan, scan.Files.Select(file => file.Id).ToArray());
+        var result = await cleanup.QuarantineAsync(scan, scan.Files.Select(file => file.Id).ToArray());
+        AssertSessionFiles(result, scan.Files.Count);
+        return result;
+    }
+
+    private void AssertSessionFiles(CleanupResult result, int expectedMoved)
+    {
+        var entries = Directory.Exists(StorageRoot)
+            ? Directory.EnumerateFileSystemEntries(StorageRoot, "*", SearchOption.AllDirectories)
+                .Take(64).Select(path => System.Text.Json.JsonSerializer.Serialize(Path.GetRelativePath(StorageRoot, path))).ToArray()
+            : [];
+        var details = $"Session {result.SessionId:N}: moved={result.MovedFiles}, skipped={result.SkippedFiles}; " +
+            $"warnings: {string.Join(" | ", result.Warnings)}; storage entries: {string.Join(" | ", entries)}";
+        Assert.True(result.MovedFiles == expectedMoved, details);
+        Assert.True(File.Exists(Path.Combine(SessionPath(result.SessionId), "manifest.json")), details);
+        Assert.True(Directory.EnumerateFiles(SessionPath(result.SessionId), "*.bin").Count() == expectedMoved, details);
     }
 
     private string SessionPath(Guid id) => Path.Combine(StorageRoot, id.ToString("N"));

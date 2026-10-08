@@ -123,16 +123,24 @@ internal sealed class CleanupFileLease : IDisposable
             var rootOffset = IntPtr.Size;
             var lengthOffset = IntPtr.Size * 2;
             var nameOffset = lengthOffset + sizeof(uint);
-            var buffer = Marshal.AllocHGlobal(nameOffset + name.Length);
+            // Win32 may convert an absolute DOS path before forwarding the counted name
+            // to NT. Supply a real UTF-16 terminator as well as the counted byte length;
+            // otherwise conversion can consume uninitialized native heap bytes.
+            var bufferLength = nameOffset + name.Length + sizeof(char);
+            var buffer = Marshal.AllocHGlobal(bufferLength);
             try
             {
                 // FILE_RENAME_INFO: ReplaceIfExists=false; RootDirectory=NULL; exact UTF-16 name.
-                for (var offset = 0; offset < nameOffset; offset++) Marshal.WriteByte(buffer, offset, 0);
+                Marshal.Copy(new byte[bufferLength], 0, buffer, bufferLength);
                 Marshal.WriteIntPtr(buffer, rootOffset, IntPtr.Zero);
                 Marshal.WriteInt32(buffer, lengthOffset, name.Length);
                 Marshal.Copy(name, 0, buffer + nameOffset, name.Length);
-                if (!SetFileInformationByHandle(stream.SafeFileHandle, 3, buffer, (uint)(nameOffset + name.Length)))
+                if (!SetFileInformationByHandle(stream.SafeFileHandle, 3, buffer, (uint)bufferLength))
                     ThrowWindowsError("Não foi possível mover o arquivo validado.");
+                var actual = FinalPath(stream.SafeFileHandle);
+                var expected = Path.Combine(CanonicalizeRoot(Path.GetDirectoryName(destination)!), Path.GetFileName(destination));
+                if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+                    throw new IOException($"A movimentação retornou um caminho inesperado: esperado '{expected}', observado '{actual}'.");
             }
             finally { Marshal.FreeHGlobal(buffer); }
         }
@@ -175,18 +183,22 @@ internal sealed class CleanupFileLease : IDisposable
         }
         using var handle = OpenWindows(existing, ReadAttributes, 7, BackupSemantics | OpenReparsePoint);
         RequireNormalHandle(handle, directory: true);
+        var canonical = FinalPath(handle);
+        while (missing.Count > 0) canonical = Path.Combine(canonical, missing.Pop());
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(canonical));
+    }
+
+    private static string FinalPath(SafeFileHandle handle)
+    {
         var capacity = 512;
-        string canonical;
         while (true)
         {
             var buffer = new StringBuilder(capacity);
             var length = GetFinalPathNameByHandleW(handle, buffer, (uint)capacity, 0);
             if (length == 0) ThrowWindowsError("Não foi possível confirmar o diretório de limpeza.");
-            if (length < capacity) { canonical = NormalizeWindowsPath(buffer.ToString()); break; }
+            if (length < capacity) return NormalizeWindowsPath(buffer.ToString());
             capacity = checked((int)length + 1);
         }
-        while (missing.Count > 0) canonical = Path.Combine(canonical, missing.Pop());
-        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(canonical));
     }
 
     private static string NormalizeWindowsPath(string path)

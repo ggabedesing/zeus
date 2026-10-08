@@ -48,3 +48,14 @@ Na área Limpeza, selecione a sessão guardada e restaure os arquivos. Se o dest
 Em Perfil e plano ou Histórico, use “Restaurar estado anterior” para preferências, energia e entradas de inicialização. Alterações posteriores conflitantes são preservadas.
 
 Para falhas do Windows após reparo/driver, use as opções de Recuperação do Windows e o ponto criado. A exportação de drivers está na pasta `driver-backup` da sessão administrativa. Essas rotas precisam ser ensaiadas em uma máquina de teste antes de distribuir para produção.
+
+## Conferência no computador principal
+
+1. Extraia a pasta inteira do pacote e abra `Zeus.Desktop.exe` com seu usuário comum.
+2. Aguarde “Diagnóstico concluído”. Confira CPU, memória, GPU e volumes; leituras ausentes devem trazer avisos.
+3. Em Hardware e carga, use “Medir carga por 5 segundos” durante a tarefa que está lenta.
+4. Em Inicialização, use “Atualizar inicialização” para ler as entradas. Em Limpeza, “Analisar temporários” apenas lista candidatos.
+5. Teste os três temas e responda às perguntas do perfil; escolher um tema ou responder ao perfil não aplica ajustes ao Windows.
+6. Exporte o JSON e confira os dados localmente. Revise nomes de computador, usuários e processos antes de compartilhar.
+
+Esse roteiro só lê dados e guarda preferências da interface. Reparos, desativação de inicialização, exclusão, efeitos do Windows, instalação de drivers e verificação offline exigem ações separadas e revisão. A conferência no PC principal não substitui os ensaios de recuperação em máquina descartável.

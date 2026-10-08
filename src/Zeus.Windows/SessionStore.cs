@@ -99,8 +99,12 @@ public static class SessionStore
                 await stream.FlushAsync();
                 stream.Flush(flushToDisk: true);
             }
-            if (File.Exists(destination)) ValidateFile(destination);
-            File.Move(temporary, destination, overwrite: replaceExisting);
+            if (File.Exists(destination) && replaceExisting)
+            {
+                ValidateFile(destination);
+                File.Replace(temporary, destination, destinationBackupFileName: null, ignoreMetadataErrors: false);
+            }
+            else File.Move(temporary, destination, overwrite: false);
         }
         finally
         {

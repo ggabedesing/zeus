@@ -77,6 +77,8 @@ public sealed class WpfExperienceTests
         }
         Assert.Equal("Diagnóstico concluído", window.StatusTitle);
         Assert.Same(window, window.DataContext);
+        Assert.Same(Application.Current.Resources["BackgroundBrush"], window.Background);
+        Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);
         Assert.NotEmpty(window.HardwareCards);
         Assert.NotNull(window.Snapshot);
         Assert.NotNull(window.Snapshot.Cpu);
