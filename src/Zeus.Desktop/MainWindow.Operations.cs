@@ -350,8 +350,8 @@ public partial class MainWindow
     private static string FormatGpuOccupancyAssessment(GpuMemoryOccupancyAssessment assessment) => assessment.State switch
     {
         GpuMemoryOccupancyState.InsufficientEvidence => $"Evidência insuficiente: {assessment.ValidSamples} leitura(s) válida(s) em {assessment.Window.TotalSeconds:0.#} s; exigidos {GpuMemoryOccupancyAnalyzer.MinimumSamples} leituras e pelo menos {GpuMemoryOccupancyAnalyzer.MinimumWindow.TotalSeconds:0} s.",
-        GpuMemoryOccupancyState.SustainedHighOccupancy => $"Ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% em {assessment.HighOccupancySamples}/{assessment.ValidSamples} leituras; média {assessment.AverageOccupancyPercent:0.#}%. Sinal para investigar; não confirma pressão, gargalo ou impacto no jogo.",
-        _ => $"Sem ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% sustentada nesta janela ({assessment.ValidSamples} leituras). Isso não exclui pressão ou gargalo por outra causa."
+        GpuMemoryOccupancyState.SustainedHighOccupancy => $"Ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% em {assessment.HighOccupancySamples}/{assessment.ValidSamples} leituras; média {assessment.AverageOccupancyPercent:0.#}%. Sinal para investigar. Pressão de VRAM permanece desconhecida: os contadores atuais são agregados por adaptador e não incluem o orçamento do processo nem evidência de paginação.",
+        _ => $"Sem ocupação dedicada ≥{GpuMemoryOccupancyAnalyzer.HighOccupancyThresholdPercent:0}% sustentada nesta janela ({assessment.ValidSamples} leituras). Pressão de VRAM permanece desconhecida: os contadores atuais não mostram o orçamento do processo nem evidência de paginação."
     };
 
     private async void SetPerformanceBaseline_Click(object sender, RoutedEventArgs e)
