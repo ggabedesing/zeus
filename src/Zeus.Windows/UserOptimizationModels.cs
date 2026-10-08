@@ -23,3 +23,12 @@ public sealed record UserChangeSession(Guid Id, DateTimeOffset CreatedAt, string
 }
 public sealed record UserChangeResult(Guid SessionId, bool Succeeded, string Message);
 public sealed record PowerPlanInfo(Guid Id, string Name, bool IsActive);
+
+/// <summary>Current-user desktop wallpaper access; kept injectable so rollback can be tested without changing the desktop.</summary>
+public interface IWallpaperPlatform
+{
+    bool IsSlideshowConfigured();
+    bool HasUniformWallpaper();
+    string GetWallpaperPath();
+    bool SetWallpaperPath(string path);
+}

@@ -155,7 +155,7 @@ Há duas funcionalidades possíveis:
 
 **Temas do próprio ZEUS:** plenamente viáveis. Minimal com poucos gráficos e animações; Completo com informações avançadas; tema original inspirado no macOS, com composição, cores e navegação próprias. Respeitar contraste elevado, movimento reduzido, teclado e leitores de tela.
 
-**Aparência do Windows:** começar com opções suportadas de tema, cores, papel de parede, efeitos e preferências disponíveis na versão detectada. Mostrar prévia e guardar configurações anteriores. Isso não transforma Windows em macOS nem garante ganho de desempenho em outras aplicações.
+**Aparência do Windows:** começar com opções suportadas de tema, cores, papel de parede, efeitos e preferências disponíveis na versão detectada. Mostrar prévia e guardar configurações anteriores. Isso não transforma Windows em macOS nem garante ganho de desempenho em outras aplicações. O primeiro fluxo de papel de parede limita-se a uma imagem estática compartilhada por todos os monitores; slideshows, papéis diferentes por monitor e a tela de bloqueio ficam fora desta ação.
 
 Dock, widgets permanentes e substituição do Explorer aumentam o escopo: processos adicionais, manutenção, compatibilidade com updates, recuperação e licenças. Recomendo tratar como expansão independente. Não copiar ativos e marcas da Apple para a distribuição.
 

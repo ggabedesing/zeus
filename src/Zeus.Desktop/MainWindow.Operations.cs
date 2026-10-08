@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using Zeus.Core;
 using Zeus.Windows;
@@ -481,6 +482,58 @@ public partial class MainWindow
             StatusTitle = result.Succeeded ? "Preferências aplicadas" : "Preferências não concluídas"; StatusDetail = result.Message;
         }, mutation: true);
     }
+
+    private void ChooseWallpaper_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Escolher imagem de papel de parede",
+            Filter = "Imagens (BMP, JPEG, PNG)|*.bmp;*.jpg;*.jpeg;*.png",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var file = new FileInfo(dialog.FileName);
+            if (file.Length is <= 0 or > 32L * 1024 * 1024) throw new InvalidDataException("Escolha uma imagem de até 32 MiB.");
+            var bitmap = new BitmapImage();
+            using (var stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.DecodePixelWidth = 960;
+                bitmap.StreamSource = stream;
+                bitmap.EndInit();
+            }
+            bitmap.Freeze();
+            WallpaperPreview = bitmap;
+            SelectedWallpaperPath = Path.GetFullPath(file.FullName);
+            ProfileSummary = $"Prévia carregada: {file.Name}. O Windows ainda não foi alterado.";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or NotSupportedException or FormatException or ArgumentException or System.Windows.Markup.XamlParseException)
+        {
+            WallpaperPreview = null;
+            SelectedWallpaperPath = null;
+            ProfileSummary = $"Não foi possível abrir essa imagem: {error.Message}";
+        }
+    }
+
+    private async void ApplyWallpaper_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanApplyWallpaper || SelectedWallpaperPath is not { } imagePath) return;
+        var fileName = Path.GetFileName(imagePath);
+        if (!Confirm($"Aplicar “{fileName}” como papel de parede do Windows?\n\nO ZEUS guardará uma cópia do papel de parede atual no histórico e verificará o resultado. Se o papel de parede for alterado depois fora do ZEUS, a restauração será bloqueada para preservar a escolha mais recente.", "Revisar papel de parede")) return;
+        await RunOperationAsync("Aplicando papel de parede", "Guardando e verificando uma cópia local do estado atual antes de alterar o Windows.", async token =>
+        {
+            var result = await _userOptimization.ApplyWallpaperAsync(imagePath, token);
+            await RefreshUserChangesAsync();
+            ProfileSummary = result.Message;
+            StatusTitle = result.Succeeded ? "Papel de parede aplicado" : "Papel de parede não alterado";
+            StatusDetail = result.Message;
+        }, mutation: true);
+    }
+
     private async Task RefreshPowerPlansAsync()
     {
         var plans = await _userOptimization.ReadPowerPlansAsync(); PowerPlans.Clear(); foreach (var plan in plans) PowerPlans.Add(plan); SelectedPowerPlan = PowerPlans.FirstOrDefault(p => p.IsActive);

@@ -58,6 +58,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private int _activityStorageWarningShown;
     private DatabaseHealth? _storageHealth;
     private PowerPlanInfo? _selectedPowerPlan;
+    private string? _selectedWallpaperPath;
+    private ImageSource? _wallpaperPreview;
     private string _statusTitle = "Preparando diagnóstico", _statusDetail = "As informações serão lidas diretamente neste computador.";
     private string _executionLog = "Nenhuma manutenção executada nesta sessão.", _maintenanceResultSummary = string.Empty;
     private string _cleanupSummary = "Analise temporários com mais de sete dias. Nenhum arquivo será selecionado automaticamente.";
@@ -142,6 +144,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanQuarantine => !_isBusy && _cleanupScan is not null && CleanupFiles.Any(f => f.IsSelected);
     public bool CanDisableStartup => !_isBusy && StartupChoices.Any(f => f.IsSelected && f.CanSelect);
     public bool CanSetPowerPlan => !_isBusy && SelectedPowerPlan is { IsActive: false };
+    public bool CanApplyWallpaper => !_isBusy && !string.IsNullOrWhiteSpace(SelectedWallpaperPath);
     public bool CanInstallDriver => !_isBusy && DriverCandidates.Any(d => d.IsSelected) && DriverCandidates.Where(d => d.IsSelected).All(d => d.LicenseReady);
     public bool CanOfflineScan => !_isBusy && OfflineRestartConfirmed && OfflineRecoveryConfirmed;
     public string StatusTitle { get => _statusTitle; private set => Set(ref _statusTitle, value); }
@@ -204,6 +207,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool OfflineRestartConfirmed { get => _offlineRestartConfirmed; set { if (Set(ref _offlineRestartConfirmed, value)) Notify(nameof(CanOfflineScan)); } }
     public bool OfflineRecoveryConfirmed { get => _offlineRecoveryConfirmed; set { if (Set(ref _offlineRecoveryConfirmed, value)) Notify(nameof(CanOfflineScan)); } }
     public PowerPlanInfo? SelectedPowerPlan { get => _selectedPowerPlan; set { if (Set(ref _selectedPowerPlan, value)) Notify(nameof(CanSetPowerPlan)); } }
+    public string? SelectedWallpaperPath { get => _selectedWallpaperPath; private set { if (Set(ref _selectedWallpaperPath, value)) Notify(nameof(CanApplyWallpaper)); } }
+    public ImageSource? WallpaperPreview { get => _wallpaperPreview; private set => Set(ref _wallpaperPreview, value); }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
@@ -498,7 +503,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
-    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); }
+    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); }
     private string? MaintenanceSelectionError()
     {
         var selected = MaintenanceChoices.Where(choice => choice.IsSelected)

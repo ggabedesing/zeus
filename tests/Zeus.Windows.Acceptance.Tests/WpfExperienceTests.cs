@@ -85,6 +85,10 @@ public sealed class WpfExperienceTests
         Assert.NotEmpty(window.FormalPlanSummary);
         Assert.Contains(window.ProfileOptions, option => option.Value == Zeus.Windows.UsageProfile.GamingStreaming);
         Assert.Contains(window.ProfileOptions, option => option.Value == Zeus.Windows.UsageProfile.Development);
+        var chooseWallpaperButton = Assert.IsType<Button>(window.FindName("ChooseWallpaperPreviewButton"));
+        Assert.True(chooseWallpaperButton.IsEnabled);
+        var applyWallpaperButton = Assert.IsType<Button>(window.FindName("ApplyWallpaperButton"));
+        Assert.False(applyWallpaperButton.IsEnabled, "A aplicação exige primeiro uma imagem escolhida e pré-visualizada.");
         Assert.NotNull(window.Snapshot.Cpu);
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);

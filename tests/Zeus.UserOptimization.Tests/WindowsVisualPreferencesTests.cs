@@ -99,3 +99,144 @@ public sealed class WindowsVisualPreferencesTests
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetAnimation(uint action, uint parameter, [MarshalAs(UnmanagedType.Bool)] bool value, uint flags);
 }
+
+public sealed class WallpaperChangeTests
+{
+    [Fact]
+    public void WindowsWallpaperStatusCanBeReadWithoutChangingTheDesktop()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var platform = new WindowsWallpaperPlatform();
+
+        _ = platform.IsSlideshowConfigured();
+        if (platform.HasUniformWallpaper())
+            Assert.True(Path.IsPathFullyQualified(platform.GetWallpaperPath()));
+    }
+
+    [Fact]
+    public async Task WallpaperChangeSavesPreviousImageAndRestoresItFromHistory()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previous = Path.Combine(root, "previous.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(previous, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        var platform = new FixtureWallpaperPlatform(previous);
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var applied = await service.ApplyWallpaperAsync(selected);
+            Assert.True(applied.Succeeded, applied.Message);
+            Assert.Equal(Path.GetFullPath(selected), platform.CurrentPath);
+            var journal = Assert.Single(await service.ListChangesAsync());
+            Assert.Equal(UserChangeStatus.Applied, journal.Status);
+            Assert.False(journal.Restored);
+
+            var restored = await service.RestoreAsync(applied.SessionId);
+
+            Assert.True(restored.Succeeded, restored.Message);
+            Assert.Equal(Bmp(1, 2, 3), await File.ReadAllBytesAsync(platform.CurrentPath));
+            Assert.True(Assert.Single(await service.ListChangesAsync()).Restored);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task WallpaperRestorePreservesAnImageChangedOutsideTheZeusSession()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previous = Path.Combine(root, "previous.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        var external = Path.Combine(root, "external.bmp");
+        await File.WriteAllBytesAsync(previous, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        await File.WriteAllBytesAsync(external, Bmp(7, 8, 9));
+        var platform = new FixtureWallpaperPlatform(previous);
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var applied = await service.ApplyWallpaperAsync(selected);
+            Assert.True(applied.Succeeded, applied.Message);
+            platform.CurrentPath = external;
+
+            var restored = await service.RestoreAsync(applied.SessionId);
+
+            Assert.False(restored.Succeeded);
+            Assert.Contains("alterado fora", restored.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(external, platform.CurrentPath);
+            Assert.Equal(UserChangeStatus.RestoreBlocked, Assert.Single(await service.ListChangesAsync()).Status);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task WallpaperChangeRejectsMisleadingExtensionBeforeCallingWindows()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previous = Path.Combine(root, "previous.bmp");
+        var mislabeled = Path.Combine(root, "not-an-image.png");
+        await File.WriteAllBytesAsync(previous, Bmp(1, 2, 3));
+        await File.WriteAllTextAsync(mislabeled, "not a PNG");
+        var platform = new FixtureWallpaperPlatform(previous);
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var result = await service.ApplyWallpaperAsync(mislabeled);
+            Assert.False(result.Succeeded);
+            Assert.Equal(previous, platform.CurrentPath);
+            Assert.Empty(await service.ListChangesAsync());
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task WallpaperChangeRefusesSlideshowsAndPerMonitorConfigurations(bool slideshow, bool uniform)
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previous = Path.Combine(root, "previous.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(previous, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        var platform = new FixtureWallpaperPlatform(previous) { Slideshow = slideshow, Uniform = uniform };
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+
+            var result = await service.ApplyWallpaperAsync(selected);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains(slideshow ? "slides" : "monitores", result.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(previous, platform.CurrentPath);
+            Assert.Empty(await service.ListChangesAsync());
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    private static byte[] Bmp(byte red, byte green, byte blue) =>
+    [0x42, 0x4d, 0x3a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x36, 0x00, 0x00, 0x00,
+     0x28, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+     0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x13, 0x0b, 0x00, 0x00,
+     0x13, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     blue, green, red, 0x00];
+
+    private sealed class FixtureWallpaperPlatform(string initialPath) : IWallpaperPlatform
+    {
+        public string CurrentPath { get; set; } = initialPath;
+        public bool Slideshow { get; set; }
+        public bool Uniform { get; set; } = true;
+        public bool IsSlideshowConfigured() => Slideshow;
+        public bool HasUniformWallpaper() => Uniform;
+        public string GetWallpaperPath() => CurrentPath;
+        public bool SetWallpaperPath(string path) { CurrentPath = path; return File.Exists(path); }
+    }
+}
