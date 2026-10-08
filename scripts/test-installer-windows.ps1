@@ -64,6 +64,38 @@ function Assert-InstalledVersion([string]$Version) {
     }
 }
 
+function Assert-ZeusLaunches {
+    $executable = Join-Path $installDirectory 'Zeus.Desktop.exe'
+    $process = Start-Process -FilePath $executable -WorkingDirectory $installDirectory -PassThru
+    $windowReady = $false
+    try {
+        $deadline = [DateTime]::UtcNow.AddSeconds(45)
+        while ([DateTime]::UtcNow -lt $deadline) {
+            $process.Refresh()
+            if ($process.HasExited) { throw "ZEUS exited during startup with code $($process.ExitCode)." }
+            if ($process.MainWindowHandle -ne [IntPtr]::Zero -and
+                $process.MainWindowTitle -eq 'ZEUS · Otimização e diagnóstico') {
+                $windowReady = $true
+                break
+            }
+            Start-Sleep -Milliseconds 250
+        }
+        if (!$windowReady) { throw 'The installed ZEUS application did not show its main window within 45 seconds.' }
+        Write-Output 'Installed ZEUS application opened its main window.'
+    } finally {
+        $process.Refresh()
+        if (!$process.HasExited) {
+            [void]$process.CloseMainWindow()
+            if (!$process.WaitForExit(15000)) {
+                $process.Kill()
+                if (!$process.WaitForExit(5000)) { throw 'Could not stop the ZEUS smoke process before MSI uninstall.' }
+                throw 'ZEUS did not close cleanly after the launch smoke; MSI uninstall was not attempted.'
+            }
+        }
+        $process.Dispose()
+    }
+}
+
 if (@(Get-ZeusUninstallEntries).Count -ne 0 -or (Test-Path -LiteralPath $installDirectory)) {
     throw 'The hosted runner is not clean; refusing to touch an existing ZEUS installation.'
 }
@@ -80,6 +112,7 @@ try {
 
     Invoke-Msi @('/i', ('"' + $CurrentInstaller + '"')) 'major-upgrade.log'
     Assert-InstalledVersion $ExpectedVersion
+    Assert-ZeusLaunches
     if (!(Test-Path -LiteralPath $sentinel -PathType Leaf)) { throw 'The major upgrade removed user-local data.' }
 
     Invoke-Msi @('/x', ('"' + $CurrentInstaller + '"')) 'uninstall.log'
