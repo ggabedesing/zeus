@@ -401,7 +401,7 @@ public partial class MainWindow
     private async Task RefreshUserChangesAsync()
     {
         var changes = await _userOptimization.ListChangesAsync(); UserChanges.Clear();
-        foreach (var s in changes) UserChanges.Add(new(s.Id, s.Description, $"{s.CreatedAt.ToLocalTime():dd/MM/yyyy HH:mm:ss} · {(s.Restored ? "Restaurado" : "Estado anterior guardado")}", !s.Restored));
+        foreach (var s in changes) UserChanges.Add(new(s.Id, s.Description, $"{s.CreatedAt.ToLocalTime():dd/MM/yyyy HH:mm:ss} · {s.StatusText}", !s.Restored));
     }
     private async void RestoreChange_Click(object sender, RoutedEventArgs e)
     {

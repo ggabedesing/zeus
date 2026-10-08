@@ -77,16 +77,23 @@ public sealed class UserOptimizationService
             var current = ReadValue(key, snapshot.Name);
             if (current is null || Fingerprint(current) != entryId)
                 return Failure("A entrada mudou durante a operação; nenhuma entrada foi excluída.", document.Id);
+            document.Status = UserChangeStatus.Applying;
+            await SaveDocumentAsync(document, cancellationToken);
             key.DeleteValue(snapshot.Name, throwOnMissingValue: true);
             key.Flush();
             if (ReadValue(key, snapshot.Name) is not null)
+            {
+                await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
                 return Failure("A entrada voltou a existir durante a operação. Atualize o diagnóstico antes de tentar novamente.", document.Id);
+            }
+            await SetChangeStatusAsync(document, UserChangeStatus.Applied);
             return Success(document.Id, "Inicialização desativada para este usuário. O histórico permite restaurá-la.");
         }, cancellationToken);
 
     public async Task<IReadOnlyList<UserChangeSession>> ListChangesAsync(CancellationToken cancellationToken = default) =>
         (await ReadDocumentsAsync(cancellationToken)).Select(document => new UserChangeSession(
-            document.Id, document.CreatedAt, document.Description, document.Restored)).ToArray();
+            document.Id, document.CreatedAt, document.Description, document.Restored,
+            document.Restored ? UserChangeStatus.Restored : document.Status)).ToArray();
 
     public Task<UserChangeResult> ApplyPreferencesAsync(UserOptimizationPreferences preferences, CancellationToken cancellationToken = default) =>
         WithChangeLockAsync(async () =>
@@ -110,13 +117,19 @@ public sealed class UserOptimizationService
             using (var recheck = Registry.CurrentUser.OpenSubKey(TransparencyScope, writable: false))
                 if (ReadAnimation() != animation || !SameValue(recheck is null ? null : ReadValue(recheck, TransparencyName), transparency))
                     return Failure("As preferências mudaram durante a operação; nenhuma alteração foi aplicada.", document.Id);
+            document.Status = UserChangeStatus.Applying;
+            await SaveDocumentAsync(document, cancellationToken);
             WriteAnimation(!preferences.ReduceAnimations);
             using var writable = Registry.CurrentUser.CreateSubKey(TransparencyScope, writable: true);
             writable.SetValue(TransparencyName, preferences.ReduceTransparency ? 0 : 1, RegistryValueKind.DWord);
             writable.Flush();
             BroadcastVisualChange();
             if (ReadAnimation() != !preferences.ReduceAnimations || ReadTransparency() != (preferences.ReduceTransparency ? 0 : 1))
+            {
+                await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
                 return Failure("O Windows não confirmou todas as preferências. Use o histórico para restaurar e verifique políticas do dispositivo.", document.Id);
+            }
+            await SetChangeStatusAsync(document, UserChangeStatus.Applied);
             return Success(document.Id, "Preferências visuais aplicadas. O perfil não altera automaticamente o plano de energia.");
         }, cancellationToken);
 
@@ -154,9 +167,15 @@ public sealed class UserOptimizationService
             cancellationToken.ThrowIfCancellationRequested();
             if (await GetActivePowerPlanAsync(cancellationToken) != current)
                 return Failure("O plano ativo mudou durante a operação; nenhuma troca foi feita.", document.Id);
+            document.Status = UserChangeStatus.Applying;
+            await SaveDocumentAsync(document, cancellationToken);
             await RunPowerCfgAsync(["/setactive", id.ToString("D")], cancellationToken);
             if (await GetActivePowerPlanAsync(cancellationToken) != id)
+            {
+                await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
                 return Failure("O Windows não confirmou a troca do plano de energia.", document.Id);
+            }
+            await SetChangeStatusAsync(document, UserChangeStatus.Applied);
             return Success(document.Id, "Plano de energia aplicado. Em notebooks, confira autonomia e temperatura.");
         }, cancellationToken);
 
@@ -167,6 +186,8 @@ public sealed class UserOptimizationService
             if (changeId == Guid.Empty) return Failure("Sessão inválida.");
             var document = await ReadDocumentAsync(changeId, cancellationToken);
             if (document.Restored) return Success(document.Id, "Esta alteração já foi restaurada.");
+            document.Status = UserChangeStatus.Restoring;
+            await SaveDocumentAsync(document, cancellationToken);
             switch (document.Kind)
             {
                 case "startup":
@@ -175,16 +196,26 @@ public sealed class UserOptimizationService
                         var saved = document.Startup!;
                         var current = ReadValue(key, saved.Name);
                         if (current is not null && Fingerprint(current) != Fingerprint(saved))
+                        {
+                            await SetChangeStatusAsync(document, UserChangeStatus.RestoreBlocked);
                             return Failure("Existe uma entrada diferente com o mesmo nome. A restauração não a sobrescreveu.", document.Id);
+                        }
                         if (current is null) key.SetValue(saved.Name, saved.StringValue!, saved.Kind);
                         key.Flush();
                         if (!SameValue(ReadValue(key, saved.Name), saved))
+                        {
+                            await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
                             return Failure("O Windows não confirmou a restauração da entrada de inicialização.", document.Id);
+                        }
                     }
                     break;
                 case "preferences":
                     var policy = CheckVisualPolicy();
-                    if (policy is not null) return Failure(policy, document.Id);
+                    if (policy is not null)
+                    {
+                        await SetChangeStatusAsync(document, UserChangeStatus.RestoreBlocked);
+                        return Failure(policy, document.Id);
+                    }
                     var preferences = document.Preferences!;
                     var currentAnimation = ReadAnimation();
                     using (var key = Registry.CurrentUser.CreateSubKey(TransparencyScope, writable: true))
@@ -193,7 +224,10 @@ public sealed class UserOptimizationService
                         var expectedTransparency = new RegistrySnapshot(TransparencyName, RegistryValueKind.DWord, null, preferences.ReduceTransparency ? 0 : 1);
                         if (currentAnimation != !preferences.ReduceAnimations && currentAnimation != document.PreviousAnimation ||
                             !SameValue(currentTransparency, expectedTransparency) && !SameValue(currentTransparency, document.PreviousTransparency))
+                        {
+                            await SetChangeStatusAsync(document, UserChangeStatus.RestoreBlocked);
                             return Failure("As preferências foram modificadas fora desta sessão. A restauração preservou as configurações atuais.", document.Id);
+                        }
                         WriteAnimation(document.PreviousAnimation!.Value);
                         if (document.PreviousTransparency is null) key.DeleteValue(TransparencyName, throwOnMissingValue: false);
                         else key.SetValue(TransparencyName, document.PreviousTransparency.DWordValue!.Value, RegistryValueKind.DWord);
@@ -203,22 +237,35 @@ public sealed class UserOptimizationService
                     using (var verification = Registry.CurrentUser.OpenSubKey(TransparencyScope, writable: false))
                         if (ReadAnimation() != document.PreviousAnimation ||
                             !SameValue(verification is null ? null : ReadValue(verification, TransparencyName), document.PreviousTransparency))
+                        {
+                            await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
                             return Failure("O Windows não confirmou a restauração das preferências visuais.", document.Id);
+                        }
                     break;
                 case "power":
                     var currentPowerPlan = await GetActivePowerPlanAsync(cancellationToken);
                     if (currentPowerPlan != document.NewPowerPlan && currentPowerPlan != document.PreviousPowerPlan)
+                    {
+                        await SetChangeStatusAsync(document, UserChangeStatus.RestoreBlocked);
                         return Failure("Outro plano de energia foi selecionado depois desta sessão. A restauração preservou essa escolha.", document.Id);
+                    }
                     if (!(await ReadPowerPlansAsync(cancellationToken)).Any(plan => plan.Id == document.PreviousPowerPlan))
+                    {
+                        await SetChangeStatusAsync(document, UserChangeStatus.RestoreBlocked);
                         return Failure("O plano anterior já não existe neste computador.", document.Id);
+                    }
                     await RunPowerCfgAsync(["/setactive", document.PreviousPowerPlan!.Value.ToString("D")], cancellationToken);
                     if (await GetActivePowerPlanAsync(cancellationToken) != document.PreviousPowerPlan)
+                    {
+                        await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
                         return Failure("O Windows não confirmou a restauração do plano de energia.", document.Id);
+                    }
                     break;
                 default:
                     throw new InvalidDataException("Tipo de alteração desconhecido.");
             }
             document.Restored = true;
+            document.Status = UserChangeStatus.Restored;
             await SaveDocumentAsync(document, CancellationToken.None);
             return Success(document.Id, "Configurações anteriores restauradas.");
         }, cancellationToken);
@@ -291,6 +338,12 @@ public sealed class UserOptimizationService
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
+    private Task SetChangeStatusAsync(ChangeDocument document, UserChangeStatus status)
+    {
+        document.Status = status;
+        return SaveDocumentAsync(document, CancellationToken.None);
+    }
+
     private string DocumentPath(Guid id)
     {
         if (id == Guid.Empty) throw new InvalidDataException("Identificador vazio no histórico.");
@@ -326,7 +379,7 @@ public sealed class UserOptimizationService
 
     private static void ValidateDocument(ChangeDocument document, Guid expectedId)
     {
-        if (document.Version != 1 || document.Id != expectedId || document.Id == Guid.Empty ||
+        if (document.Version != 1 || document.Id != expectedId || document.Id == Guid.Empty || !Enum.IsDefined(document.Status) ||
             document.Scope != "CurrentUser" || string.IsNullOrWhiteSpace(document.Description) || document.Description.Length > 512 ||
             document.CreatedAt == default || document.CreatedAt > DateTimeOffset.UtcNow.AddMinutes(5))
             throw new InvalidDataException("Metadados inválidos no histórico.");
@@ -355,7 +408,7 @@ public sealed class UserOptimizationService
 
     private static ChangeDocument NewDocument(string kind, string description) => new()
     {
-        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Description = description, Kind = kind,
+        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Description = description, Kind = kind, Status = UserChangeStatus.Prepared,
         RegistryPath = kind == "startup" ? StartupScope : kind == "preferences" ? TransparencyScope : null
     };
 
@@ -492,6 +545,7 @@ public sealed class UserOptimizationService
         public string Kind { get; set; } = "";
         public string? RegistryPath { get; set; }
         public bool Restored { get; set; }
+        public UserChangeStatus Status { get; set; }
         public RegistrySnapshot? Startup { get; set; }
         public UserOptimizationPreferences? Preferences { get; set; }
         public bool? PreviousAnimation { get; set; }

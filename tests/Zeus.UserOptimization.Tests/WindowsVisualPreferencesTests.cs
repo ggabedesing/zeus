@@ -47,6 +47,7 @@ public sealed class WindowsVisualPreferencesTests
             var journal = Assert.Single(await service.ListChangesAsync());
             Assert.Equal(sessionId, journal.Id);
             Assert.False(journal.Restored);
+            Assert.Equal(UserChangeStatus.Applied, journal.Status);
             // The usage profile is informational and must not automatically switch power plans.
             Assert.Equal(originalPowerPlan, Assert.Single(await service.ReadPowerPlansAsync(), plan => plan.IsActive).Id);
             var restored = await service.RestoreAsync(sessionId);
@@ -61,7 +62,9 @@ public sealed class WindowsVisualPreferencesTests
                     Assert.Equal(originalValue, current.GetValue(ValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames));
                 }
             }
-            Assert.True(Assert.Single(await service.ListChangesAsync()).Restored);
+            var restoredJournal = Assert.Single(await service.ListChangesAsync());
+            Assert.True(restoredJournal.Restored);
+            Assert.Equal(UserChangeStatus.Restored, restoredJournal.Status);
         }
         finally
         {

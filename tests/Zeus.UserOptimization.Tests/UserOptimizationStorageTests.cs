@@ -24,6 +24,7 @@ public sealed class UserOptimizationStorageTests : IDisposable
         Assert.Equal(id, entry.Id);
         Assert.Equal("Teste local de metadados", entry.Description);
         Assert.False(entry.Restored);
+        Assert.Equal(UserChangeStatus.Unknown, entry.Status);
     }
 
     [Theory]
@@ -45,6 +46,30 @@ public sealed class UserOptimizationStorageTests : IDisposable
         var (id, document) = StartupDocument();
         document["Id"] = Guid.NewGuid();
         await WriteAsync(id, document);
+        await Assert.ThrowsAsync<InvalidDataException>(() => new UserOptimizationService(root).ListChangesAsync());
+    }
+
+    [Fact]
+    public async Task InterruptedMutationStatusSurvivesLoadingAndIsNotPresentedAsApplied()
+    {
+        var (id, document) = StartupDocument();
+        document["Status"] = (int)UserChangeStatus.Applying;
+        await WriteAsync(id, document);
+
+        var change = Assert.Single(await new UserOptimizationService(root).ListChangesAsync());
+
+        Assert.False(change.Restored);
+        Assert.Equal(UserChangeStatus.Applying, change.Status);
+        Assert.Contains("interrompida", change.StatusText);
+    }
+
+    [Fact]
+    public async Task RejectsUnknownMutationStatus()
+    {
+        var (id, document) = StartupDocument();
+        document["Status"] = int.MaxValue;
+        await WriteAsync(id, document);
+
         await Assert.ThrowsAsync<InvalidDataException>(() => new UserOptimizationService(root).ListChangesAsync());
     }
 

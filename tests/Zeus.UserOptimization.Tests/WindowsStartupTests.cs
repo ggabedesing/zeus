@@ -28,13 +28,16 @@ public sealed class WindowsStartupTests
             var disabled = await service.DisableStartupAsync(entry.Id);
             Assert.True(disabled.Succeeded, disabled.Message);
             Assert.DoesNotContain(name, key.GetValueNames());
+            Assert.Equal(UserChangeStatus.Applied, Assert.Single(await service.ListChangesAsync()).Status);
             var retained = Assert.Single(await service.ReadStartupAsync(), item => item.Name == name);
             Assert.False(retained.IsEnabled);
             var restored = await service.RestoreAsync(disabled.SessionId);
             Assert.True(restored.Succeeded, restored.Message);
             Assert.Equal(RegistryValueKind.ExpandString, key.GetValueKind(name));
             Assert.Equal(Command, key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames));
-            Assert.True(Assert.Single(await service.ListChangesAsync()).Restored);
+            var change = Assert.Single(await service.ListChangesAsync());
+            Assert.True(change.Restored);
+            Assert.Equal(UserChangeStatus.Restored, change.Status);
             Assert.True((await service.RestoreAsync(disabled.SessionId)).Succeeded);
         });
     }
@@ -68,7 +71,9 @@ public sealed class WindowsStartupTests
             Assert.False(restored.Succeeded);
             Assert.Equal(RegistryValueKind.String, key.GetValueKind(name));
             Assert.Equal(Command + " ", key.GetValue(name));
-            Assert.False(Assert.Single(await service.ListChangesAsync()).Restored);
+            var change = Assert.Single(await service.ListChangesAsync());
+            Assert.False(change.Restored);
+            Assert.Equal(UserChangeStatus.RestoreBlocked, change.Status);
         });
     }
 
