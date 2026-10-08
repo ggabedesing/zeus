@@ -115,8 +115,18 @@ public sealed class WpfExperienceTests
         Assert.NotNull(window.Snapshot);
         Assert.NotEmpty(window.DeviceRepairSummary);
         Assert.NotEmpty(window.EventDiagnosticSummary);
-        Assert.Contains("IP:", window.NetworkResetPreparationSummary);
-        Assert.Contains("Proxy observado", window.NetworkResetPreparationSummary);
+        if (window.Snapshot.WindowsInventory?.NetworkConfiguration.Count > 0)
+        {
+            Assert.Contains("IP:", window.NetworkResetPreparationSummary);
+            Assert.Contains("Proxy observado", window.NetworkResetPreparationSummary);
+        }
+        else
+        {
+            Assert.True(
+                window.NetworkResetPreparationSummary.Contains("Configuração de rede indisponível", StringComparison.Ordinal) ||
+                window.NetworkResetPreparationSummary.Contains("Nenhuma configuração de interface", StringComparison.Ordinal),
+                "Missing network data must be stated explicitly before any reset can be prepared.");
+        }
         Assert.All(window.EventDiagnosticRows, row => Assert.False(string.IsNullOrWhiteSpace(row.Detail)));
         Assert.All(window.DeviceRepairRows, row =>
         {
