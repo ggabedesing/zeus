@@ -94,6 +94,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<DeviceRow> DiskRows { get; } = [];
     public ObservableCollection<DeviceRow> ExtendedHardwareRows { get; } = [];
     public ObservableCollection<DeviceRow> ProcessRows { get; } = [];
+    public ObservableCollection<DeviceRow> PerformanceResourceRows { get; } = [];
     public ObservableCollection<DeviceRow> StartupRows { get; } = [];
     public ObservableCollection<string> Warnings { get; } = [];
     public ObservableCollection<MaintenanceChoice> MaintenanceChoices { get; } = [];

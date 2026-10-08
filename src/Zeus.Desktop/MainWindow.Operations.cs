@@ -141,6 +141,13 @@ public partial class MainWindow
         ProcessRows.Clear();
         foreach (var process in observation.Processes)
             ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · Memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}"));
+        PerformanceResourceRows.Clear();
+        foreach (var engine in (observation.GpuEngines ?? []).OrderByDescending(engine => engine.UtilizationPercent).Take(20))
+            PerformanceResourceRows.Add(new($"GPU {engine.EngineType} · PID {engine.ProcessId?.ToString() ?? "indisponível"}", $"Uso desta instância: {engine.UtilizationPercent:0.#}% · não representa uso total da GPU"));
+        foreach (var disk in observation.Disks ?? [])
+            PerformanceResourceRows.Add(new($"Disco · {disk.InstanceName}", $"Transferência: {FormatBytesPerSecond(disk.BytesPerSecond)} · ativo: {(disk.ActivePercent is { } active ? $"{active:0.#}%" : "indisponível")} · leitura: {(disk.AverageReadLatencyMilliseconds is { } latency ? $"{latency:0.##} ms" : "indisponível")}"));
+        foreach (var network in observation.Networks ?? [])
+            PerformanceResourceRows.Add(new($"Rede · {network.Adapter}", $"Tráfego: {FormatBytesPerSecond(network.BytesPerSecond)} · enlace reportado: {FormatBitsPerSecond(network.LinkBitsPerSecond)} · erros acumulados: {network.ErrorPackets?.ToString() ?? "indisponível"}"));
         foreach (var warning in observation.Warnings)
             if (!Warnings.Contains(warning)) Warnings.Add(warning);
         Notify(nameof(Performance)); Notify(nameof(CanSetPerformanceBaseline)); Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
@@ -155,6 +162,14 @@ public partial class MainWindow
         Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
         StatusDetail = $"Referência definida com {observations.Length} amostras. Execute a mesma tarefa em condições semelhantes e colete ao menos três amostras posteriores.";
     }
+
+    private static string FormatBytesPerSecond(ulong? bytes) => bytes is { } value
+        ? $"{ByteFormatting.Format(value)}/s" : "indisponível";
+
+    private static string FormatBitsPerSecond(ulong? bits) => bits is not { } value ? "indisponível"
+        : value >= 1_000_000_000 ? $"{value / 1_000_000_000d:0.#} Gbps"
+        : value >= 1_000_000 ? $"{value / 1_000_000d:0.#} Mbps"
+        : $"{value / 1_000d:0.#} Kbps";
 
     private void ComparePerformance_Click(object sender, RoutedEventArgs e)
     {

@@ -13,7 +13,7 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 | Preferências | Efeitos do usuário aplicados/restaurados; perfil não troca energia sozinho |
 | Inventário e carga | CPU, RAM e volumes reais; contadores nativos de CPU/memória/processos |
 | Inventário estendido | drivers, PnP, rede, processos, serviços, tarefas, software, eventos recentes, Secure Boot e TPM; fontes opcionais podem permanecer indisponíveis |
-| Observador | buffer circular limitado, política adaptativa, comparação descritiva antes/depois de CPU/RAM e exportação; GPU/disco/rede contínuos, métricas de jogos/OBS e persistência entre execuções continuam pendentes |
+| Observador | buffer circular limitado, política adaptativa, comparação descritiva antes/depois de CPU/RAM, contadores locais de GPU/disco/rede quando disponíveis e exportação; métricas específicas de jogos/OBS e persistência de sessões entre execuções continuam pendentes |
 | Auxiliar | Argumentos inválidos rejeitados antes de operação e armazenamento administrativo protegido |
 | Persistência SQLite | Migrações transacionais, integridade, sessões/etapas, preferências, eventos e importação idempotente sem remover JSON de origem |
 | Interface | Aplicação WPF real com inventário, oito áreas e três temas capturados em PNG |

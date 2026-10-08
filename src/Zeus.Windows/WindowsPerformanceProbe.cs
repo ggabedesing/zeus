@@ -2,12 +2,17 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Management;
+using System.Text.RegularExpressions;
 
 [assembly: InternalsVisibleTo("Zeus.Hardware.Tests")]
 
 namespace Zeus.Windows;
 
 public sealed record ProcessObservation(int Id, string Name, double? CpuPercent, ulong WorkingSetBytes);
+public sealed record GpuEngineObservation(string InstanceName, int? ProcessId, string EngineType, double UtilizationPercent);
+public sealed record DiskPerformanceObservation(string InstanceName, ulong? BytesPerSecond, double? ActivePercent, double? AverageReadLatencyMilliseconds);
+public sealed record NetworkPerformanceObservation(string Adapter, ulong? BytesPerSecond, ulong? LinkBitsPerSecond, ulong? QueueLength, ulong? ErrorPackets);
 
 public sealed record PerformanceObservation(
     DateTimeOffset CollectedAt,
@@ -16,7 +21,10 @@ public sealed record PerformanceObservation(
     ulong TotalMemoryBytes,
     ulong AvailableMemoryBytes,
     IReadOnlyList<ProcessObservation> Processes,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<GpuEngineObservation>? GpuEngines = null,
+    IReadOnlyList<DiskPerformanceObservation>? Disks = null,
+    IReadOnlyList<NetworkPerformanceObservation>? Networks = null);
 
 /// <summary>
 /// A bounded, read-only observation, not a benchmark or prediction of performance
@@ -89,9 +97,14 @@ public sealed class WindowsPerformanceProbe
             available = memory.AvailablePhysical;
         }
         else warnings.Add("Memória física indisponível via GlobalMemoryStatusEx; zero neste relatório indica ausência de leitura.");
+        var gpuEngines = ReadGpuCounters(token, warnings);
+        var disks = ReadDiskCounters(token, warnings);
+        var networks = ReadNetworkCounters(token, warnings);
+        warnings.Add("GPU: utilização por instância/engine não é uso total nem VRAM; sensores ausentes permanecem desconhecidos.");
+        warnings.Add("Disco e rede: contadores são taxas locais; tráfego não mede latência ou qualidade da Internet e erros são contagens reportadas pelo adaptador.");
         warnings.Add("A amostra reflete a carga atual. Compare tarefas e condições equivalentes; CPU/RAM livres não medem FPS ou garantem melhorias.");
         return new PerformanceObservation(DateTimeOffset.UtcNow, Stopwatch.GetElapsedTime(start, cpuEnd),
-            cpu, total, available, top, warnings.Distinct().ToArray());
+            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks);
     }
 
     internal readonly record struct SystemCpuTimes(ulong Idle, ulong Kernel, ulong User);
@@ -121,6 +134,88 @@ public sealed class WindowsPerformanceProbe
             elapsed.TotalSeconds / logicalProcessors * 100;
         return double.IsFinite(load) ? Math.Clamp(load, 0, 100) : null;
     }
+
+    private static IReadOnlyList<GpuEngineObservation> ReadGpuCounters(CancellationToken token, List<string> warnings) =>
+        ReadCounterRows("GPU", "Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine",
+            "SELECT Name,UtilizationPercentage FROM Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine", 500, token, warnings, row =>
+            {
+                var instance = Convert.ToString(row["Name"], System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                var utilization = CounterDouble(row, "UtilizationPercentage");
+                if (string.IsNullOrWhiteSpace(instance) || utilization is null) return null;
+                var processMatch = Regex.Match(instance, @"(?:^|_)pid_(\d+)(?:_|$)", RegexOptions.CultureInvariant);
+                var engineMatch = Regex.Match(instance, @"_engtype_(.+)$", RegexOptions.CultureInvariant);
+                return new GpuEngineObservation(instance,
+                    processMatch.Success && int.TryParse(processMatch.Groups[1].Value, out var pid) ? pid : null,
+                    engineMatch.Success ? engineMatch.Groups[1].Value : "Desconhecido", utilization.Value);
+            });
+
+    private static IReadOnlyList<DiskPerformanceObservation> ReadDiskCounters(CancellationToken token, List<string> warnings) =>
+        ReadCounterRows("Disco", "Win32_PerfFormattedData_PerfDisk_PhysicalDisk",
+            "SELECT Name,DiskBytesPersec,PercentDiskTime,AvgDisksecPerRead FROM Win32_PerfFormattedData_PerfDisk_PhysicalDisk WHERE Name <> '_Total'", 64, token, warnings, row =>
+            {
+                var name = Convert.ToString(row["Name"], System.Globalization.CultureInfo.InvariantCulture);
+                if (string.IsNullOrWhiteSpace(name)) return null;
+                var latencySeconds = CounterDouble(row, "AvgDisksecPerRead");
+                return new DiskPerformanceObservation(name, CounterUInt64(row, "DiskBytesPersec"),
+                    CounterDouble(row, "PercentDiskTime"), latencySeconds is { } value ? value * 1000 : null);
+            });
+
+    private static IReadOnlyList<NetworkPerformanceObservation> ReadNetworkCounters(CancellationToken token, List<string> warnings) =>
+        ReadCounterRows("Rede", "Win32_PerfFormattedData_Tcpip_NetworkInterface",
+            "SELECT Name,BytesTotalPersec,CurrentBandwidth,OutputQueueLength,PacketsReceivedErrors,PacketsOutboundErrors FROM Win32_PerfFormattedData_Tcpip_NetworkInterface", 128, token, warnings, row =>
+            {
+                var name = Convert.ToString(row["Name"], System.Globalization.CultureInfo.InvariantCulture);
+                if (string.IsNullOrWhiteSpace(name)) return null;
+                var receivedErrors = CounterUInt64(row, "PacketsReceivedErrors");
+                var sentErrors = CounterUInt64(row, "PacketsOutboundErrors");
+                ulong? errors = receivedErrors is null ? sentErrors : sentErrors is null ? receivedErrors
+                    : ulong.MaxValue - receivedErrors.Value < sentErrors.Value ? null : receivedErrors + sentErrors;
+                return new NetworkPerformanceObservation(name, CounterUInt64(row, "BytesTotalPersec"),
+                    CounterUInt64(row, "CurrentBandwidth"), CounterUInt64(row, "OutputQueueLength"), errors);
+            });
+
+    private static IReadOnlyList<T> ReadCounterRows<T>(string label, string className, string query, int limit,
+        CancellationToken token, List<string> warnings, Func<ManagementBaseObject, T?> convert) where T : class
+    {
+        var result = new List<T>();
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(new ManagementScope("root\\CIMV2"), new ObjectQuery(query),
+                new System.Management.EnumerationOptions { Timeout = TimeSpan.FromSeconds(3), ReturnImmediately = true, Rewindable = false });
+            using var rows = searcher.Get();
+            foreach (ManagementObject row in rows)
+            {
+                using (row)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (convert(row) is { } value) result.Add(value);
+                    if (result.Count < limit) continue;
+                    warnings.Add($"{label}: limite de {limit} contadores atingido; a lista pode estar incompleta.");
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception error)
+        {
+            warnings.Add($"{label}: contador {className} indisponível ({error.GetType().Name}).");
+            return [];
+        }
+        if (result.Count == 0) warnings.Add($"{label}: o provedor não retornou instâncias; a métrica permanece indisponível.");
+        return result;
+    }
+
+    private static double? CounterDouble(ManagementBaseObject row, string property)
+    {
+        var value = row[property];
+        return double.TryParse(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture),
+            System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed) &&
+            double.IsFinite(parsed) && parsed >= 0 ? parsed : null;
+    }
+
+    private static ulong? CounterUInt64(ManagementBaseObject row, string property) =>
+        ulong.TryParse(Convert.ToString(row[property], System.Globalization.CultureInfo.InvariantCulture),
+            System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
 
     private static SystemCpuTimes? ReadSystemTimes(List<string> warnings)
     {

@@ -16,6 +16,21 @@ public sealed class WindowsInventoryTests
         Assert.InRange(observation.AvailableMemoryBytes, 0UL, observation.TotalMemoryBytes);
         Assert.True(observation.SamplingDuration >= TimeSpan.FromSeconds(2));
         Assert.InRange(observation.Processes.Count, 1, 10);
+        Assert.NotNull(observation.GpuEngines);
+        Assert.NotNull(observation.Disks);
+        Assert.NotNull(observation.Networks);
+        Assert.All(observation.GpuEngines, engine =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(engine.EngineType));
+            Assert.True(double.IsFinite(engine.UtilizationPercent));
+            Assert.True(engine.UtilizationPercent >= 0);
+        });
+        Assert.All(observation.Disks, disk =>
+        {
+            if (disk.BytesPerSecond is { } rate) Assert.True(rate >= 0);
+            if (disk.AverageReadLatencyMilliseconds is { } latency) Assert.True(double.IsFinite(latency) && latency >= 0);
+        });
+        Assert.All(observation.Networks, network => Assert.False(string.IsNullOrWhiteSpace(network.Adapter)));
         Assert.All(observation.Processes, process =>
         {
             Assert.True(process.Id >= 0);
