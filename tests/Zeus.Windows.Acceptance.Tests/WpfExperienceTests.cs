@@ -167,6 +167,8 @@ public sealed class WpfExperienceTests
         Assert.Equal("NVIDIA (heurística pelo nome declarado)", licensed.ProviderCategory);
         Assert.Equal("2025-11-04", licensed.DriverDate);
         Assert.Equal("Windows Update · serviço público", licensed.DriverSource);
+        Assert.Contains("valida hashes e assinaturas", licensed.PackageIntegritySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("não captura", licensed.PackageIntegritySummary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("indisponível", unlicensed.DriverDate);
         Assert.False(unlicensed.CanSelectForInstall);
         Assert.Contains("data ausente", unlicensed.InstallabilityReason, StringComparison.OrdinalIgnoreCase);

@@ -97,6 +97,7 @@
        <TextBlock Text="{Binding InstallabilityReason}" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
        <TextBlock Text="{Binding DriverSource, StringFormat='Origem: {0}'}" Style="{StaticResource MutedText}"/>
        <TextBlock Text="{Binding DriverVersion, StringFormat='Versão: {0}', TargetNullValue='indisponível'}" Style="{StaticResource MutedText}"/>
+       <TextBlock Text="{Binding PackageIntegritySummary}" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
        <TextBlock Text="{Binding Id, StringFormat='Identidade: {0}'}" FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0"/>
        <Expander Header="Revisar licença deste candidato" Margin="0,12,0,0"><Expander.Style><Style TargetType="Expander"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding RequiresEula}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Expander.Style>
         <StackPanel><TextBox Text="{Binding EulaText, Mode=OneWay}" IsReadOnly="True" Height="210" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Termos de licença deste driver"/><CheckBox IsChecked="{Binding EulaAccepted}" Margin="0,12,0,0"><TextBlock Text="Li e aceito os termos apresentados para este candidato."/></CheckBox></StackPanel>

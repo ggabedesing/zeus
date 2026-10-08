@@ -83,6 +83,8 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
     public string DriverDate => Candidate.DriverDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "indisponível";
     public string ProviderCategory => ClassifyProvider(Candidate.DriverProvider, Candidate.Manufacturer);
     public string DriverSource => Zeus.Core.WindowsUpdateSourcePolicy.Describe(Candidate.UpdateServerSelection, Candidate.UpdateServiceId);
+    public string PackageIntegritySummary =>
+        "Na instalação, o Windows Update valida hashes e assinaturas do conteúdo. O ZEUS não captura nem valida esse material independentemente; a busca também não fornece a versão numérica do pacote.";
     public bool RequiresEula => Candidate.RequiresEula;
     public string EulaText => Candidate.EulaText ?? "A licença não está disponível. Instale este candidato pelo Windows Update para revisar os termos.";
     public bool LicenseReady => !RequiresEula || (EulaAccepted && !string.IsNullOrWhiteSpace(Candidate.EulaText));
