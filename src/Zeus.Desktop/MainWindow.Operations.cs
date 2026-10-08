@@ -506,6 +506,24 @@ public partial class MainWindow
         }, mutation: true);
     }
 
+    private async void CompleteFirstRunSetup_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_loaded || FirstRunSetupComplete) return;
+        await _preferenceLock.WaitAsync();
+        try
+        {
+            await _storage.SavePreferencesAsync(CurrentPreferences() with { FirstRunSetupComplete = true });
+            FirstRunSetupComplete = true;
+            StatusTitle = "Configuração inicial salva";
+            StatusDetail = "Seu perfil foi salvo. O ZEUS continua sem aplicar alterações ao Windows sem sua revisão.";
+        }
+        catch (Exception error) when (IsStorageError(error))
+        {
+            StatusDetail = $"A configuração inicial não foi marcada como concluída porque o armazenamento falhou: {error.Message}";
+        }
+        finally { _preferenceLock.Release(); }
+    }
+
     private void ChooseWallpaper_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog

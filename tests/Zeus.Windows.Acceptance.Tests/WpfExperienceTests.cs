@@ -44,7 +44,7 @@ public sealed class WpfExperienceTests
                     {
                         window = new MainWindow(fixture) { Width = 1440, Height = 1024 };
                         window.Show();
-                        await VerifyExperienceAsync(window);
+                        await VerifyExperienceAsync(window, fixture);
                         Assert.Empty(bindingErrors.Errors);
                         completion.TrySetResult();
                     }
@@ -67,7 +67,7 @@ public sealed class WpfExperienceTests
         Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "The WPF application must exit after acceptance.");
     }
 
-    private static async Task VerifyExperienceAsync(MainWindow window)
+    private static async Task VerifyExperienceAsync(MainWindow window, string fixture)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(120);
         while (window.StatusTitle != "Diagnóstico concluído" && DateTimeOffset.UtcNow < deadline)
@@ -76,6 +76,17 @@ public sealed class WpfExperienceTests
             await Task.Delay(100);
         }
         Assert.Equal("Diagnóstico concluído", window.StatusTitle);
+        Assert.False(window.FirstRunSetupComplete);
+        Assert.Equal(Visibility.Visible, window.FirstRunSetupVisibility);
+        var firstRunButton = Assert.IsType<Button>(window.FindName("CompleteFirstRunSetupButton"));
+        Assert.Equal("complete-first-run-setup", AutomationProperties.GetAutomationId(firstRunButton));
+        Assert.True(firstRunButton.IsEnabled);
+        firstRunButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, firstRunButton));
+        var firstRunDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        while (!window.FirstRunSetupComplete && DateTimeOffset.UtcNow < firstRunDeadline) await Task.Delay(25);
+        Assert.True(window.FirstRunSetupComplete, "The first-run preference must only be marked done after SQLite persistence succeeds.");
+        Assert.Equal(Visibility.Collapsed, window.FirstRunSetupVisibility);
+        Assert.True((await new DesktopStorage(fixture).ReadPreferencesAsync()).FirstRunSetupComplete);
         Assert.Same(window, window.DataContext);
         Assert.Same(Application.Current.Resources["BackgroundBrush"], window.Background);
         Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);

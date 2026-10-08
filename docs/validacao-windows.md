@@ -39,8 +39,10 @@ Após a correção do limite do inventário, a checagem somente de leitura volto
 | Latência ICMP | teste sob demanda para IP/host informado, resolução DNS limitada a 5 s, cinco tentativas com timeout de 1 s, respostas/status/latência e proporção de timeouts observados registrados no SQLite; o percentual usa somente as tentativas concluídas para aquele destino e horário, não é classificado como perda geral de pacotes nem como falta de Internet |
 | Auxiliar | Argumentos inválidos rejeitados antes de operação e armazenamento administrativo protegido |
 | Persistência SQLite | Migrações transacionais v1→v2→v3, integridade, sessões/etapas de manutenção e desempenho, amostras/referência, preferências, eventos, importação idempotente sem remover JSON de origem, backup verificado e restauração confirmada com cópia de segurança do banco ativo e recuperação automática em falha |
-| Interface | Aplicação WPF real com inventário, oito áreas e três temas capturados em PNG |
+| Interface | Aplicação WPF real com inventário, oito áreas, três temas e configuração inicial persistida no SQLite; novos usuários recebem um guia, preferências antigas são reconhecidas como configuração já concluída, e a tela só fecha o guia depois de confirmar a gravação |
 | Publicação | Pacote autocontido com interface, auxiliar e dependências, proveniência por commit, manifesto SHA-256 por arquivo, conferência dos hashes dentro do ZIP e hash do arquivo final; assinatura Authenticode de produção continua pendente |
+
+Em 2026-10-08, o teste WPF real percorreu o guia de primeira execução, confirmou que a configuração foi gravada no SQLite e que o guia foi ocultado somente após a gravação. A suíte `Zeus.Windows.Acceptance.Tests` passou com 40 testes aprovados e um teste administrativo ignorado. O teste usou um banco temporário e não alterou preferências do Windows.
 
 O relatório de `.validation/status.json` relaciona o commit, execução do Actions, contagens de testes, resultados por etapa e capturas. `accepted=true` refere-se **somente a esta aceitação automatizada**. As limitações de hardware e operações não executadas também constam nesse relatório.
 

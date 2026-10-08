@@ -85,7 +85,7 @@ internal sealed class DesktopStorage
             json = await _database.ReadSettingAsync(PreferencesSettingKey);
             if (json is not null) return DeserializePreferences(json);
         }
-        return new(false);
+        return new(false, FirstRunSetupComplete: false);
     }
 
     public Task SavePreferencesAsync(DesktopPreferences preferences) =>

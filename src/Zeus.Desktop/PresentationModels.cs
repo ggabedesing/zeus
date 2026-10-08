@@ -162,7 +162,8 @@ public sealed record HistoryRow(Guid SessionId, string Title, string Summary, st
 
 internal sealed record DesktopPreferences(bool IsMinimal, DesktopTheme Theme = DesktopTheme.Complete,
     UsageProfile Profile = UsageProfile.Balanced, bool ReduceAnimations = false, bool ReduceTransparency = false,
-    bool NeedsBluetooth = true, bool NeedsPrinting = true, bool NeedsCloudSync = true, bool NeedsVirtualization = false);
+    bool NeedsBluetooth = true, bool NeedsPrinting = true, bool NeedsCloudSync = true, bool NeedsVirtualization = false,
+    bool FirstRunSetupComplete = true);
 
 // Export deliberately excludes startup command strings, raw logs and process environment.
 internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset ExportedAt, HardwareSnapshot? Diagnostics,

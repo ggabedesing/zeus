@@ -37,6 +37,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(MaintenanceVerificationStatus.NotRecorded, migratedHistory.Steps[0].Verification);
         Assert.True(migratedPreferences.IsMinimal);
         Assert.Equal(UsageProfile.Gaming, migratedPreferences.Profile);
+        Assert.True(migratedPreferences.FirstRunSetupComplete);
         Assert.True(File.Exists(historyPath));
         Assert.True(File.Exists(preferencesPath));
         Assert.Equal(historyJson, await File.ReadAllTextAsync(historyPath));

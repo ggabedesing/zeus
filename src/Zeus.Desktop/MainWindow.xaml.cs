@@ -49,6 +49,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private PerformanceComparison? _performanceComparison;
     private CleanupScan? _cleanupScan;
     private bool _isBusy, _isExecuting, _loaded, _historyReadable = true;
+    private bool _firstRunSetupComplete = true;
     private DesktopTheme _selectedTheme = DesktopTheme.Complete;
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
@@ -245,6 +246,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public UsageProfile SelectedProfile { get => _selectedProfile; set { if (Enum.IsDefined(value) && Set(ref _selectedProfile, value)) ProfileChanged(); } }
     public bool ReduceAnimations { get => _reduceAnimations; set { if (Set(ref _reduceAnimations, value)) ProfileChanged(); } }
     public bool ReduceTransparency { get => _reduceTransparency; set { if (Set(ref _reduceTransparency, value)) ProfileChanged(); } }
+    public bool FirstRunSetupComplete { get => _firstRunSetupComplete; private set { if (Set(ref _firstRunSetupComplete, value)) Notify(nameof(FirstRunSetupVisibility)); } }
+    public Visibility FirstRunSetupVisibility => FirstRunSetupComplete ? Visibility.Collapsed : Visibility.Visible;
     public bool NeedsBluetooth { get => _needsBluetooth; set { if (Set(ref _needsBluetooth, value)) ProfileChanged(); } }
     public bool NeedsPrinting { get => _needsPrinting; set { if (Set(ref _needsPrinting, value)) ProfileChanged(); } }
     public bool NeedsCloudSync { get => _needsCloudSync; set { if (Set(ref _needsCloudSync, value)) ProfileChanged(); } }
@@ -266,6 +269,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 var p = await _storage.ReadPreferencesAsync();
                 SelectedTheme = p.IsMinimal ? DesktopTheme.Minimal : p.Theme;
                 SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency;
+                FirstRunSetupComplete = p.FirstRunSetupComplete;
                 NeedsBluetooth = p.NeedsBluetooth; NeedsPrinting = p.NeedsPrinting; NeedsCloudSync = p.NeedsCloudSync; NeedsVirtualization = p.NeedsVirtualization;
             }
             catch (Exception error) when (IsStorageError(error)) { _startupWarnings.Add("As preferências salvas não puderam ser lidas; os valores padrão serão usados."); }
@@ -482,7 +486,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var title in new[] { "Processador", "Memória RAM", "Placas de vídeo", "Armazenamento", "Microsoft Defender", "Placa-mãe" }) HardwareCards.Add(new(title, "Aguardando leitura", "Dados locais do Windows"));
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
-    private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization);
+    private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete);
     private void QueuePreferencesSave() { if (_loaded) _ = SavePreferencesAsync(); }
     private async Task SavePreferencesAsync()
     {
