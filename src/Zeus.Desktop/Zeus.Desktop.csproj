@@ -13,6 +13,8 @@
     <ProjectReference Include="../Zeus.Cleanup/Zeus.Cleanup.csproj" />
     <ProjectReference Include="../Zeus.Windows/Zeus.Windows.csproj" />
     <ProjectReference Include="../Zeus.Maintenance/Zeus.Maintenance.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Zeus.Storage/Zeus.Storage.csproj" />
+    <InternalsVisibleTo Include="Zeus.Windows.Acceptance.Tests" />
   </ItemGroup>
   <Target Name="CopyMaintenanceHelper" AfterTargets="Build">
     <PropertyGroup>

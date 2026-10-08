@@ -299,7 +299,7 @@ try {
         Add-ZeusStage 'build' 'success' $buildStarted 'Toda a solução compilada em Release.'
     }
 
-    $expected = @('Zeus.Core.Tests', 'Zeus.Cleanup.Tests', 'Zeus.Maintenance.Protocol.Tests', 'Zeus.UserOptimization.Tests', 'Zeus.Hardware.Tests', 'Zeus.Windows.Acceptance.Tests')
+    $expected = @('Zeus.Core.Tests', 'Zeus.Cleanup.Tests', 'Zeus.Maintenance.Protocol.Tests', 'Zeus.UserOptimization.Tests', 'Zeus.Hardware.Tests', 'Zeus.Storage.Tests', 'Zeus.Windows.Acceptance.Tests')
     $projects = @(Get-ChildItem -LiteralPath (Join-Path $repository 'tests') -Recurse -Filter '*.csproj' | Sort-Object FullName)
     foreach ($name in $expected) {
         if (@($projects | Where-Object { $_.BaseName -eq $name }).Count -ne 1) { throw ('Projeto de testes ausente ou duplicado: ' + $name) }

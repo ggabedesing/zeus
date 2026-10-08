@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Data.Common;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -10,6 +11,7 @@ using Microsoft.Win32;
 using Zeus.Cleanup;
 using Zeus.Core;
 using Zeus.Windows;
+using Zeus.Storage;
 
 namespace Zeus.Desktop;
 
@@ -29,6 +31,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly SemaphoreSlim _preferenceLock = new(1, 1);
     private readonly List<MaintenanceReport> _reports = [];
     private readonly List<string> _startupWarnings = [];
+    private readonly List<Task> _activityWrites = [];
     private CancellationTokenSource? _readCancellation;
     private HardwareSnapshot? _snapshot;
     private PerformanceObservation? _performance;
@@ -38,6 +41,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
+    private bool _closingAfterActivityDrain;
+    private int _activityStorageWarningShown;
+    private DatabaseHealth? _storageHealth;
     private PowerPlanInfo? _selectedPowerPlan;
     private string _statusTitle = "Preparando diagnóstico", _statusDetail = "As informações serão lidas diretamente neste computador.";
     private string _executionLog = "Nenhuma manutenção executada nesta sessão.", _maintenanceResultSummary = string.Empty;
@@ -69,6 +75,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     public HardwareSnapshot? Snapshot => _snapshot;
+    public DatabaseHealth? StorageHealth => _storageHealth;
     public PerformanceObservation? Performance => _performance;
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
@@ -156,9 +163,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             catch (Exception error) when (IsStorageError(error)) { _startupWarnings.Add("As preferências salvas não puderam ser lidas; os valores padrão serão usados."); }
             try { _reports.AddRange(await _storage.ReadHistoryAsync()); RebuildHistory(); }
             catch (Exception error) when (IsStorageError(error)) { _historyReadable = false; _startupWarnings.Add("O histórico não pôde ser lido e foi preservado. Exporte as novas sessões."); }
+            try
+            {
+                _storageHealth = await _storage.CheckHealthAsync();
+                if (!_storageHealth.IsHealthy) _startupWarnings.Add("O banco local informou uma condição degradada. Os dados existentes foram preservados.");
+                Notify(nameof(StorageHealth));
+            }
+            catch (Exception error) when (IsStorageError(error))
+            {
+                _startupWarnings.Add("A saúde do armazenamento local não pôde ser confirmada; os arquivos antigos foram preservados.");
+                _storageHealth = new(false, 0, "unavailable", "unavailable", 0, 0, 0, error.GetType().Name);
+            }
             await LoadLocalSessionsAsync();
             ApplyTheme();
             _loaded = true;
+            QueueActivity(new(DateTimeOffset.UtcNow, "application", "started", "info", "ZEUS iniciado."));
         }
         finally { SetBusy(false); }
         await RefreshDiagnosticsAsync();
@@ -260,19 +279,77 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _isExecuting = mutation;
         if (cancellable) _readCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         SetBusy(true); StatusTitle = title; StatusDetail = detail;
-        try { await operation(_readCancellation?.Token ?? _lifetime.Token); }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested || _readCancellation?.IsCancellationRequested == true) { StatusTitle = "Leitura cancelada"; StatusDetail = "Os últimos dados disponíveis foram preservados."; }
-        catch (Exception error) { StatusTitle = "Operação não concluída"; StatusDetail = error.Message; AppendLog($"{title}: {error.Message}"); }
+        QueueActivity(new(DateTimeOffset.UtcNow, mutation ? "maintenance" : "diagnostics", "started", "info", title));
+        try
+        {
+            await operation(_readCancellation?.Token ?? _lifetime.Token);
+            QueueActivity(new(DateTimeOffset.UtcNow, mutation ? "maintenance" : "diagnostics", "completed", "info", title));
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested || _readCancellation?.IsCancellationRequested == true)
+        {
+            StatusTitle = "Leitura cancelada"; StatusDetail = "Os últimos dados disponíveis foram preservados.";
+            QueueActivity(new(DateTimeOffset.UtcNow, "operation", "cancelled", "info", title));
+        }
+        catch (Exception error)
+        {
+            StatusTitle = "Operação não concluída"; StatusDetail = error.Message; AppendLog($"{title}: {error.Message}");
+            QueueActivity(new(DateTimeOffset.UtcNow, "operation", "failed", "warning", title,
+                JsonSerializer.Serialize(new { errorType = error.GetType().Name })));
+        }
         finally { _readCancellation?.Dispose(); _readCancellation = null; _isExecuting = false; SetBusy(false); }
     }
     private void Cancel_Click(object sender, RoutedEventArgs e) => _readCancellation?.Cancel();
     private void OpenMaintenance_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 1;
     private void OpenProfile_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 4;
     private void RebuildHistory() { HistoryRows.Clear(); foreach (var report in _reports) HistoryRows.Add(HistoryRow.From(report)); Notify(nameof(HistoryEmptyText)); Notify(nameof(CanExport)); }
-    private void AppendLog(string message) => ExecutionLog += $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
-    private void Window_Closing(object? sender, CancelEventArgs e)
+    private void AppendLog(string message)
+    {
+        ExecutionLog += $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
+        QueueActivity(new(DateTimeOffset.UtcNow, "activity", "log", "info", message));
+    }
+
+    private void QueueActivity(ActivityEntry entry)
+    {
+        if (entry.Summary.Length > 2_000) entry = entry with { Summary = entry.Summary[..1_997] + "…" };
+        _activityWrites.RemoveAll(task => task.IsCompleted);
+        _activityWrites.Add(PersistActivitySafelyAsync(entry));
+    }
+
+    private async Task PersistActivitySafelyAsync(ActivityEntry entry)
+    {
+        try { await _storage.AppendActivityAsync(entry); }
+        catch (Exception error) when (IsStorageError(error))
+        {
+            if (Interlocked.Exchange(ref _activityStorageWarningShown, 1) == 0)
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    _startupWarnings.Add("O registro de atividades não pôde ser gravado no banco local.");
+                    if (_snapshot is not null) { Warnings.Clear(); foreach (var warning in _startupWarnings.Concat(_snapshot.Warnings)) Warnings.Add(warning); }
+                    _storageHealth = new(false, _storageHealth?.SchemaVersion ?? 0, "unavailable", "unavailable", 0, 0, 0, error.GetType().Name);
+                    Notify(nameof(StorageHealth));
+                });
+            }
+        }
+    }
+
+    private async void Window_Closing(object? sender, CancelEventArgs e)
     {
         if (_isExecuting) { e.Cancel = true; MessageBox.Show(this, "Uma alteração está em andamento. Aguarde o resultado antes de fechar o ZEUS.", "Aguarde a conclusão", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+        if (_closingAfterActivityDrain) return;
+        QueueActivity(new(DateTimeOffset.UtcNow, "application", "stopping", "info", "ZEUS encerrando."));
+        var pending = _activityWrites.ToArray();
+        if (pending.Length > 0)
+        {
+            e.Cancel = true;
+            _closingAfterActivityDrain = true;
+            IsEnabled = false;
+            try { await Task.WhenAll(pending).WaitAsync(TimeSpan.FromSeconds(5)); }
+            catch (Exception) { }
+            _lifetime.Cancel();
+            _ = Dispatcher.BeginInvoke(new Action(Close));
+            return;
+        }
         _lifetime.Cancel();
     }
     private void SetBusy(bool busy)
@@ -282,7 +359,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         NotifyActionState();
     }
     private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); }
-    private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException;
+    private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or DbException;
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "Indisponível" : value;
     private static string BooleanStatus(bool? value) => value switch { true => "Ativo", false => "Desativado", null => "Indisponível" };
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; Notify(name); return true; }

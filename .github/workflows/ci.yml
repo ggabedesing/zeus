@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for project in Zeus.Core.Tests Zeus.Cleanup.Tests Zeus.Maintenance.Protocol.Tests Zeus.UserOptimization.Tests Zeus.Hardware.Tests; do
+          for project in Zeus.Core.Tests Zeus.Cleanup.Tests Zeus.Maintenance.Protocol.Tests Zeus.UserOptimization.Tests Zeus.Hardware.Tests Zeus.Storage.Tests; do
             dotnet test "tests/$project/$project.csproj" -c Release -p:EnableWindowsTargeting=true --results-directory "$RUNNER_TEMP/zeus-test-results/$project" --logger 'trx;LogFileName=results.trx'
           done
       - name: Require executed portable tests
@@ -32,7 +32,7 @@ jobs:
           import os, pathlib, xml.etree.ElementTree as ET
           root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'zeus-test-results'
           results = list(root.glob('*/results.trx'))
-          assert len(results) == 5, 'Each portable test project must produce fresh results.'
+          assert len(results) == 6, 'Each portable test project must produce fresh results.'
           for result in results:
               counters = ET.parse(result).find('.//{*}Counters')
               assert counters is not None, f'Missing counters: {result.parent.name}'

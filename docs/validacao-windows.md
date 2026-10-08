@@ -13,6 +13,7 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 | Preferências | Efeitos do usuário aplicados/restaurados; perfil não troca energia sozinho |
 | Inventário e carga | CPU, RAM e volumes reais; contadores nativos de CPU/memória/processos |
 | Auxiliar | Argumentos inválidos rejeitados antes de operação e armazenamento administrativo protegido |
+| Persistência SQLite | Migrações transacionais, integridade, sessões/etapas, preferências, eventos e importação idempotente sem remover JSON de origem |
 | Interface | Aplicação WPF real com inventário, oito áreas e três temas capturados em PNG |
 | Publicação | Pacote autocontido com interface, auxiliar e dependências |
 

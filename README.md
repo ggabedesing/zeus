@@ -19,12 +19,15 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 | Plano geral | Reúne preferências visuais explicitamente incluídas e as seleções de limpeza, inicialização e manutenção. Exibe o plano antes de executar sequencialmente. |
 | Aparência | Temas Completo, Mínimo e Aurora, inspirado no macOS, para a interface do ZEUS. |
 | Histórico | Resultados, logs, estados anteriores e recuperação de sessões interrompidas; exportação de relatório JSON. |
+| Persistência local | SQLite versionado para preferências, atividades e sessões/etapas de manutenção; importação dos JSON antigos sem removê-los e verificação rápida de integridade. |
 
 Nenhuma manutenção é selecionada automaticamente. Drivers e Defender offline possuem fluxos de revisão específicos. O tema altera a interface do ZEUS; as preferências de efeitos do Windows são uma operação separada.
 
 Mover arquivos para recuperação **não libera espaço**. Só a exclusão definitiva remove os bytes guardados; ela não passa pela Lixeira e não pode ser desfeita. Ponto de restauração não recupera documentos apagados. O módulo limita a análise a 10.000 candidatos e arquivos de até 128 MiB.
 
 ## Requisitos e execução
+
+O banco local fica em `%LOCALAPPDATA%\Zeus\zeus.db`. A primeira abertura cria o esquema SQLite versionado. `history.json` e `preferences.json` existentes são importados de forma idempotente e mantidos como cópias locais; falhas de leitura não apagam nem substituem esses arquivos. O registro de atividades fica local e mantém os 10.000 eventos mais recentes; revise os dados antes de compartilhar o banco.
 
 - Windows 11 x64 em versão suportada.
 - Proteção do Sistema disponível para reparos e instalação de drivers. O auxiliar exige um ponto **novo e confirmado**, sem contornar limites ou políticas do Windows.
@@ -52,7 +55,7 @@ pwsh -File scripts/publish-windows.ps1
 
 O teste que aplica/restaura efeitos visuais exige `ZEUS_WINDOWS_ACCEPTANCE=1`. Essa opção é definida no workflow e no iniciador de testes local quando o usuário escolhe testar o aplicativo. Os arquivos de publicação ficam em `artifacts/`, incluindo ZIP, SHA-256 e identificação do código-fonte.
 
-Para executar a suíte completa no próprio PC, extraia `zeus-testes-windows.zip` e abra `INICIAR-TESTES.cmd`. O Windows solicitará administrador para verificar as ACLs. O iniciador usa ou baixa o SDK oficial, confere SHA-512 e executa os seis projetos de testes, com relatório JSON, TRX, logs e capturas em `artifacts/TestResults/<sessão>`. Os testes criam arquivos e entradas próprios; o teste de efeitos visuais aplica e restaura o estado anterior. Reparos, drivers e reinícios têm revisão própria e não integram essa suíte automática.
+Para executar a suíte completa no próprio PC, extraia `zeus-testes-windows.zip` e abra `INICIAR-TESTES.cmd`. O Windows solicitará administrador para verificar as ACLs. O iniciador usa ou baixa o SDK oficial, confere SHA-512 e executa os sete projetos de testes, com relatório JSON, TRX, logs e capturas em `artifacts/TestResults/<sessão>`. Os testes criam arquivos e entradas próprios; o teste de efeitos visuais aplica e restaura o estado anterior. Reparos, drivers e reinícios têm revisão própria e não integram essa suíte automática.
 
 No checkout, use `scripts/iniciar-testes.cmd` ou `powershell -NoProfile -File scripts/test-on-windows.ps1`. O pacote de fonte/testes é gerado com `pwsh -File scripts/package-windows-tests.ps1` após commitar as alterações.
 
@@ -62,7 +65,7 @@ export PATH="/workspace/.dotnet:$PATH"
 export DOTNET_CLI_HOME=/workspace/.dotnet-home
 export NUGET_PACKAGES=/workspace/.nuget/packages
 dotnet build Zeus.slnx -c Release
-for project in Zeus.Core.Tests Zeus.Cleanup.Tests Zeus.Maintenance.Protocol.Tests Zeus.UserOptimization.Tests Zeus.Hardware.Tests; do
+for project in Zeus.Core.Tests Zeus.Cleanup.Tests Zeus.Maintenance.Protocol.Tests Zeus.UserOptimization.Tests Zeus.Hardware.Tests Zeus.Storage.Tests; do
   dotnet test "tests/$project/$project.csproj" -c Release --no-build
 done
 ```
@@ -81,10 +84,13 @@ Reparos, instalação de drivers, criação de pontos de restauração e reiníc
 | --- | --- |
 | `Zeus.Core` | Modelos, recomendações e protocolo validado de manutenção |
 | `Zeus.Cleanup` | Limpeza seletiva, journal e recuperação de arquivos |
+| `Zeus.Storage` | Persistência SQLite local, esquema versionado, atividade e histórico estruturado |
 | `Zeus.Windows` | Inventário, carga, preferências, Windows Update e coordenação do auxiliar |
 | `Zeus.Maintenance` | Operações administrativas previamente implementadas |
 | `Zeus.Desktop` | Interface WPF, revisão do plano, histórico e exportação |
 | `tests/` | Regras portáveis, fronteiras de arquivos, registro e aceitação nativa |
 | `Zeus.SmokeCheck` | Diagnóstico nativo somente de leitura |
+
+O [esquema e a migração do armazenamento local](docs/persistencia-local.md) descrevem localização, preservação dos JSON antigos, verificação de saúde e limites do registro de atividades.
 
 Leia [SECURITY.md](SECURITY.md) e o [relatório de viabilidade com fontes](docs/relatorio-viabilidade-zeus.md).
