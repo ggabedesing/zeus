@@ -264,6 +264,36 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void ComparisonAveragesDiskThroughputAndLatencyPerDeviceWithIndependentCoverage()
+    {
+        var reference = new[]
+        {
+            Sample(20) with { Disks = [new("disk0", 100, 20, 2), new("disk1", null, null, null)] },
+            Sample(30) with { Disks = [new("disk0", 300, 40, null)] }
+        };
+        var later = new[]
+        {
+            Sample(40) with { Disks = [new("disk0", 500, 60, 8)] },
+            Sample(50) with { Disks = [] }
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+
+        var disk = Assert.Single(comparison.DiskIo!, item => item.InstanceName == "disk0");
+        Assert.Equal(200, disk.ReferenceBytesPerSecond);
+        Assert.Equal(500, disk.LaterBytesPerSecond);
+        Assert.Equal(2, disk.ReferenceThroughputSamples);
+        Assert.Equal(1, disk.LaterThroughputSamples);
+        Assert.Equal(2, disk.ReferenceReadLatencyMilliseconds);
+        Assert.Equal(8, disk.LaterReadLatencyMilliseconds);
+        Assert.Equal(1, disk.ReferenceLatencySamples);
+        Assert.Equal(1, disk.LaterLatencySamples);
+        var unavailableDisk = Assert.Single(comparison.DiskIo!, item => item.InstanceName == "disk1");
+        Assert.Null(unavailableDisk.ReferenceBytesPerSecond);
+        Assert.Equal(0, unavailableDisk.LaterThroughputSamples);
+    }
+
+    [Fact]
     public void ComparisonKeepsUnavailableCountersUnknown()
     {
         var unavailable = Sample(null) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 };
@@ -290,6 +320,7 @@ public sealed class PerformanceCounterTests
         Assert.Null(comparison.CpuUsage);
         Assert.Null(comparison.MemoryUsage);
         Assert.Null(comparison.NetworkTraffic);
+        Assert.Null(comparison.DiskIo);
     }
 
     [Fact]

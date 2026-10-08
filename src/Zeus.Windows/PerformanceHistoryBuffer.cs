@@ -16,7 +16,8 @@ public sealed record PerformanceComparison(
     IReadOnlyList<PerformanceGpuMemoryComparison>? GpuMemoryUsage = null,
     PerformanceMetricComparison? CpuUsage = null,
     PerformanceMetricComparison? MemoryUsage = null,
-    IReadOnlyList<PerformanceNetworkComparison>? NetworkTraffic = null);
+    IReadOnlyList<PerformanceNetworkComparison>? NetworkTraffic = null,
+    IReadOnlyList<PerformanceDiskComparison>? DiskIo = null);
 
 public sealed record PerformanceMetricComparison(
     double? ReferencePercent,
@@ -39,6 +40,17 @@ public sealed record PerformanceNetworkComparison(
     double? LaterBytesPerSecond,
     int ReferenceAvailableSamples,
     int LaterAvailableSamples);
+
+public sealed record PerformanceDiskComparison(
+    string InstanceName,
+    double? ReferenceBytesPerSecond,
+    double? LaterBytesPerSecond,
+    int ReferenceThroughputSamples,
+    int LaterThroughputSamples,
+    double? ReferenceReadLatencyMilliseconds,
+    double? LaterReadLatencyMilliseconds,
+    int ReferenceLatencySamples,
+    int LaterLatencySamples);
 
 /// <summary>A process-local, bounded history that preserves observations until exported.</summary>
 public sealed class PerformanceHistoryBuffer
@@ -200,10 +212,36 @@ public static class PerformanceComparisonBuilder
             return new PerformanceNetworkComparison(adapter, left.Average, right.Average, left.Count, right.Count);
         }).ToArray();
 
+        var diskInstances = reference.Concat(later).SelectMany(sample => sample.Disks ?? [])
+            .Select(disk => disk.InstanceName).Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var diskIo = diskInstances.Select(instance =>
+        {
+            static (double? Average, int Count) Summarize(IReadOnlyList<PerformanceObservation> samples,
+                string diskName, Func<DiskPerformanceObservation, double?> selector)
+            {
+                var values = samples.SelectMany(sample => sample.Disks ?? [])
+                    .Where(disk => string.Equals(disk.InstanceName, diskName, StringComparison.OrdinalIgnoreCase))
+                    .Select(selector).Where(value => value is { } number && double.IsFinite(number) && number >= 0)
+                    .Select(value => value!.Value).ToArray();
+                return (values.Length == 0 ? null : values.Average(), values.Length);
+            }
+
+            static double? BytesPerSecond(DiskPerformanceObservation disk) => disk.BytesPerSecond is { } bytes ? bytes : null;
+            static double? ReadLatency(DiskPerformanceObservation disk) => disk.AverageReadLatencyMilliseconds;
+            var referenceThroughput = Summarize(reference, instance, BytesPerSecond);
+            var laterThroughput = Summarize(later, instance, BytesPerSecond);
+            var referenceLatency = Summarize(reference, instance, ReadLatency);
+            var laterLatency = Summarize(later, instance, ReadLatency);
+            return new PerformanceDiskComparison(instance,
+                referenceThroughput.Average, laterThroughput.Average, referenceThroughput.Count, laterThroughput.Count,
+                referenceLatency.Average, laterLatency.Average, referenceLatency.Count, laterLatency.Count);
+        }).ToArray();
+
         return new(reference.Count, later.Count,
             cpuUsage.ReferencePercent, cpuUsage.LaterPercent,
             memoryUsage.ReferencePercent, memoryUsage.LaterPercent,
             reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk, gpuMemory,
-            cpuUsage, memoryUsage, networkTraffic);
+            cpuUsage, memoryUsage, networkTraffic, diskIo);
     }
 }

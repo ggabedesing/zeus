@@ -113,14 +113,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 : " · uso de memória GPU: indisponível";
             var network = comparison.NetworkTraffic is { Count: > 0 } adapters
                 ? " · rede por adaptador: " + string.Join("; ", adapters.Select(item =>
-                    $"{item.Adapter} {FormatNetworkRate(item.ReferenceBytesPerSecond)} ({item.ReferenceAvailableSamples}/{comparison.ReferenceSampleCount}) → {FormatNetworkRate(item.LaterBytesPerSecond)} ({item.LaterAvailableSamples}/{comparison.LaterSampleCount})"))
+                    $"{item.Adapter} {FormatRate(item.ReferenceBytesPerSecond)} ({item.ReferenceAvailableSamples}/{comparison.ReferenceSampleCount}) → {FormatRate(item.LaterBytesPerSecond)} ({item.LaterAvailableSamples}/{comparison.LaterSampleCount})"))
                 : " · tráfego de rede: indisponível";
-            return $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}{gpuMemory}{network}. Cobertura mostra amostras válidas sobre o total; engines individuais não são uso total da GPU, e ocupação não comprova um gargalo sozinha. Comparação descritiva, sem atribuir causa ou ganho.";
+            var diskIo = comparison.DiskIo is { Count: > 0 } disks
+                ? " · disco por unidade: " + string.Join("; ", disks.Select(item =>
+                    $"{item.InstanceName} leitura {FormatRate(item.ReferenceBytesPerSecond)} ({item.ReferenceThroughputSamples}/{comparison.ReferenceSampleCount}) → {FormatRate(item.LaterBytesPerSecond)} ({item.LaterThroughputSamples}/{comparison.LaterSampleCount}); latência {FormatLatency(item.ReferenceReadLatencyMilliseconds)} ({item.ReferenceLatencySamples}/{comparison.ReferenceSampleCount}) → {FormatLatency(item.LaterReadLatencyMilliseconds)} ({item.LaterLatencySamples}/{comparison.LaterSampleCount})"))
+                : " · transferência/latência de disco: indisponível";
+            return $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}{diskIo}{gpuMemory}{network}. Cobertura mostra amostras válidas sobre o total; engines individuais não são uso total da GPU, e ocupação não comprova um gargalo sozinha. Comparação descritiva, sem atribuir causa ou ganho.";
         }
     }
 
-    private static string FormatNetworkRate(double? bytesPerSecond) => bytesPerSecond is { } value && double.IsFinite(value) && value >= 0
+    private static string FormatRate(double? bytesPerSecond) => bytesPerSecond is { } value && double.IsFinite(value) && value >= 0
         ? FormatBytesPerSecond(value >= ulong.MaxValue ? ulong.MaxValue : (ulong)Math.Round(value))
+        : "indisponível";
+
+    private static string FormatLatency(double? milliseconds) => milliseconds is { } value && double.IsFinite(value) && value >= 0
+        ? $"{value:0.##} ms"
         : "indisponível";
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
