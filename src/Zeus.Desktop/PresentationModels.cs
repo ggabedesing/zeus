@@ -6,6 +6,10 @@ namespace Zeus.Desktop;
 
 public sealed record HardwareCard(string Title, string Value, string Detail);
 public sealed record DeviceRow(string Title, string Detail);
+public sealed record DriverInventoryRow(string Title, string Detail, string? SupportSource)
+{
+    public bool HasOfficialSource => SupportSource is not null;
+}
 public sealed record RecommendationRow(string Title, string Reason, string ActionText);
 public sealed record ProfileOption(UsageProfile Value, string Name)
 {

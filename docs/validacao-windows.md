@@ -28,7 +28,7 @@ Compilação local do Desktop e do auxiliar: sem avisos ou erros. Testes: Core 7
 
 ### Inventário de drivers instalados — verificação local em 2026-10-08
 
-A aba de drivers mostra até 100 entradas ordenadas por dispositivo, com versão, data, signatário e valor `IsSigned` reportado por `Win32_PnPSignedDriver`; a exportação JSON conserva a lista completa e os estados conhecidos/desconhecidos. O campo não é apresentado como validação criptográfica independente. Valores que não sejam booleanos válidos do provedor são convertidos em desconhecido, nunca em “não assinado”. Testes de aceitação confirmaram a projeção dos campos no JSON schema 6 e a lista na interface. Resultado local: aceitação Windows 42 aprovados/1 teste administrativo ignorado, hardware 90/90 e compilação Release sem avisos ou erros. Nenhuma configuração do Windows foi alterada.
+A aba de drivers mostra até 100 entradas ordenadas por dispositivo, com versão, data, signatário e valor `IsSigned` reportado por `Win32_PnPSignedDriver`; a exportação JSON conserva a lista completa e os estados conhecidos/desconhecidos. O campo não é apresentado como validação criptográfica independente. Valores que não sejam booleanos válidos do provedor são convertidos em desconhecido, nunca em “não assinado”. O ZEUS oferece consulta manual em páginas oficiais de NVIDIA, AMD e Intel apenas quando o fornecedor corresponde; não verifica disponibilidade ou compatibilidade, e não baixa nem instala pacotes. Fornecedores sem correspondência não recebem link. A verificação local deste incremento passou 97 testes de hardware, uma aceitação da interface com inventário real e build Release sem avisos/erros. Nenhuma configuração do Windows foi alterada.
 
 | Área | Evidência exigida pelo workflow |
 | --- | --- |

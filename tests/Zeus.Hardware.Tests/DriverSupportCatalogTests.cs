@@ -1,0 +1,24 @@
+using Zeus.Core;
+
+namespace Zeus.Hardware.Tests;
+
+public sealed class DriverSupportCatalogTests
+{
+    [Theory]
+    [InlineData("NVIDIA Corporation", "www.nvidia.com")]
+    [InlineData("Advanced Micro Devices, Inc.", "www.amd.com")]
+    [InlineData("Intel(R) Corporation", "www.intel.com")]
+    public void RecognizedChipVendorsHaveFixedOfficialHttpsLookup(string provider, string host)
+    {
+        var source = Assert.IsType<DriverSupportSource>(DriverSupportCatalog.Find(provider));
+        Assert.Equal("https", source.Uri.Scheme);
+        Assert.Equal(host, source.Uri.Host);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("Unknown Device Company")]
+    public void UnknownProviderHasNoSuggestedDestination(string? provider) =>
+        Assert.Null(DriverSupportCatalog.Find(provider));
+}

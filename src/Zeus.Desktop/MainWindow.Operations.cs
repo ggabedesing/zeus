@@ -836,6 +836,18 @@ public partial class MainWindow
         }
     }
     private void OpenVendorSupport_Click(object sender, RoutedEventArgs e) => OpenTrustedUri("https://support.microsoft.com/windows/update-drivers-through-device-manager-in-windows-ec62f46c-ff14-c91d-eead-d7126dc1f7b6");
+    private void OpenDriverSupport_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: DriverInventoryRow row }) return;
+        var source = DriverSupportCatalog.Find(row.SupportSource);
+        if (source is null)
+        {
+            StatusTitle = "Consulta oficial não mapeada";
+            StatusDetail = "O fornecedor deste driver não tem um destino oficial confirmado no catálogo do ZEUS. Use o site do fabricante do computador ou o Windows Update.";
+            return;
+        }
+        OpenTrustedUri(source.Uri.AbsoluteUri);
+    }
     private void OpenTrustedUri(string uri)
     {
         if (_isBusy) return;
