@@ -80,6 +80,9 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
     public bool EulaAccepted { get => _eulaAccepted; set { if (_eulaAccepted == value) return; _eulaAccepted = value; Raise(nameof(EulaAccepted)); Raise(nameof(LicenseReady)); } }
 }
 
+public sealed record WingetUpdateRow(string Name, string PackageId, string InstalledVersion,
+    string AvailableVersion, string Source);
+
 public sealed record ChangeRow(Guid Id, string Title, string Detail, bool CanRestore);
 public sealed record CleanupSessionRow(Guid Id, string Title, string Detail, bool CanRestore, bool CanPurge);
 public sealed record HistoryRow(Guid SessionId, string Title, string Summary, string Protection, IReadOnlyList<string> Steps, string Error, bool HasLogFiles)

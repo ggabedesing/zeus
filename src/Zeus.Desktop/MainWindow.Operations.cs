@@ -449,6 +449,22 @@ public partial class MainWindow
             StatusTitle = "Consulta de drivers encerrada"; StatusDetail = DriverSummary;
         }, cancellable: true);
     }
+    private async void SearchWingetUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        await RunOperationAsync("Consultando atualizações de programas", "Consulta somente leitura pela fonte winget; nenhuma licença será aceita e nenhum programa será instalado.", async token =>
+        {
+            var search = await _wingetUpdates.SearchAsync(token);
+            WingetUpdates.Clear();
+            foreach (var update in search.Updates)
+                WingetUpdates.Add(new(update.Name, update.PackageId, update.InstalledVersion, update.AvailableVersion, update.Source));
+            WingetSummary = search.IsComplete
+                ? $"Consulta concluída em {search.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}: {search.Updates.Count} atualização(ões). " + string.Join(" ", search.Warnings)
+                : string.Join(" ", search.Warnings);
+            StatusTitle = search.IsComplete ? "Consulta do WinGet concluída" : "Consulta do WinGet incompleta";
+            StatusDetail = WingetSummary;
+        }, cancellable: true);
+    }
+
     private async void InstallDriver_Click(object sender, RoutedEventArgs e)
     {
         if (!CanInstallDriver) return;

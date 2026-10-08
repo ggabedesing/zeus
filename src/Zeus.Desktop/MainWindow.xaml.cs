@@ -23,6 +23,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly PerformanceHistoryBuffer _performanceHistory = new();
     private Guid _performanceSessionId = Guid.NewGuid();
     private readonly WindowsUpdateService _windowsUpdate = new();
+    private readonly WingetUpdateService _wingetUpdates = new();
     private readonly PendingMaintenanceSessions _pendingSessions = new();
     private readonly UserOptimizationService _userOptimization;
     private readonly TemporaryFileCleanup _cleanup;
@@ -59,6 +60,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _startupSummary = "Leia os programas do seu usuário para escolher o que precisa iniciar com o Windows.";
     private string _profileSummary = "O perfil orienta o plano. Ajustes do Windows são separados e reversíveis.";
     private string _driverSummary = "Consulte os drivers oferecidos oficialmente pelo Windows Update para este computador.";
+    private string _wingetSummary = "Consulte atualizações de programas identificadas pela fonte winget. A consulta não instala nada.";
     private string _performanceSummary = "Meça por cinco segundos durante a tarefa lenta para observar a carga real.";
 
     public MainWindow() : this(null) { }
@@ -110,6 +112,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<ChangeRow> UserChanges { get; } = [];
     public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
+    public ObservableCollection<WingetUpdateRow> WingetUpdates { get; } = [];
     public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
     public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS")];
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -132,6 +135,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string StartupSummary { get => _startupSummary; private set => Set(ref _startupSummary, value); }
     public string ProfileSummary { get => _profileSummary; private set => Set(ref _profileSummary, value); }
     public string DriverSummary { get => _driverSummary; private set => Set(ref _driverSummary, value); }
+    public string WingetSummary { get => _wingetSummary; private set => Set(ref _wingetSummary, value); }
     public string PerformanceSummary { get => _performanceSummary; private set => Set(ref _performanceSummary, value); }
     public string CollectionDate => _snapshot is null ? "Leitura pendente" : _snapshot.CollectedAt.ToLocalTime().ToString("dd/MM HH:mm:ss");
     public string SystemDescription => _snapshot is null ? "Inventário local do Windows" : $"{_snapshot.ComputerName} · {_snapshot.OperatingSystem}";
