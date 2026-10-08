@@ -115,4 +115,5 @@ internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset Exported
     IReadOnlyList<ChangeRow>? Changes = null, IReadOnlyList<CleanupSessionRow>? Cleanup = null,
     IReadOnlyList<PerformanceHistoryEntry>? PerformanceHistory = null,
     IReadOnlyList<PerformanceObservation>? PerformanceBaseline = null,
-    PerformanceComparison? PerformanceComparison = null);
+    PerformanceComparison? PerformanceComparison = null,
+    OptimizationPlan? FormalOptimizationPlan = null);

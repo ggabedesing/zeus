@@ -27,7 +27,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly UserOptimizationService _userOptimization;
     private readonly TemporaryFileCleanup _cleanup;
     private readonly bool _isFixture;
-    private readonly OptimizationPlanner _planner = new();
+    private readonly OptimizationRuleEngine _ruleEngine = new();
     private readonly DesktopStorage _storage;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _preferenceLock = new(1, 1);
@@ -39,6 +39,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly Dictionary<Guid, int> _performanceSessionSequences = [];
     private CancellationTokenSource? _readCancellation;
     private HardwareSnapshot? _snapshot;
+    private OptimizationPlan? _optimizationPlan;
     private PerformanceObservation? _performance;
     private PerformanceObservation[] _performanceBaseline = [];
     private PerformanceComparison? _performanceComparison;
@@ -82,6 +83,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     public HardwareSnapshot? Snapshot => _snapshot;
+    public OptimizationPlan? FormalOptimizationPlan => _optimizationPlan;
     public DatabaseHealth? StorageHealth => _storageHealth;
     public PerformanceObservation? Performance => _performance;
     public IReadOnlyList<PerformanceHistoryEntry> PerformanceHistory => _performanceHistory.Snapshot();
@@ -134,6 +136,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string CollectionDate => _snapshot is null ? "Leitura pendente" : _snapshot.CollectedAt.ToLocalTime().ToString("dd/MM HH:mm:ss");
     public string SystemDescription => _snapshot is null ? "Inventário local do Windows" : $"{_snapshot.ComputerName} · {_snapshot.OperatingSystem}";
     public string RecommendationEmptyText => _snapshot is null ? "As recomendações aparecem depois do diagnóstico." : Recommendations.Count == 0 ? "Nenhum alerta pelos critérios desta leitura. Meça a tarefa lenta para investigar." : string.Empty;
+    public string FormalPlanSummary => _optimizationPlan?.Status switch
+    {
+        OptimizationPlanStatus.NeedsMoreData => "Plano preliminar: faltam leituras para avaliar todos os critérios. Os dados indisponíveis aparecem nas recomendações.",
+        OptimizationPlanStatus.NoOptimizationRequired => "Nenhuma otimização necessária pelos critérios avaliados nesta coleta.",
+        OptimizationPlanStatus.RecommendationsAvailable => "Há pontos para revisar com base nesta coleta. As sugestões não comprovam um gargalo nem aplicam alterações.",
+        _ => "O plano formal aparece depois do diagnóstico."
+    };
     public string DevicesEmptyText => _snapshot is null ? "Inventário ainda não carregado." : "Leituras fornecidas pelo Windows. Sensores ausentes permanecem indisponíveis.";
     public string StartupEmptyText => StartupChoices.Count == 0 ? "Nenhuma entrada editável foi carregada. Atualize a lista e consulte o resultado." : string.Empty;
     public string HistoryEmptyText => !_historyReadable ? "O histórico anterior foi preservado porque não pôde ser lido. Exporte os novos resultados." : HistoryRows.Count == 0 ? "Ainda não há sessões de manutenção neste usuário." : string.Empty;
@@ -246,14 +255,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         Warnings.Clear(); foreach (var warning in _startupWarnings.Concat(snapshot.Warnings)) Warnings.Add(warning);
         BuildPersonalPlan();
-        foreach (var property in new[] { nameof(Snapshot), nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(DevicesEmptyText), nameof(CanExport) }) Notify(property);
+        foreach (var property in new[] { nameof(Snapshot), nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(FormalPlanSummary), nameof(FormalOptimizationPlan), nameof(DevicesEmptyText), nameof(CanExport) }) Notify(property);
     }
 
     private void BuildPersonalPlan()
     {
         Recommendations.Clear();
         if (_snapshot is null) return;
-        foreach (var r in _planner.Build(_snapshot)) Recommendations.Add(new(r.Title, r.Reason, r.Action is { } a ? $"Revisar em Manutenção: {MaintenanceCatalog.Get(a).Title}" : ""));
+        _optimizationPlan = _ruleEngine.Evaluate(_snapshot, ToOptimizationProfile(SelectedProfile));
+        foreach (var result in _optimizationPlan.Rules.Where(result => result.Triggered))
+            Recommendations.Add(new(result.Rule.Title, result.Reason, result.Action is { } a ? $"Revisar em Manutenção: {MaintenanceCatalog.Get(a).Title}" : ""));
         var profile = SelectedProfile switch
         {
             UsageProfile.Gaming => ("Durante seus jogos", "Meça com o jogo aberto. Compare uso de CPU e RAM; quedas de FPS também podem depender da GPU, temperatura e configurações do jogo. Atualize drivers apenas quando houver compatibilidade e indicação."),
@@ -268,7 +279,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Recommendations.Add(new("Recursos necessários ao seu uso", required.Count > 0 ? $"Seu plano preserva {string.Join(", ", required)}. Revise programas relacionados antes de desativar sua inicialização." : "Você não marcou dependências adicionais. As alterações continuam seletivas; nenhum serviço é desativado automaticamente.", "Revise cada entrada em Inicialização"));
         if (_performance is { } sample && sample.CpuPercent >= 85) Recommendations.Add(new("CPU muito ocupada nesta amostra", $"Uso observado de {sample.CpuPercent:0.#}% durante {sample.SamplingDuration.TotalSeconds:0.#} segundos. Consulte os processos em Hardware e repita durante a tarefa; uma amostra isolada não comprova um gargalo.", "Medição real de carga"));
         Notify(nameof(RecommendationEmptyText));
+        Notify(nameof(FormalPlanSummary));
+        Notify(nameof(FormalOptimizationPlan));
     }
+
+    private static OptimizationProfile ToOptimizationProfile(UsageProfile profile) => profile switch
+    {
+        UsageProfile.Gaming => OptimizationProfile.Gaming,
+        UsageProfile.Work => OptimizationProfile.Work,
+        UsageProfile.Creative => OptimizationProfile.Editing,
+        UsageProfile.Battery => OptimizationProfile.General,
+        _ => OptimizationProfile.General
+    };
 
     private void ShowPendingHardware()
     {

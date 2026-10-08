@@ -116,9 +116,12 @@ public sealed class OptimizationRuleEngine
     {
         "memory.pressure" or "memory.capacity" => snapshot.Memory is { TotalBytes: > 0 } memory && memory.AvailableBytes <= memory.TotalBytes,
         "storage.free-space" => snapshot.Disks.Any(disk => disk.TotalBytes > 0 && disk.FreeBytes <= disk.TotalBytes),
-        "startup.review" => true,
+        "startup.review" => !SourceUnavailable(snapshot, "Inicialização"),
         "security.provider" => !snapshot.OperatingSystem.Contains("Windows", StringComparison.OrdinalIgnoreCase) || snapshot.Security?.DefenderEnabled is not null,
         "diagnostics.warnings" => true,
         _ => false
     };
+
+    private static bool SourceUnavailable(HardwareSnapshot snapshot, string source) => snapshot.Warnings.Any(warning =>
+        warning.StartsWith(source + ":", StringComparison.OrdinalIgnoreCase));
 }

@@ -55,6 +55,20 @@ public sealed class OptimizationPlannerTests
     }
 
     [Fact]
+    public void FailedStartupCollectionIsUnknownRatherThanAnEmptyConfirmedInventory()
+    {
+        var snapshot = HealthySnapshot() with { Warnings = ["Inicialização: o provedor excedeu o prazo de consulta; dados indisponíveis."] };
+
+        var plan = ruleEngine.Evaluate(snapshot, OptimizationProfile.Work);
+        var startup = Assert.Single(plan.Rules, result => result.Rule.Id == "startup.review");
+
+        Assert.Equal(OptimizationPlanStatus.NeedsMoreData, plan.Status);
+        Assert.False(startup.EvidenceAvailable);
+        Assert.False(startup.Triggered);
+        Assert.Contains("não estão disponíveis", startup.Reason);
+    }
+
+    [Fact]
     public void HealthySnapshotDoesNotInventProblemsOrPromiseAnUpgrade()
     {
         var recommendations = planner.Build(HealthySnapshot());

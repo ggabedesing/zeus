@@ -81,6 +81,8 @@ public sealed class WpfExperienceTests
         Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);
         Assert.NotEmpty(window.HardwareCards);
         Assert.NotNull(window.Snapshot);
+        Assert.NotNull(window.FormalOptimizationPlan);
+        Assert.NotEmpty(window.FormalPlanSummary);
         Assert.NotNull(window.Snapshot.Cpu);
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
