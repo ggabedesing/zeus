@@ -35,6 +35,8 @@ Em 8 de outubro de 2026, o usuário enviou o relatório da suíte executada no s
 
 O [resumo da evidência](evidencias/pc-local-2026-10-08.json) preserva o commit e os resultados, sem caminhos pessoais. O relatório lista 12 capturas; os arquivos dessas capturas locais não foram recebidos para revisão. A versão do Windows e a configuração física não constam no relatório. Esse resultado confirma a suíte automatizada nessa execução local e mantém pendentes os cenários administrativos abaixo.
 
+Na validação local do commit `2a4c718`, `Zeus.SmokeCheck` concluiu a coleta nativa e encontrou contadores de memória GPU para dois adaptadores, com leitura dedicada disponível nos dois. Isso confirma disponibilidade do contador neste computador, não pressão de VRAM nem capacidade total; nenhum reparo ou restauração foi executado.
+
 ## Aceitação administrativa em máquinas de teste
 
 Use Windows 11 suportado, snapshots quando disponíveis e backups independentes. Guarde a versão/commit, ação, relatório e resultado após reiniciar. Execute cada cenário separadamente.
