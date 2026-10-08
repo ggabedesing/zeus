@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -91,6 +92,22 @@ public sealed class WpfExperienceTests
         Assert.False(string.IsNullOrWhiteSpace(window.BuildVersion));
         Assert.Same(Application.Current.Resources["BackgroundBrush"], window.Background);
         Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);
+        var themeSelector = Assert.IsType<ComboBox>(window.FindName("ThemeSelector"));
+        Assert.Equal("theme-selector", AutomationProperties.GetAutomationId(themeSelector));
+        var themeSelectorPeer = Assert.IsAssignableFrom<ComboBoxAutomationPeer>(UIElementAutomationPeer.CreatePeerForElement(themeSelector));
+        Assert.Equal("Tema do aplicativo", themeSelectorPeer.GetName());
+        var expandCollapse = Assert.IsAssignableFrom<IExpandCollapseProvider>(themeSelectorPeer.GetPattern(PatternInterface.ExpandCollapse));
+        Assert.Equal(3, themeSelector.Items.Count);
+        expandCollapse.Expand();
+        Assert.True(themeSelector.IsDropDownOpen);
+        expandCollapse.Collapse();
+        Assert.False(themeSelector.IsDropDownOpen);
+        foreach (var theme in new[] { DesktopTheme.Complete, DesktopTheme.Minimal, DesktopTheme.MacInspired })
+        {
+            window.SelectedTheme = theme;
+            Assert.Same(Application.Current.Resources["PanelBrush"], themeSelector.Background);
+            Assert.Same(Application.Current.Resources["TextBrush"], themeSelector.Foreground);
+        }
         Assert.NotEmpty(window.HardwareCards);
         Assert.NotNull(window.Snapshot);
         Assert.NotEmpty(window.DeviceRepairSummary);
@@ -267,10 +284,14 @@ public sealed class WpfExperienceTests
         app.RefreshSystemContrast(true);
         Assert.Same(SystemColors.WindowBrush, app.Resources["BackgroundBrush"]);
         Assert.Same(SystemColors.WindowTextBrush, app.Resources["TextBrush"]);
+        Assert.Same(SystemColors.WindowBrush, themeSelector.Background);
+        Assert.Same(SystemColors.WindowTextBrush, themeSelector.Foreground);
         Assert.Same(SystemColors.HighlightBrush, app.Resources["PrimaryButtonBrush"]);
         window.SelectedTheme = DesktopTheme.Complete;
         app.RefreshSystemContrast(false);
         Assert.Equal(DesktopTheme.Complete, window.SelectedTheme);
+        Assert.Same(app.Resources["PanelBrush"], themeSelector.Background);
+        Assert.Same(app.Resources["TextBrush"], themeSelector.Foreground);
         Assert.Equal(Color.FromRgb(0x65, 0xE3, 0xE0), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
         Assert.Equal(Color.FromRgb(0xFF, 0xD1, 0x8B), Assert.IsType<SolidColorBrush>(app.Resources["WarningBrush"]).Color);
         window.SelectedTheme = DesktopTheme.MacInspired;
