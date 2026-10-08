@@ -12,14 +12,17 @@ public sealed class HardwareCompatibilityTests
             {
               "CollectedAt": "2026-01-01T00:00:00Z", "OperatingSystem": "Windows",
               "ComputerName": "PC", "Cpu": null, "Memory": null, "Graphics": [],
-              "Disks": [], "Startup": [], "Security": null, "Warnings": []
+              "Disks": [], "Startup": [], "Security": null, "Warnings": [],
+              "PhysicalDisks": [{"Name":"NVMe","MediaType":"SSD","BusType":"NVMe","SizeBytes":512000000000,"HealthStatus":"Healthy","TemperatureCelsius":null,"Wear":null}]
             }
             """;
         var snapshot = JsonSerializer.Deserialize<HardwareSnapshot>(previous)!;
         Assert.Null(snapshot.Board);
         Assert.Null(snapshot.Bios);
         Assert.Null(snapshot.MemoryModules);
-        Assert.Null(snapshot.PhysicalDisks);
+        Assert.Null(snapshot.PhysicalDisks![0].PowerOnHours);
+        Assert.Null(snapshot.PhysicalDisks[0].ReadErrorsTotal);
+        Assert.Null(snapshot.PhysicalDisks[0].WriteErrorsTotal);
         Assert.Null(snapshot.Batteries);
         Assert.Null(snapshot.NetworkAdapters);
         Assert.Null(snapshot.MemoryArraySlotsReported);
@@ -39,6 +42,9 @@ public sealed class HardwareCompatibilityTests
         var restored = JsonSerializer.Deserialize<HardwareSnapshot>(JsonSerializer.Serialize(snapshot))!;
         Assert.Null(restored.PhysicalDisks![0].TemperatureCelsius);
         Assert.Null(restored.PhysicalDisks[0].Wear);
+        Assert.Null(restored.PhysicalDisks[0].PowerOnHours);
+        Assert.Null(restored.PhysicalDisks[0].ReadErrorsTotal);
+        Assert.Null(restored.PhysicalDisks[0].WriteErrorsTotal);
         Assert.Equal(42d, restored.PhysicalDisks[1].TemperatureCelsius);
         Assert.Equal(12UL, restored.PhysicalDisks[1].Wear);
         Assert.Null(restored.MemoryModules![0].SpeedMHz);

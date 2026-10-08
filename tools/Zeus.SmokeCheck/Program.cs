@@ -30,7 +30,9 @@ try
     Console.WriteLine($"Activity context: {performance.ActivityContext?.Summary ?? "unavailable"}");
     foreach (var warning in performance.Warnings.Where(warning => warning.Contains("Memória GPU", StringComparison.OrdinalIgnoreCase)))
         Console.WriteLine($"GPU memory detail: {warning}");
-    Console.WriteLine($"Optional inventory: board={snapshot.Board is not null}; BIOS={snapshot.Bios is not null}; physicalDisks={snapshot.PhysicalDisks?.Count ?? 0}.");
+    var physicalDisks = snapshot.PhysicalDisks ?? [];
+    Console.WriteLine($"Optional inventory: board={snapshot.Board is not null}; BIOS={snapshot.Bios is not null}; physicalDisks={physicalDisks.Count}.");
+    Console.WriteLine($"Storage provider counters: temperature={physicalDisks.Count(disk => disk.TemperatureCelsius.HasValue)}/{physicalDisks.Count}; wear={physicalDisks.Count(disk => disk.Wear.HasValue)}/{physicalDisks.Count}; power-on hours={physicalDisks.Count(disk => disk.PowerOnHours.HasValue)}/{physicalDisks.Count}; read/write error counters={physicalDisks.Count(disk => disk.ReadErrorsTotal.HasValue || disk.WriteErrorsTotal.HasValue)}/{physicalDisks.Count}. Missing values are unavailable, not zero.");
     Console.WriteLine($"Memory inventory: modules={snapshot.MemoryModules?.Count.ToString() ?? "unavailable"}; firmware-declared slots={snapshot.MemoryArraySlotsReported?.ToString() ?? "unavailable"}; channels=not inferred.");
     Console.WriteLine($"Optional warnings: {snapshot.Warnings.Count}. No repair or restore operation executed.");
     return 0;

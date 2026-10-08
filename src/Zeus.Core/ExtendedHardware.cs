@@ -9,8 +9,9 @@ public sealed record BiosInfo(string Manufacturer, string Version, string? Relea
 public sealed record MemoryModuleInfo(string Location, ulong CapacityBytes, uint? SpeedMHz, string Manufacturer);
 
 /// <summary>
-/// Status and sensors are those supplied by the storage provider. Unknown sensors
-/// stay null; an absent wear reading is not zero wear and a healthy status is not a guarantee.
+/// Status, sensors, and reliability counters are those supplied by the storage provider.
+/// Unknown values stay null; an absent wear reading is not zero wear and a healthy status
+/// is not a guarantee.
 /// </summary>
 public sealed record PhysicalDiskInfo(
     string Name,
@@ -19,7 +20,13 @@ public sealed record PhysicalDiskInfo(
     ulong SizeBytes,
     string HealthStatus,
     double? TemperatureCelsius,
-    ulong? Wear);
+    ulong? Wear,
+    double? TemperatureMaxCelsius = null,
+    ulong? PowerOnHours = null,
+    ulong? ReadErrorsTotal = null,
+    ulong? ReadErrorsUncorrected = null,
+    ulong? WriteErrorsTotal = null,
+    ulong? WriteErrorsUncorrected = null);
 
 public sealed record BatteryInfo(string Name, int? ChargePercent, string Status);
 

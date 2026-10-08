@@ -10,6 +10,8 @@ Verificação local em 2026-10-08: a captura automática inicial compilou de for
 
 Esta evidência valida o MSI de desenvolvimento neste Windows x64. Não valida atualização de versões já instaladas, todas as edições do Windows, assinatura Authenticode, SmartScreen, recuperação de interrupção ou instalação assistida visual. Não publique o MSI como versão de produção até essas verificações e a assinatura do fornecedor serem concluídas.
 
+Em 2026-10-08, a coleta real deste PC retornou um disco físico e nenhum dos contadores de temperatura, desgaste, horas ligado ou erros de leitura/gravação. A interface mantém esses campos como indisponíveis. A checagem de fumaça não executou reparos. Depois da ampliação, o build Release passou sem avisos/erros, os testes de hardware passaram em 82 casos e a aceitação Windows passou em 40, com um teste administrativo ignorado.
+
 ## Testes automatizados
 
 | Área | Evidência exigida pelo workflow |
@@ -21,7 +23,7 @@ Esta evidência valida o MSI de desenvolvimento neste Windows x64. Não valida a
 | Preferências | Efeitos do usuário aplicados/restaurados; perfil não troca energia sozinho |
 | Inventário e carga | CPU, RAM e volumes reais; contadores nativos de CPU/memória/processos |
 | Papel de parede | prévia local, limites de formato/tamanho/caminho, backup SHA-256, aplicação verificada, restauração pelo histórico, bloqueio de mudança externa e preservação de slideshow/papéis distintos por monitor |
-| Inventário estendido | drivers, PnP, rede, processos, serviços, tarefas, software, eventos recentes, Secure Boot, TPM e slots de memória declarados pelo firmware; canais não são inferidos e fontes opcionais podem permanecer indisponíveis |
+| Inventário estendido | drivers, PnP, rede, processos, serviços, tarefas, software, eventos recentes, Secure Boot, TPM e slots de memória declarados pelo firmware; discos incluem temperatura, desgaste, horas ligado e erros de leitura/gravação somente quando informados por `Get-StorageReliabilityCounter`; canais não são inferidos e fontes opcionais podem permanecer indisponíveis. Os contadores vêm do provedor de armazenamento do Windows ([cmdlet](https://learn.microsoft.com/en-us/powershell/module/storage/get-storagereliabilitycounter?view=windowsserver2025-ps), [classe](https://learn.microsoft.com/en-us/windows-hardware/drivers/storage/msft-storagereliabilitycounter)) e não garantem cobertura de todos os atributos S.M.A.R.T. do fabricante. |
 | WinGet | consulta de leitura e testes de prévia/argumentos seguros; atualização individual só após confirmação, nova checagem de ID/versões, execução interativa e verificação posterior. Nenhum aceite automático de termos. Tentativas sem confirmação são registradas e bloqueadas para repetição; não há garantia genérica de reversão. A aceitação automatizada nunca instala pacote. |
 | Atualizações do Windows | busca WUA sob demanda para software pendente, com origem/políticas configuradas; estados parciais e falhas permanecem explícitos; a busca não baixa nem instala. Em 08/10/2026 às 16:52 UTC, uma consulta real deste PC terminou completa e retornou zero atualizações de software pendentes. Isso cobre somente a fonte configurada e não avalia drivers nem atualizações ocultas. |
 | DISM ScanHealth | estados explícitos do repositório de componentes são classificados; código de saída sem uma mensagem conhecida permanece desconhecido e exige revisão do log |

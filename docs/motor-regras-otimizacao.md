@@ -25,4 +25,4 @@ Em conflito, vence a regra com maior confiança (`High`, `Medium`, `Low`). Empat
 
 Os critérios de RAM, espaço livre e contagem de inicialização são heurísticas de triagem. O plano de teste de cada regra pede uma observação representativa antes de atribuir causa ou benefício. Uma leitura vazia não equivale a inventário confirmado quando o coletor registrou falha da fonte.
 
-Os testes `OptimizationPlannerTests` cobrem plano sem alterações necessárias, evidência ausente, dependência pendente, resolução de conflito, observação específica de jogos e a ausência de ação automática. A aceitação WPF verifica a presença do plano e dos perfis na interface; o relatório exportado inclui o plano formal no schema 4.
+Os testes `OptimizationPlannerTests` cobrem plano sem alterações necessárias, evidência ausente, dependência pendente, resolução de conflito, observação específica de jogos e a ausência de ação automática. A aceitação WPF verifica a presença do plano e dos perfis na interface; o relatório exportado inclui o plano formal no schema 5, que acrescenta contadores de confiabilidade do armazenamento quando disponíveis.

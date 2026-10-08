@@ -405,7 +405,13 @@ $inventory = [pscustomobject]@{
             "$items += [pscustomobject]@{ Name = [string]$d.FriendlyName; MediaType = [string]$d.MediaType; " +
             "BusType = [string]$d.BusType; SizeBytes = [uint64]$d.Size; HealthStatus = [string]$d.HealthStatus; " +
             "TemperatureCelsius = if ($null -ne $r -and $null -ne $r.Temperature -and $r.Temperature -gt 0 -and $r.Temperature -le 125) { [double]$r.Temperature } else { $null }; " +
-            "Wear = if ($null -ne $r -and $null -ne $r.Wear) { [uint64]$r.Wear } else { $null } }; }; " +
+            "TemperatureMaxCelsius = if ($null -ne $r -and $null -ne $r.TemperatureMax -and $r.TemperatureMax -gt 0 -and $r.TemperatureMax -le 125) { [double]$r.TemperatureMax } else { $null }; " +
+            "Wear = if ($null -ne $r -and $null -ne $r.Wear) { [uint64]$r.Wear } else { $null }; " +
+            "PowerOnHours = if ($null -ne $r) { $r.PowerOnHours } else { $null }; " +
+            "ReadErrorsTotal = if ($null -ne $r) { $r.ReadErrorsTotal } else { $null }; " +
+            "ReadErrorsUncorrected = if ($null -ne $r) { $r.ReadErrorsUncorrected } else { $null }; " +
+            "WriteErrorsTotal = if ($null -ne $r) { $r.WriteErrorsTotal } else { $null }; " +
+            "WriteErrorsUncorrected = if ($null -ne $r) { $r.WriteErrorsUncorrected } else { $null } }; }; " +
             "[pscustomobject]@{ Disks = @($items); Warnings = @($notes) } | Microsoft.PowerShell.Utility\\ConvertTo-Json -Depth 4 -Compress }";
         using var json = await RunPowerShellJsonAsync(script, token, WindowsPowerShellModule.Utility, WindowsPowerShellModule.Storage);
         if (json.RootElement.TryGetProperty("Warnings", out var notes))
@@ -429,7 +435,10 @@ $inventory = [pscustomobject]@{
         if (wear is > 100)
             warnings.Enqueue($"Disco físico {name}: desgaste informado de {wear}% acima do limite estimado de 100%; preserve um backup e consulte o fabricante.");
         return new PhysicalDiskInfo(name, JsonText(disk, "MediaType"), JsonText(disk, "BusType"), bytes,
-            JsonText(disk, "HealthStatus"), NullableDouble(disk, "TemperatureCelsius"), wear);
+            JsonText(disk, "HealthStatus"), NullableDouble(disk, "TemperatureCelsius"), wear,
+            NullableDouble(disk, "TemperatureMaxCelsius"), NullableUInt64(disk, "PowerOnHours"),
+            NullableUInt64(disk, "ReadErrorsTotal"), NullableUInt64(disk, "ReadErrorsUncorrected"),
+            NullableUInt64(disk, "WriteErrorsTotal"), NullableUInt64(disk, "WriteErrorsUncorrected"));
     }
 
     internal static bool TryReadCapacity(ulong? reported, string component, ConcurrentQueue<string> warnings, out ulong bytes)

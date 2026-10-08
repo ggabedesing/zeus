@@ -64,4 +64,18 @@ public sealed class StorageProviderTests
         Assert.Equal(512000000000UL, disk.SizeBytes);
         Assert.Empty(warnings);
     }
+
+    [Fact]
+    public void ReliabilityCountersArePreservedWithoutInferringMissingValues()
+    {
+        using var json = JsonDocument.Parse("{\"Name\":\"Disco\",\"SizeBytes\":512000000000,\"TemperatureMaxCelsius\":70,\"PowerOnHours\":1234,\"ReadErrorsTotal\":7,\"ReadErrorsUncorrected\":2,\"WriteErrorsTotal\":0,\"WriteErrorsUncorrected\":null}");
+        var disk = WindowsHardwareDiagnostics.ParsePhysicalDisk(json.RootElement, new ConcurrentQueue<string>())!;
+
+        Assert.Equal(70, disk.TemperatureMaxCelsius);
+        Assert.Equal(1234UL, disk.PowerOnHours);
+        Assert.Equal(7UL, disk.ReadErrorsTotal);
+        Assert.Equal(2UL, disk.ReadErrorsUncorrected);
+        Assert.Equal(0UL, disk.WriteErrorsTotal);
+        Assert.Null(disk.WriteErrorsUncorrected);
+    }
 }

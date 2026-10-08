@@ -407,7 +407,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ExtendedHardwareRows.Add(new("RAM · Slots e canais", $"{moduleCount} módulo(s) reportado(s) · {slots} slot(s) declarados · canais: não informados pelo provedor; não inferidos pela velocidade."));
         }
         foreach (var module in snapshot.MemoryModules ?? []) ExtendedHardwareRows.Add(new($"RAM · {Available(module.Location)}", $"{ByteFormatting.Format(module.CapacityBytes)} · {module.SpeedMHz?.ToString() ?? "Indisponível"} MHz · {Available(module.Manufacturer)}"));
-        foreach (var disk in snapshot.PhysicalDisks ?? []) ExtendedHardwareRows.Add(new(Available(disk.Name), $"{disk.MediaType} · {disk.BusType} · {ByteFormatting.Format(disk.SizeBytes)} · Estado informado: {Available(disk.HealthStatus)}\nTemperatura: {(disk.TemperatureCelsius.HasValue ? $"{disk.TemperatureCelsius.Value:0.#} °C" : "indisponível")} · Desgaste informado: {disk.Wear?.ToString() ?? "indisponível"}"));
+        foreach (var disk in snapshot.PhysicalDisks ?? []) ExtendedHardwareRows.Add(new(Available(disk.Name), $"{disk.MediaType} · {disk.BusType} · {ByteFormatting.Format(disk.SizeBytes)} · Estado informado: {Available(disk.HealthStatus)}\nTemperatura informada: {(disk.TemperatureCelsius.HasValue ? $"{disk.TemperatureCelsius.Value:0.#} °C" : "indisponível")} (máx. {(disk.TemperatureMaxCelsius.HasValue ? $"{disk.TemperatureMaxCelsius.Value:0.#} °C" : "indisponível")}) · Desgaste informado: {disk.Wear?.ToString() ?? "indisponível"}\nHoras ligado: {disk.PowerOnHours?.ToString() ?? "indisponível"} · Erros leitura: {FormatDiskErrors(disk.ReadErrorsTotal, disk.ReadErrorsUncorrected)} · Erros gravação: {FormatDiskErrors(disk.WriteErrorsTotal, disk.WriteErrorsUncorrected)}"));
         foreach (var battery in snapshot.Batteries ?? []) ExtendedHardwareRows.Add(new(Available(battery.Name), $"Carga: {battery.ChargePercent?.ToString() ?? "indisponível"}% · {Available(battery.Status)}"));
         foreach (var network in snapshot.NetworkAdapters ?? []) ExtendedHardwareRows.Add(new(Available(network.Name), $"{Available(network.Status)} · Velocidade de enlace: {(network.SpeedBitsPerSecond.HasValue ? $"{network.SpeedBitsPerSecond.Value / 1_000_000d:0.#} Mbps" : "indisponível")}"));
         if (inventory is not null)
@@ -612,6 +612,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or DbException;
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "Indisponível" : value;
+    private static string FormatDiskErrors(ulong? total, ulong? uncorrected) => total is null && uncorrected is null
+        ? "indisponíveis"
+        : $"{total?.ToString() ?? "indisponível"} total / {uncorrected?.ToString() ?? "indisponível"} não corrigidos";
     private static string FormatNetworkValues(IEnumerable<string>? values)
     {
         var items = values?.Where(value => !string.IsNullOrWhiteSpace(value)).ToArray() ?? [];
