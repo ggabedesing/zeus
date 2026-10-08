@@ -104,7 +104,19 @@ function Read-Part([string]$label, [scriptblock]$body) {
 }
 $routes = Read-Part 'Rotas de rede' { Get-NetRoute -ErrorAction Stop | Select-Object -First 300 @{n='AdapterIndex';e={[int]$_.InterfaceIndex}},@{n='Route';e={([string]$_.DestinationPrefix + ' -> ' + [string]$_.NextHop)} } }
 $network = Read-Part 'Rede' { Get-NetIPConfiguration -ErrorAction Stop | Select-Object @{n='Adapter';e={$_.InterfaceAlias}},@{n='InterfaceIndex';e={$_.InterfaceIndex}},@{n='Addresses';e={@($_.IPv4Address.IPAddress + $_.IPv6Address.IPAddress)}},@{n='DnsServers';e={@($_.DNSServer.ServerAddresses)}},@{n='Gateways';e={@($_.IPv4DefaultGateway.NextHop + $_.IPv6DefaultGateway.NextHop)}},@{n='Status';e={[string]$_.NetProfile.NetworkCategory}} }
-$proxy = $null; try { $proxy=[string](Get-ItemPropertyValue 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyServer -ErrorAction Stop); if([string]::IsNullOrWhiteSpace($proxy)){$proxy=$null} elseif($proxy -match '@'){$proxy=$proxy -replace '(?i)(^|;)[^;]*@','$1[redigido]@'} } catch { }
+$proxy = $null; $proxyEnabled = $null; $proxyPac = $null; $proxyAutoDetect = $null; $proxyBypass = $null; $proxyAvailable = $false
+try {
+  $settings = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -ErrorAction Stop
+  if ($null -ne $settings.ProxyEnable) { $proxyEnabled = ([int]$settings.ProxyEnable -eq 1) }
+  $proxy = [string]$settings.ProxyServer
+  if ([string]::IsNullOrWhiteSpace($proxy)) { $proxy = $null } elseif ($proxy -match '@') { $proxy = $proxy -replace '(?i)(^|;)[^;]*@','$1[redigido]@' }
+  $proxyPac = [string]$settings.AutoConfigURL
+  if (![string]::IsNullOrWhiteSpace($proxyPac)) { $proxyPac = $proxyPac -replace '(?i)://[^/@]*@','://[redigido]@'; $proxyPac = ($proxyPac -split '[?#]',2)[0] } else { $proxyPac = $null }
+  if ($null -ne $settings.AutoDetect) { $proxyAutoDetect = ([int]$settings.AutoDetect -eq 1) }
+  $proxyBypass = [string]$settings.ProxyOverride
+  if ([string]::IsNullOrWhiteSpace($proxyBypass)) { $proxyBypass = $null }
+  $proxyAvailable = $true
+} catch { $warnings.Add('Proxy do usuário: configurações do Registro HKCU indisponíveis.') }
 $drivers = Read-Part 'Drivers' { Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop | Select-Object DeviceName,DriverProviderName,DriverVersion,@{n='Date';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}else{$null}}},Signer }
 $pnp = Read-Part 'Dispositivos PnP' { Get-CimInstance Win32_PnPEntity -ErrorAction Stop | Select-Object Name,PNPClass,Status,@{n='ProblemCode';e={if($_.ConfigManagerErrorCode -ne 0){[string]$_.ConfigManagerErrorCode}else{$null}}} }
 $processes = Read-Part 'Processos' { Get-Process -ErrorAction Stop | Sort-Object WorkingSet64 -Descending | Select-Object -First 200 @{n='Name';e={$_.ProcessName}},Id,@{n='CpuSeconds';e={if($_.CPU -ne $null){[double]$_.CPU}else{$null}}},@{n='WorkingSetBytes';e={[uint64]$_.WorkingSet64}} }
@@ -117,6 +129,7 @@ $tpmPresent = $null; $tpmReady = $null; try { $t=Get-Tpm -ErrorAction Stop; $tpm
 $updates = $null; $warnings.Add('Windows Update: atualizações pendentes não foram consultadas nesta coleta para evitar busca online ou espera longa.')
 $inventory = [pscustomobject]@{
  NetworkConfiguration=@($network | ForEach-Object { $ifIndex=$_.InterfaceIndex; [pscustomobject]@{Adapter=[string]$_.Adapter;Addresses=@($_.Addresses);DnsServers=@($_.DnsServers);Gateways=@($_.Gateways);Status=[string]$_.Status;Routes=@($routes | Where-Object AdapterIndex -eq $ifIndex | ForEach-Object Route);Proxy=$proxy} });
+ ProxyConfiguration=[pscustomobject]@{ManualProxyEnabled=$proxyEnabled;ManualProxyServer=$proxy;AutoConfigUrl=$proxyPac;AutoDetectEnabled=$proxyAutoDetect;BypassList=$proxyBypass;IsAvailable=$proxyAvailable};
  Drivers=@($drivers | ForEach-Object { [pscustomobject]@{Device=[string]$_.DeviceName;Provider=[string]$_.DriverProviderName;Version=[string]$_.DriverVersion;Date=$_.Date;Signer=$_.Signer} });
  PnpDevices=@($pnp | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Class=[string]$_.PNPClass;Status=[string]$_.Status;ProblemCode=$_.ProblemCode} });
  Processes=@($processes | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Id=[int]$_.Id;CpuSeconds=$_.CpuSeconds;WorkingSetBytes=$_.WorkingSetBytes} });
@@ -128,7 +141,7 @@ $inventory = [pscustomobject]@{
  UpdateState=[pscustomobject]@{PendingCount=$updates;Source='Não consultado nesta coleta'};
  WindowsImageHealth=$null
 }
-[void]$warnings.Add('RAM: canais de memória não são inferidos pela quantidade de módulos. Integridade da imagem do Windows não é medida nesta coleta; use o Centro de Reparos. Proxy de usuário não configurado pode aparecer como indisponível.')
+[void]$warnings.Add('RAM: canais de memória não são inferidos pela quantidade de módulos. Integridade da imagem do Windows não é medida nesta coleta; use o Centro de Reparos. O proxy aqui cobre apenas valores observados em HKCU Internet Settings; auto-detecção ausente no Registro e configurações WinHTTP ou por aplicativo permanecem desconhecidas ou fora desta fonte.')
 [pscustomobject]@{Inventory=$inventory;Warnings=@($warnings)} | ConvertTo-Json -Depth 7 -Compress";
 
         using var json = await RunPowerShellJsonAsync(script, token, WindowsPowerShellModule.Utility);

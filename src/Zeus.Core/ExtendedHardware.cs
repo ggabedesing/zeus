@@ -39,9 +39,12 @@ public sealed record WindowsInventoryInfo(
     WindowsSecurityState? SecurityState,
     WindowsUpdateState? UpdateState,
     string? WindowsImageHealth,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    ProxyConfigurationInfo? ProxyConfiguration = null);
 
 public sealed record NetworkConfigurationInfo(string Adapter, string[] Addresses, string[] DnsServers, string[] Gateways, string Status, string[]? Routes = null, string? Proxy = null);
+public sealed record ProxyConfigurationInfo(bool? ManualProxyEnabled, string? ManualProxyServer,
+    string? AutoConfigUrl, bool? AutoDetectEnabled, string? BypassList, bool IsAvailable);
 public sealed record DriverInfo(string Device, string Provider, string Version, string? Date, string? Signer);
 public sealed record PnpDeviceInfo(string Name, string Class, string Status, string? ProblemCode);
 public sealed record ProcessInfo(string Name, int Id, double? CpuSeconds, ulong? WorkingSetBytes);

@@ -309,6 +309,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var network in snapshot.NetworkAdapters ?? []) ExtendedHardwareRows.Add(new(Available(network.Name), $"{Available(network.Status)} · Velocidade de enlace: {(network.SpeedBitsPerSecond.HasValue ? $"{network.SpeedBitsPerSecond.Value / 1_000_000d:0.#} Mbps" : "indisponível")}"));
         if (inventory is not null)
         {
+            foreach (var network in inventory.NetworkConfiguration)
+                ExtendedHardwareRows.Add(new($"Rede · {Available(network.Adapter)}", $"Estado: {Available(network.Status)} · IP: {FormatNetworkValues(network.Addresses)} · DNS: {FormatNetworkValues(network.DnsServers)} · Gateway: {FormatNetworkValues(network.Gateways)} · Rotas: {FormatNetworkValues(network.Routes)}"));
+            ExtendedHardwareRows.Add(new("Proxy do usuário (HKCU)", FormatProxyConfiguration(inventory.ProxyConfiguration)));
             ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
             ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
             ExtendedHardwareRows.Add(new("Tarefas agendadas", $"{inventory.ScheduledTasks.Count} entradas inventariadas; nomes e estados completos ficam no relatório exportado."));
@@ -506,6 +509,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or DbException;
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "Indisponível" : value;
+    private static string FormatNetworkValues(IEnumerable<string>? values)
+    {
+        var items = values?.Where(value => !string.IsNullOrWhiteSpace(value)).ToArray() ?? [];
+        return items.Length == 0 ? "não informado" : string.Join(", ", items.Take(6)) + (items.Length > 6 ? $" (+{items.Length - 6}; ver relatório)" : "");
+    }
+    private static string FormatProxyConfiguration(ProxyConfigurationInfo? proxy)
+    {
+        if (proxy is not { IsAvailable: true }) return "Estado indisponível nesta coleta. Fonte consultada: Registro HKCU Internet Settings.";
+        var manual = proxy.ManualProxyEnabled switch
+        {
+            true => $"manual ativado · servidor: {Available(proxy.ManualProxyServer)}",
+            false => $"manual desativado{(string.IsNullOrWhiteSpace(proxy.ManualProxyServer) ? "" : $" · valor armazenado: {proxy.ManualProxyServer}")}",
+            null => "manual: estado não informado pelo Registro"
+        };
+        var pac = string.IsNullOrWhiteSpace(proxy.AutoConfigUrl) ? "PAC: URL não configurada" : $"PAC configurado: {proxy.AutoConfigUrl}";
+        var autodetect = proxy.AutoDetectEnabled switch { true => "AutoDetect no Registro: ativado", false => "AutoDetect no Registro: desativado", null => "AutoDetect no Registro: não informado" };
+        var bypass = string.IsNullOrWhiteSpace(proxy.BypassList) ? "lista de exceções: não informada" : $"lista de exceções: {proxy.BypassList}";
+        return $"{manual} · {pac} · {autodetect} · {bypass}. Fonte: HKCU Internet Settings; WinHTTP e configurações por aplicativo não consultados.";
+    }
     private static string FormatMetric(double? value) => value is { } number ? $"{number:0.#}%" : "indisponível";
     private static string FormatGpuMemory(double? bytes) => bytes is { } value && double.IsFinite(value) && value >= 0
         ? $"{value / (1024d * 1024 * 1024):0.##} GiB" : "indisponível";

@@ -77,6 +77,9 @@ public sealed class WindowsInventoryTests
         });
         Assert.NotNull(snapshot.WindowsInventory.SecurityState);
         Assert.NotNull(snapshot.WindowsInventory.Warnings);
+        Assert.NotNull(snapshot.WindowsInventory.ProxyConfiguration);
+        Assert.Contains(snapshot.WindowsInventory.Warnings, warning => warning.Contains("WinHTTP", StringComparison.OrdinalIgnoreCase));
+        Assert.All(snapshot.WindowsInventory.NetworkConfiguration, network => Assert.NotNull(network.Addresses));
         // Defender, physical sensors, OEM inventory, Secure Boot and TPM are optional on CI VMs.
         // The collector must preserve warnings when providers are absent and never invent results.
         Assert.NotNull(snapshot.Warnings);

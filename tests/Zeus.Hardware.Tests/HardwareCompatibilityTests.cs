@@ -23,6 +23,7 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(snapshot.Batteries);
         Assert.Null(snapshot.NetworkAdapters);
         Assert.Null(snapshot.MemoryArraySlotsReported);
+        Assert.Null(snapshot.WindowsInventory);
     }
 
     [Fact]
@@ -45,5 +46,17 @@ public sealed class HardwareCompatibilityTests
         Assert.Equal(1_000_000_000UL, restored.NetworkAdapters![0].SpeedBitsPerSecond);
         Assert.Null(restored.Bios!.ReleaseDate);
         Assert.Equal(4, restored.MemoryArraySlotsReported);
+    }
+
+    [Fact]
+    public void ProxyInventoryPreservesDisabledManualProxyAndUnknownAutoDetect()
+    {
+        var proxy = new ProxyConfigurationInfo(false, "proxy.local:8080", "https://pac.example/proxy.pac", null, "localhost", true);
+        var restored = JsonSerializer.Deserialize<ProxyConfigurationInfo>(JsonSerializer.Serialize(proxy))!;
+        Assert.False(restored.ManualProxyEnabled);
+        Assert.Equal("proxy.local:8080", restored.ManualProxyServer);
+        Assert.Equal("https://pac.example/proxy.pac", restored.AutoConfigUrl);
+        Assert.Null(restored.AutoDetectEnabled);
+        Assert.True(restored.IsAvailable);
     }
 }
