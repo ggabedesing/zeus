@@ -53,6 +53,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
+    private bool _networkResetReviewed, _networkResetRecoveryReady;
     private bool _wingetAuditReadable = true;
     private bool _closingAfterActivityDrain;
     private int _activityStorageWarningShown;
@@ -142,6 +143,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanRefresh => !_isBusy;
     public bool CanChooseActions => !_isBusy;
     public bool CanAnalyzeServiceDependencies => !_isBusy && _snapshot?.WindowsInventory is not null;
+    public bool CanOpenNetworkResetSettings => !_isBusy && _networkResetReviewed && _networkResetRecoveryReady;
+    public bool CanSaveNetworkResetReference => !_isBusy && _snapshot?.WindowsInventory is not null;
     public bool CanExecute => !_isBusy && MaintenanceSelectionError() is null && MaintenanceChoices.Any(c => c.IsSelected);
     public bool CanExport => !_isBusy && (_snapshot is not null || _reports.Count > 0);
     public bool CanCancel => _isBusy && _readCancellation is not null;
@@ -157,6 +160,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string ServiceDependencySummary { get; private set; } = "Leia o inventário do Windows para consultar as dependências declaradas dos serviços.";
     public string DeviceRepairSummary { get; private set; } = "Leia o inventário do Windows para consultar os códigos de problema PnP.";
     public string EventDiagnosticSummary { get; private set; } = "Leia os logs locais para procurar assinaturas repetidas de eventos.";
+    public string NetworkResetPreparationSummary { get; private set; } = "Leia o inventário de rede antes de considerar uma redefinição.";
+    public bool NetworkResetReviewed { get => _networkResetReviewed; set { if (Set(ref _networkResetReviewed, value)) NotifyActionState(); } }
+    public bool NetworkResetRecoveryReady { get => _networkResetRecoveryReady; set { if (Set(ref _networkResetRecoveryReady, value)) NotifyActionState(); } }
     public string MaintenanceResultSummary { get => _maintenanceResultSummary; private set => Set(ref _maintenanceResultSummary, value); }
     public string CleanupSummary { get => _cleanupSummary; private set => Set(ref _cleanupSummary, value); }
     public string StartupSummary { get => _startupSummary; private set => Set(ref _startupSummary, value); }
@@ -339,6 +345,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 : eventReport.Summary;
         }
         Notify(nameof(EventDiagnosticSummary));
+        if (inventory is null)
+            NetworkResetPreparationSummary = "Configuração de rede indisponível nesta coleta; não use esta tela como cópia dos valores atuais.";
+        else if (inventory.NetworkConfiguration.Count == 0)
+            NetworkResetPreparationSummary = "Nenhuma configuração de interface foi retornada. A fonte pode estar incompleta; confira manualmente em Configurações do Windows.";
+        else
+        {
+            var networkPreview = inventory.NetworkConfiguration.Take(8).Select(network =>
+                $"{Available(network.Adapter)} · IP: {FormatNetworkValues(network.Addresses)} · DNS: {FormatNetworkValues(network.DnsServers)} · Gateway: {FormatNetworkValues(network.Gateways)}").ToArray();
+            NetworkResetPreparationSummary = string.Join(Environment.NewLine, networkPreview) +
+                (inventory.NetworkConfiguration.Count > 8 ? $"{Environment.NewLine}(mais {inventory.NetworkConfiguration.Count - 8} interface(s) no relatório)" : string.Empty) +
+                $"{Environment.NewLine}Proxy observado em HKCU: {FormatProxyConfiguration(inventory.ProxyConfiguration)}" +
+                $"{Environment.NewLine}Valores coletados são apenas uma referência; configuração estática e software especializado podem exigir anotação e recuperação próprias.";
+        }
+        Notify(nameof(NetworkResetPreparationSummary));
         HardwareCards.Add(new("Inventário do Windows", inventory is null ? "Indisponível" : $"{inventory.Processes.Count} processos · {inventory.Services.Count} serviços", inventory is null ? "As fontes do Windows não responderam nesta coleta." : $"{inventory.Drivers.Count} drivers · {inventory.PnpDevices.Count} dispositivos · {inventory.InstalledSoftware.Count} programas"));
         GraphicsRows.Clear(); foreach (var item in snapshot.Graphics) GraphicsRows.Add(new(Available(item.Name), $"Driver {Available(item.DriverVersion)}"));
         DiskRows.Clear(); foreach (var disk in snapshot.Disks) DiskRows.Add(new($"{disk.DriveLetter} · {Available(disk.Name)}", $"{ByteFormatting.Format(disk.FreeBytes)} livres de {ByteFormatting.Format(disk.TotalBytes)} · {Available(disk.FileSystem)}"));
@@ -372,7 +392,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         Warnings.Clear(); foreach (var warning in _startupWarnings.Concat(snapshot.Warnings)) Warnings.Add(warning);
         BuildPersonalPlan();
-        foreach (var property in new[] { nameof(Snapshot), nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(FormalPlanSummary), nameof(FormalOptimizationPlan), nameof(DevicesEmptyText), nameof(CanExport), nameof(CanAnalyzeServiceDependencies) }) Notify(property);
+        foreach (var property in new[] { nameof(Snapshot), nameof(CollectionDate), nameof(SystemDescription), nameof(RecommendationEmptyText), nameof(FormalPlanSummary), nameof(FormalOptimizationPlan), nameof(DevicesEmptyText), nameof(CanExport), nameof(CanAnalyzeServiceDependencies), nameof(CanSaveNetworkResetReference) }) Notify(property);
     }
 
     private void BuildPersonalPlan()
@@ -545,10 +565,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SetBusy(bool busy)
     {
         _isBusy = busy;
-        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanAnalyzeServiceDependencies), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
+        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
-    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); }
+    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }
     private string? MaintenanceSelectionError()
     {
         var selected = MaintenanceChoices.Where(choice => choice.IsSelected)

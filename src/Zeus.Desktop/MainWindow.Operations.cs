@@ -755,6 +755,55 @@ public partial class MainWindow
     }
     private void OpenWindowsUpdate_Click(object sender, RoutedEventArgs e) => OpenTrustedUri("ms-settings:windowsupdate");
     private void OpenWindowsSecurity_Click(object sender, RoutedEventArgs e) => OpenTrustedUri("windowsdefender:");
+    private void OpenNetworkResetSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanOpenNetworkResetSettings || _isBusy) return;
+        if (!Confirm("O ZEUS não executará a redefinição. O Windows pode remover e reinstalar adaptadores e retornar suas configurações ao padrão, solicitar reinício e exigir reconfigurar VPN ou switches virtuais. Perfis conhecidos podem passar a públicos. Confirme a redefinição somente na tela oficial do Windows, se ainda for necessária.", "Revisar redefinição de rede")) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo("ms-settings:network-status") { UseShellExecute = true });
+            StatusTitle = "Configurações de rede abertas";
+            StatusDetail = "Nenhuma redefinição foi executada pelo ZEUS. Se você confirmar na tela do Windows, revise a conexão depois do reinício e reconfigure serviços de rede que utiliza.";
+        }
+        catch (Exception error) when (error is Win32Exception or InvalidOperationException)
+        {
+            StatusTitle = "Configurações de rede não foram abertas";
+            StatusDetail = $"O Windows não abriu Configurações de Rede: {error.Message}";
+        }
+    }
+    private void SaveNetworkResetReference_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanSaveNetworkResetReference || _snapshot?.WindowsInventory is not { } inventory) return;
+        var dialog = new SaveFileDialog
+        {
+            Title = "Salvar referência da configuração de rede",
+            Filter = "Arquivo JSON (*.json)|*.json",
+            DefaultExt = ".json",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = "referencia-rede-zeus.json"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var reference = new
+            {
+                SchemaVersion = 1,
+                CollectedAt = _snapshot.CollectedAt,
+                Notice = "Referência dos valores retornados pelo inventário. Não é backup integral da rede nem restauração automática. Confirme cada valor depois de qualquer redefinição.",
+                NetworkConfiguration = inventory.NetworkConfiguration,
+                ProxyConfiguration = inventory.ProxyConfiguration
+            };
+            File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(reference, new JsonSerializerOptions { WriteIndented = true }));
+            StatusTitle = "Referência de rede salva";
+            StatusDetail = $"Arquivo salvo em {dialog.FileName}. Pode conter endereços internos e configuração de proxy; mantenha-o privado.";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Security.SecurityException or JsonException or NotSupportedException)
+        {
+            StatusTitle = "Referência de rede não salva";
+            StatusDetail = $"O arquivo não foi gravado: {error.Message}";
+        }
+    }
     private void OpenVendorSupport_Click(object sender, RoutedEventArgs e) => OpenTrustedUri("https://support.microsoft.com/windows/update-drivers-through-device-manager-in-windows-ec62f46c-ff14-c91d-eead-d7126dc1f7b6");
     private void OpenTrustedUri(string uri)
     {

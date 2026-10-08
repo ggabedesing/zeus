@@ -83,6 +83,8 @@ public sealed class WpfExperienceTests
         Assert.NotNull(window.Snapshot);
         Assert.NotEmpty(window.DeviceRepairSummary);
         Assert.NotEmpty(window.EventDiagnosticSummary);
+        Assert.Contains("IP:", window.NetworkResetPreparationSummary);
+        Assert.Contains("Proxy observado", window.NetworkResetPreparationSummary);
         Assert.All(window.EventDiagnosticRows, row => Assert.False(string.IsNullOrWhiteSpace(row.Detail)));
         Assert.All(window.DeviceRepairRows, row =>
         {
@@ -92,6 +94,19 @@ public sealed class WpfExperienceTests
         var serviceDependencyButton = Assert.IsType<Button>(window.FindName("AnalyzeServiceDependenciesButton"));
         Assert.Equal("analyze-service-dependencies", AutomationProperties.GetAutomationId(serviceDependencyButton));
         Assert.True(serviceDependencyButton.IsEnabled);
+        var networkResetButton = Assert.IsType<Button>(window.FindName("OpenNetworkResetSettingsButton"));
+        Assert.Equal("open-network-reset-settings", AutomationProperties.GetAutomationId(networkResetButton));
+        Assert.False(networkResetButton.IsEnabled, "A navegação exige revisar os dados e confirmar preparo para recuperação.");
+        var saveNetworkReferenceButton = Assert.IsType<Button>(window.FindName("SaveNetworkResetReferenceButton"));
+        Assert.Equal("save-network-reference", AutomationProperties.GetAutomationId(saveNetworkReferenceButton));
+        Assert.True(saveNetworkReferenceButton.IsEnabled);
+        window.NetworkResetReviewed = true;
+        Assert.False(networkResetButton.IsEnabled);
+        window.NetworkResetRecoveryReady = true;
+        Assert.True(networkResetButton.IsEnabled);
+        window.NetworkResetReviewed = false;
+        window.NetworkResetRecoveryReady = false;
+        Assert.False(networkResetButton.IsEnabled);
         serviceDependencyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, serviceDependencyButton));
         Assert.NotEmpty(window.ServiceDependencyRows);
         Assert.Contains("serviço(s)", window.ServiceDependencySummary);
