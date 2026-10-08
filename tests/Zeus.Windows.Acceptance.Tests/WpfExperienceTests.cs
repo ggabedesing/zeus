@@ -219,6 +219,17 @@ public sealed class WpfExperienceTests
         window.SelectedTheme = DesktopTheme.MacInspired;
         Assert.Equal(DesktopTheme.MacInspired, window.SelectedTheme);
         Assert.Equal(Visibility.Visible, window.DetailedVisibility);
+        var app = Assert.IsType<App>(Application.Current);
+        app.RefreshSystemContrast(true);
+        Assert.Same(SystemColors.WindowBrush, app.Resources["BackgroundBrush"]);
+        Assert.Same(SystemColors.WindowTextBrush, app.Resources["TextBrush"]);
+        Assert.Same(SystemColors.HighlightBrush, app.Resources["PrimaryButtonBrush"]);
+        window.SelectedTheme = DesktopTheme.Complete;
+        app.RefreshSystemContrast(false);
+        Assert.Equal(DesktopTheme.Complete, window.SelectedTheme);
+        Assert.Equal(Color.FromRgb(0x65, 0xE3, 0xE0), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
+        Assert.Equal(Color.FromRgb(0xFF, 0xD1, 0x8B), Assert.IsType<SolidColorBrush>(app.Resources["WarningBrush"]).Color);
+        window.SelectedTheme = DesktopTheme.MacInspired;
         await RenderAsync(window, "zeus-mac-inspired-overview.png");
 
         foreach (var tab in actualTabs)

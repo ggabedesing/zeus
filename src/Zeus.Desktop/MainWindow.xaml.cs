@@ -567,6 +567,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Application.Current.Resources["ButtonTextBrush"] = Application.Current.Resources["TextBrush"];
     }
 
+    internal void RefreshSelectedThemeAfterContrastChange() => ApplyTheme();
+
     private async Task RunOperationAsync(string title, string detail, Func<CancellationToken, Task> operation, bool cancellable = false, bool mutation = false)
     {
         if (_isBusy) return;
