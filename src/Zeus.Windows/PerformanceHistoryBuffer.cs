@@ -123,7 +123,7 @@ public static class AdaptiveSamplingPolicy
         foreach (var disk in observation.Disks ?? []) AddPercent(disk.ActivePercent, loadSignals);
         foreach (var network in observation.Networks ?? [])
             if (network.BytesPerSecond is { } bytes && network.LinkBitsPerSecond is { } linkBitsPerSecond && linkBitsPerSecond > 0)
-                AddPercent(bytes * 8d / linkBitsPerSecond * 100d, loadSignals);
+                AddPercent(Math.Min(100, bytes * 8d / linkBitsPerSecond * 100d), loadSignals);
 
         if (loadSignals.Count == 0) return TimeSpan.FromSeconds(10);
         var busiest = loadSignals.Max();

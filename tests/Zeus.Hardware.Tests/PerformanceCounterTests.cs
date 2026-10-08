@@ -159,6 +159,17 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void AdaptivePolicyTreatsAggregateFullDuplexTrafficAboveLinkRateAsSaturated()
+    {
+        var fullDuplexAggregate = Sample(null) with
+        {
+            Networks = [new("Ethernet", 150_000_000, 1_000_000_000, null, null)]
+        };
+
+        Assert.Equal(TimeSpan.FromSeconds(2), AdaptiveSamplingPolicy.NextInterval(fullDuplexAggregate));
+    }
+
+    [Fact]
     public void ComparisonUsesOnlyValidSamplesAndReportsAverageCpuAndMemoryUse()
     {
         var reference = new[] { Sample(20), Sample(40) };
