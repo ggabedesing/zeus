@@ -80,8 +80,16 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
     public bool EulaAccepted { get => _eulaAccepted; set { if (_eulaAccepted == value) return; _eulaAccepted = value; Raise(nameof(EulaAccepted)); Raise(nameof(LicenseReady)); } }
 }
 
-public sealed record WingetUpdateRow(string Name, string PackageId, string InstalledVersion,
-    string AvailableVersion, string Source);
+public sealed record WingetUpdateRow(WingetUpdateCandidate Candidate, bool PendingReview = false)
+{
+    public string Name => Candidate.Name;
+    public string PackageId => Candidate.PackageId;
+    public string InstalledVersion => Candidate.InstalledVersion;
+    public string AvailableVersion => Candidate.AvailableVersion;
+    public string Source => Candidate.Source;
+    public bool CanInstall => Candidate.CanInstall && !PendingReview;
+    public string InstallabilityReason => PendingReview ? "Tentativa anterior sem resultado confirmado. Confira manualmente o programa e consulte novamente antes de qualquer nova ação." : Candidate.InstallabilityReason;
+}
 
 public sealed record ChangeRow(Guid Id, string Title, string Detail, bool CanRestore);
 public sealed record CleanupSessionRow(Guid Id, string Title, string Detail, bool CanRestore, bool CanPurge);

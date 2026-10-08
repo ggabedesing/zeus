@@ -35,6 +35,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly List<MaintenanceReport> _reports = [];
     private readonly List<string> _startupWarnings = [];
     private readonly List<Task> _activityWrites = [];
+    private readonly HashSet<string> _pendingWingetPackages = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _pendingWingetCorrelations = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<Guid> _performanceSessionStartAttempts = [];
     private readonly HashSet<Guid> _persistedPerformanceSessions = [];
     private readonly Dictionary<Guid, int> _performanceSessionSequences = [];
@@ -50,6 +52,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
+    private bool _wingetAuditReadable = true;
     private bool _closingAfterActivityDrain;
     private int _activityStorageWarningShown;
     private DatabaseHealth? _storageHealth;
@@ -200,6 +203,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             catch (Exception error) when (IsStorageError(error)) { _startupWarnings.Add("As preferências salvas não puderam ser lidas; os valores padrão serão usados."); }
             try { _reports.AddRange(await _storage.ReadHistoryAsync()); RebuildHistory(); }
             catch (Exception error) when (IsStorageError(error)) { _historyReadable = false; _startupWarnings.Add("O histórico não pôde ser lido e foi preservado. Exporte as novas sessões."); }
+            try
+            {
+                var activities = await _storage.ReadRecentActivityAsync(10_000);
+                var wingetEvents = activities.Where(entry => entry.Category == "winget" && entry.CorrelationId is not null).ToArray();
+                var terminal = wingetEvents.Where(entry => entry.EventType is "upgrade-completed" or "upgrade-manual-review-cleared")
+                    .Select(entry => entry.CorrelationId!).ToHashSet(StringComparer.Ordinal);
+                foreach (var entry in wingetEvents.Where(entry => entry.EventType == "upgrade-started" && !terminal.Contains(entry.CorrelationId!)))
+                {
+                    try
+                    {
+                        using var details = JsonDocument.Parse(entry.DetailsJson ?? "{}");
+                        if (details.RootElement.TryGetProperty("packageId", out var packageId) && packageId.GetString() is { Length: > 0 } id)
+                        {
+                            _pendingWingetPackages.Add(id);
+                            _pendingWingetCorrelations[id] = entry.CorrelationId!;
+                        }
+                    }
+                    catch (JsonException) { }
+                }
+                if (_pendingWingetPackages.Count > 0)
+                    _startupWarnings.Add("Há atualização WinGet anterior sem resultado confirmado. Confira esses programas manualmente antes de tentar novamente.");
+            }
+            catch (Exception error) when (IsStorageError(error)) { _startupWarnings.Add("Não foi possível verificar tentativas anteriores do WinGet; atualizações ficam indisponíveis nesta sessão por segurança."); _wingetAuditReadable = false; }
             try
             {
                 _storageHealth = await _storage.CheckHealthAsync();
@@ -399,9 +425,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _activityWrites.Add(PersistActivitySafelyAsync(entry));
     }
 
-    private async Task PersistActivitySafelyAsync(ActivityEntry entry)
+    private async Task<bool> PersistActivitySafelyAsync(ActivityEntry entry)
     {
-        try { await _storage.AppendActivityAsync(entry); }
+        try { await _storage.AppendActivityAsync(entry); return true; }
         catch (Exception error) when (IsStorageError(error))
         {
             if (Interlocked.Exchange(ref _activityStorageWarningShown, 1) == 0)
@@ -414,6 +440,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     Notify(nameof(StorageHealth));
                 });
             }
+            return false;
         }
     }
 

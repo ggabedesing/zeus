@@ -7,6 +7,7 @@ using System.Windows;
 using Microsoft.Win32;
 using Zeus.Core;
 using Zeus.Windows;
+using Zeus.Storage;
 
 namespace Zeus.Desktop;
 
@@ -462,13 +463,64 @@ public partial class MainWindow
             var search = await _wingetUpdates.SearchAsync(token);
             WingetUpdates.Clear();
             foreach (var update in search.Updates)
-                WingetUpdates.Add(new(update.Name, update.PackageId, update.InstalledVersion, update.AvailableVersion, update.Source));
+                WingetUpdates.Add(new(update, !_wingetAuditReadable || _pendingWingetPackages.Contains(update.PackageId)));
             WingetSummary = search.IsComplete
                 ? $"Consulta concluída em {search.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}: {search.Updates.Count} atualização(ões). " + string.Join(" ", search.Warnings)
                 : string.Join(" ", search.Warnings);
             StatusTitle = search.IsComplete ? "Consulta do WinGet concluída" : "Consulta do WinGet incompleta";
             StatusDetail = WingetSummary;
         }, cancellable: true);
+    }
+
+    private async void UpgradeWinget_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy || sender is not FrameworkElement { Tag: WingetUpdateRow row } || !row.CanInstall || !_wingetAuditReadable) return;
+        var candidate = row.Candidate;
+        if (!Confirm($"Atualizar somente este programa?\n\n{candidate.Name}\nID: {candidate.PackageId}\nInstalada: {candidate.InstalledVersion}\nDisponível: {candidate.AvailableVersion}\nFonte: {candidate.Source}\n\nO WinGet abrirá uma janela interativa. Leia e aceite os termos somente se concordar; o ZEUS não aceita termos automaticamente. O instalador pode pedir acesso de administrador. O ZEUS não autorizará reinicialização automática. A reversão da versão anterior depende do fornecedor e não é garantida.\n\nApós iniciar, aguarde a verificação. Se o resultado ficar desconhecido, não repita antes de conferir o programa.", "Confirmar atualização individual")) return;
+
+        var correlationId = Guid.NewGuid().ToString("N");
+        var started = new ActivityEntry(DateTimeOffset.UtcNow, "winget", "upgrade-started", "warning",
+            $"Atualização individual iniciada: {candidate.PackageId}", JsonSerializer.Serialize(new { packageId = candidate.PackageId, installedVersion = candidate.InstalledVersion, targetVersion = candidate.AvailableVersion }), correlationId);
+        await RunOperationAsync("Atualizando um programa", $"WinGet interativo · {candidate.PackageId}", async _ =>
+        {
+            if (!await PersistActivitySafelyAsync(started))
+            {
+                WingetSummary = "Registro local indisponível. A atualização não foi iniciada; consulte a saúde do armazenamento antes de tentar novamente.";
+                return;
+            }
+            _pendingWingetPackages.Add(candidate.PackageId);
+            _pendingWingetCorrelations[candidate.PackageId] = correlationId;
+            WingetUpdates.Clear();
+            WingetSummary = "Atualização iniciada. A lista foi limpa; consulte novamente após o resultado. Não feche a janela do WinGet sem ler a mensagem final.";
+            var result = await _wingetUpdates.UpgradeAsync(candidate);
+            var eventType = result.Succeeded ? "upgrade-completed" : "upgrade-result-unknown";
+            var terminal = new ActivityEntry(DateTimeOffset.UtcNow, "winget", eventType, result.Succeeded ? "info" : "warning",
+                $"Resultado WinGet: {candidate.PackageId}", JsonSerializer.Serialize(new { packageId = candidate.PackageId, targetVersion = candidate.AvailableVersion, result.ExitCode, result.ObservedInstalledVersion, result.InstalledVersionVerified, recovery = WingetUpdateTransactionResult.RecoveryClassification, message = result.Message }), correlationId);
+            var persisted = await PersistActivitySafelyAsync(terminal);
+            if (result.Succeeded && persisted)
+            {
+                _pendingWingetPackages.Remove(candidate.PackageId);
+                _pendingWingetCorrelations.Remove(candidate.PackageId);
+            }
+            WingetSummary = result.Message + (persisted ? "" : " O resultado também não pôde ser gravado; confira manualmente antes de outra tentativa.");
+            StatusTitle = result.Succeeded ? "Atualização verificada" : "Resultado da atualização não confirmado";
+            StatusDetail = WingetSummary;
+            WingetUpdates.Clear();
+        }, mutation: true);
+    }
+
+    private async void ClearWingetReview_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy || sender is not FrameworkElement { Tag: WingetUpdateRow row } || !_pendingWingetPackages.Contains(row.PackageId)) return;
+        if (!Confirm($"Você conferiu manualmente que {row.Name} está funcionando e verificou a versão instalada e o histórico do WinGet?\n\nEsta confirmação apenas libera uma nova consulta; não reverte nem altera o programa. A próxima atualização ainda exigirá confirmação separada.", "Registrar revisão manual")) return;
+        var correlationId = _pendingWingetCorrelations.GetValueOrDefault(row.PackageId) ?? Guid.NewGuid().ToString("N");
+        var entry = new ActivityEntry(DateTimeOffset.UtcNow, "winget", "upgrade-manual-review-cleared", "info",
+            $"Revisão manual confirmada: {row.PackageId}", JsonSerializer.Serialize(new { packageId = row.PackageId, reviewedInstalledVersion = row.InstalledVersion }), correlationId);
+        if (!await PersistActivitySafelyAsync(entry)) return;
+        _pendingWingetPackages.Remove(row.PackageId);
+        _pendingWingetCorrelations.Remove(row.PackageId);
+        WingetUpdates.Clear();
+        WingetSummary = "Revisão manual registrada. Faça uma nova consulta para carregar versões atuais antes de qualquer atualização.";
     }
 
     private async void InstallDriver_Click(object sender, RoutedEventArgs e)

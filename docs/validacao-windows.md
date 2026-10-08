@@ -13,7 +13,7 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 | Preferências | Efeitos do usuário aplicados/restaurados; perfil não troca energia sozinho |
 | Inventário e carga | CPU, RAM e volumes reais; contadores nativos de CPU/memória/processos |
 | Inventário estendido | drivers, PnP, rede, processos, serviços, tarefas, software, eventos recentes, Secure Boot, TPM e slots de memória declarados pelo firmware; canais não são inferidos e fontes opcionais podem permanecer indisponíveis |
-| WinGet | consulta de leitura apenas à fonte `winget`, versões exatas ou resultado desconhecido quando a tabela não é reconhecida; não aceita licenças nem instala pacotes |
+| WinGet | consulta de leitura e testes de prévia/argumentos seguros; atualização individual só após confirmação, nova checagem de ID/versões, execução interativa e verificação posterior. Nenhum aceite automático de termos. Tentativas sem confirmação são registradas e bloqueadas para repetição; não há garantia genérica de reversão. A aceitação automatizada nunca instala pacote. |
 | DISM ScanHealth | estados explícitos do repositório de componentes são classificados; código de saída sem uma mensagem conhecida permanece desconhecido e exige revisão do log |
 | Separação de reparos | planos combinando SFC/DISM Scan e Repair são bloqueados na política, interface e fronteira do auxiliar |
 | Observador | buffer circular limitado, política adaptativa, comparação descritiva antes/depois de CPU/RAM, contadores locais de GPU/disco/rede quando disponíveis, heurísticas de processos de jogos/OBS, sessões/referência recuperadas do SQLite e exportação; métricas específicas de jogo/encoder e detecção confiável de partida/transmissão continuam pendentes |

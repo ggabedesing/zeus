@@ -114,6 +114,14 @@ public sealed class WpfExperienceTests
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
         licensed.IsSelected = true; unlicensed.IsSelected = true;
         Assert.False(window.CanInstallDriver);
+
+        var wingetCandidate = new WingetUpdateCandidate("Fixture App", "Vendor.Fixture", "1.0", "2.0", "winget");
+        var availableUpdate = new WingetUpdateRow(wingetCandidate);
+        Assert.True(availableUpdate.CanInstall);
+        var pendingUpdate = new WingetUpdateRow(wingetCandidate, PendingReview: true);
+        Assert.False(pendingUpdate.CanInstall);
+        Assert.Contains("resultado confirmado", pendingUpdate.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
+
         licensed.EulaAccepted = true;
         Assert.True(window.CanInstallDriver);
         window.DriverCandidates.Clear();
