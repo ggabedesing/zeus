@@ -25,6 +25,8 @@ public static class MaintenancePolicy
             throw new ArgumentException("Selecione pelo menos uma ação para iniciar a manutenção.", nameof(actions));
         }
 
+        EnsureScansAndRepairsAreSeparate(selected, nameof(actions));
+
         return Array.AsReadOnly(selected.OrderBy(GetOrder).ToArray());
     }
 
@@ -68,8 +70,22 @@ public static class MaintenancePolicy
                     throw new ArgumentException("Somente a instalação de driver permite identidade e aceite de licença.", nameof(requests));
             }
         }
+        EnsureScansAndRepairsAreSeparate(supplied.Select(request => request.Action), nameof(requests));
         // OrderBy is stable: drivers retain the explicit order selected by the user.
         return Array.AsReadOnly(supplied.OrderBy(request => GetOrder(request.Action)).ToArray());
+    }
+
+    private static void EnsureScansAndRepairsAreSeparate(IEnumerable<MaintenanceActionId> actions, string parameterName)
+    {
+        var selected = actions.ToHashSet();
+        var includesScan = selected.Contains(MaintenanceActionId.ScanWindowsImage) ||
+                           selected.Contains(MaintenanceActionId.VerifySystemFiles);
+        var includesRepair = selected.Contains(MaintenanceActionId.RepairWindowsImage) ||
+                             selected.Contains(MaintenanceActionId.RepairSystemFiles);
+        if (includesScan && includesRepair)
+            throw new ArgumentException(
+                "Separe verificação e reparo: execute a análise primeiro, revise o resultado e então monte um novo plano de reparo.",
+                parameterName);
     }
 
     private static int GetOrder(MaintenanceActionId action) => action switch

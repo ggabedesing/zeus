@@ -52,7 +52,13 @@ public partial class MainWindow
     private async Task ReviewAndExecuteAsync(IReadOnlyCollection<MaintenanceRequest> requests)
     {
         if (_isBusy) return;
-        var ordered = MaintenancePolicy.ValidateRequests(requests);
+        IReadOnlyList<MaintenanceRequest> ordered;
+        try { ordered = MaintenancePolicy.ValidateRequests(requests); }
+        catch (ArgumentException error)
+        {
+            MessageBox.Show(this, error.Message, "Plano de manutenção inválido", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
         var definitions = ordered.Select(r => MaintenanceCatalog.Get(r.Action)).ToArray();
         var text = new StringBuilder("Revise as ações selecionadas:\n\n");
         foreach (var definition in definitions) text.AppendLine($"• {definition.Title}");

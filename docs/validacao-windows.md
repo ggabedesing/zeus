@@ -15,6 +15,7 @@ Esta matriz distingue implementação, teste automatizado e aceitação das alte
 | Inventário estendido | drivers, PnP, rede, processos, serviços, tarefas, software, eventos recentes, Secure Boot, TPM e slots de memória declarados pelo firmware; canais não são inferidos e fontes opcionais podem permanecer indisponíveis |
 | WinGet | consulta de leitura apenas à fonte `winget`, versões exatas ou resultado desconhecido quando a tabela não é reconhecida; não aceita licenças nem instala pacotes |
 | DISM ScanHealth | estados explícitos do repositório de componentes são classificados; código de saída sem uma mensagem conhecida permanece desconhecido e exige revisão do log |
+| Separação de reparos | planos combinando SFC/DISM Scan e Repair são bloqueados na política, interface e fronteira do auxiliar |
 | Observador | buffer circular limitado, política adaptativa, comparação descritiva antes/depois de CPU/RAM, contadores locais de GPU/disco/rede quando disponíveis, heurísticas de processos de jogos/OBS, sessões/referência recuperadas do SQLite e exportação; métricas específicas de jogo/encoder e detecção confiável de partida/transmissão continuam pendentes |
 | Auxiliar | Argumentos inválidos rejeitados antes de operação e armazenamento administrativo protegido |
 | Persistência SQLite | Migração transacional v1→v2, integridade, sessões/etapas de manutenção e desempenho, amostras/referência, preferências, eventos e importação idempotente sem remover JSON de origem |

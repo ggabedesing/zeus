@@ -119,7 +119,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public bool CanRefresh => !_isBusy;
     public bool CanChooseActions => !_isBusy;
-    public bool CanExecute => !_isBusy && MaintenanceChoices.Any(c => c.IsSelected);
+    public bool CanExecute => !_isBusy && MaintenanceSelectionError() is null && MaintenanceChoices.Any(c => c.IsSelected);
     public bool CanExport => !_isBusy && (_snapshot is not null || _reports.Count > 0);
     public bool CanCancel => _isBusy && _readCancellation is not null;
     public bool CanQuarantine => !_isBusy && _cleanupScan is not null && CleanupFiles.Any(f => f.IsSelected);
@@ -151,7 +151,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string DevicesEmptyText => _snapshot is null ? "Inventário ainda não carregado." : "Leituras fornecidas pelo Windows. Sensores ausentes permanecem indisponíveis.";
     public string StartupEmptyText => StartupChoices.Count == 0 ? "Nenhuma entrada editável foi carregada. Atualize a lista e consulte o resultado." : string.Empty;
     public string HistoryEmptyText => !_historyReadable ? "O histórico anterior foi preservado porque não pôde ser lido. Exporte os novos resultados." : HistoryRows.Count == 0 ? "Ainda não há sessões de manutenção neste usuário." : string.Empty;
-    public string SelectedActionsText => $"{MaintenanceChoices.Count(c => c.IsSelected)} ação(ões) selecionada(s)";
+    public string SelectedActionsText
+    {
+        get
+        {
+            var count = MaintenanceChoices.Count(c => c.IsSelected);
+            var error = MaintenanceSelectionError();
+            return error is null ? $"{count} ação(ões) selecionada(s)" : $"Plano inválido: {error}";
+        }
+    }
     public string CleanupSelectedText => $"{CleanupFiles.Count(f => f.IsSelected)} arquivo(s) · {ByteFormatting.Format(CleanupFiles.Where(f => f.IsSelected).Aggregate(0UL, (sum, f) => sum + f.SizeBytes))} selecionados";
     public Visibility DetailedVisibility => IsMinimal ? Visibility.Collapsed : Visibility.Visible;
     public string LayoutDescription => ThemeOptions.First(t => t.Value == SelectedTheme).Name;
@@ -435,6 +443,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         NotifyActionState();
     }
     private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); }
+    private string? MaintenanceSelectionError()
+    {
+        var selected = MaintenanceChoices.Where(choice => choice.IsSelected)
+            .Select(choice => new MaintenanceRequest(choice.Id)).ToArray();
+        if (selected.Length == 0) return null;
+        try { _ = MaintenancePolicy.ValidateRequests(selected); return null; }
+        catch (ArgumentException error) { return error.Message; }
+    }
     private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or DbException;
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "Indisponível" : value;
     private static string FormatMetric(double? value) => value is { } number ? $"{number:0.#}%" : "indisponível";

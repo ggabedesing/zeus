@@ -104,7 +104,7 @@ public sealed class MaintenanceRequestProtocolTests
 
     [Theory]
     [InlineData("DefenderQuickScan", true)]
-    [InlineData("ScanWindowsImage,RepairWindowsImage", true)]
+    [InlineData("ScanWindowsImage,RepairWindowsImage", false)]
     [InlineData("0", false)]
     [InlineData("DefenderQuickScan,DefenderQuickScan", false)]
     [InlineData("defenderquickscan", false)]
@@ -145,11 +145,25 @@ public sealed class MaintenanceRequestProtocolTests
         MaintenancePolicy.EnsureRestorePoint([MaintenanceActionId.OptimizeSystemDrive], false);
     }
 
-    [Fact]
-    public void EveryNewActionIsOrderedAndCataloguedAndRequestsCannotBeMutated()
+    [Theory]
+    [InlineData(MaintenanceActionId.ScanWindowsImage, MaintenanceActionId.RepairWindowsImage)]
+    [InlineData(MaintenanceActionId.VerifySystemFiles, MaintenanceActionId.RepairSystemFiles)]
+    public void HelperRejectsCombinedScanAndRepairRequestsBeforeExecution(MaintenanceActionId scan, MaintenanceActionId repair)
     {
-        var requests = Enum.GetValues<MaintenanceActionId>().Select(action =>
-            new MaintenanceRequest(action, action == MaintenanceActionId.InstallDriverUpdate ? DriverId : null)).ToArray();
+        var requests = new[] { new MaintenanceRequest(scan), new MaintenanceRequest(repair) };
+        Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateRequests(requests));
+        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(requests)));
+        Assert.False(MaintenanceRequestProtocol.TryReadArguments(
+            ["--session", SessionId, "--requests", payload], out _, out _));
+    }
+
+    [Fact]
+    public void EveryActionIsCataloguedAndCompatibleRequestsCannotBeMutated()
+    {
+        Assert.All(Enum.GetValues<MaintenanceActionId>(), action => Assert.Equal(action, MaintenanceCatalog.Get(action).Id));
+        var requests = Enum.GetValues<MaintenanceActionId>()
+            .Where(action => action is not MaintenanceActionId.ScanWindowsImage and not MaintenanceActionId.VerifySystemFiles)
+            .Select(action => new MaintenanceRequest(action, action == MaintenanceActionId.InstallDriverUpdate ? DriverId : null)).ToArray();
         var ordered = MaintenancePolicy.ValidateRequests(requests);
         Assert.Equal(requests.Length, ordered.Count);
         Assert.Equal(MaintenanceActionId.DefenderOfflineScan, ordered[^1].Action);

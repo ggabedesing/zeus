@@ -88,6 +88,14 @@ public sealed class WpfExperienceTests
         Assert.NotNull(window.Snapshot.Cpu);
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
+        var scanChoice = window.MaintenanceChoices.Single(choice => choice.Id == Zeus.Core.MaintenanceActionId.ScanWindowsImage);
+        var repairChoice = window.MaintenanceChoices.Single(choice => choice.Id == Zeus.Core.MaintenanceActionId.RepairWindowsImage);
+        scanChoice.IsSelected = true;
+        repairChoice.IsSelected = true;
+        Assert.False(window.CanExecute);
+        Assert.Contains("Separe verificação e reparo", window.SelectedActionsText, StringComparison.OrdinalIgnoreCase);
+        scanChoice.IsSelected = false;
+        repairChoice.IsSelected = false;
         Assert.All(window.MaintenanceChoices, choice => Assert.False(choice.IsSelected));
         Assert.False(window.CanExecute, "Opening ZEUS must not preselect privileged maintenance.");
         Assert.False(window.CanGeneralOptimize);

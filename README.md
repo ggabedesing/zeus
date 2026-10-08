@@ -14,7 +14,7 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 | Limpeza | Analisa temporários do usuário com mais de sete dias; permite selecionar, guardar em recuperação, restaurar e excluir definitivamente em operações separadas. |
 | Inicialização | Desativa entradas selecionadas de HKCU Run, preserva comando/tipo anteriores e permite desfazer. Heurísticas protegem entradas de segurança, backup e sincronização. |
 | Perfil | Perguntas de uso orientam recomendações; efeitos visuais e planos de energia existentes têm revisão e recuperação próprias. |
-| Manutenção | DISM e SFC separados entre verificar e reparar; um ScanHealth só informa estado quando a resposta do DISM é reconhecida. Análise e otimização de volume usam o mecanismo nativo conforme o tipo de mídia. |
+| Manutenção | DISM e SFC separados entre verificar e reparar em planos distintos; revise a saída da verificação antes de montar um reparo. Um ScanHealth só informa estado quando a resposta do DISM é reconhecida. Análise e otimização de volume usam o mecanismo nativo conforme o tipo de mídia. |
 | Proteção | Atualização de assinaturas e verificações rápida, completa e offline do Microsoft Defender ativo. O Windows mantém suas políticas de remediação. |
 | Drivers | Consulta candidatos oficiais do Windows Update, mostra licenças e instala as identidades selecionadas após proteção de recuperação e exportação dos drivers existentes. |
 | Atualizações de programas | Consulta a fonte `winget` sob demanda e mostra versão instalada/disponível. A busca é somente leitura; Microsoft Store e pacotes não correspondidos não são incluídos, e o ZEUS não instala atualizações WinGet nesta etapa. |

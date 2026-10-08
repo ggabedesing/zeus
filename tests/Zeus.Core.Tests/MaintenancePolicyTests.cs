@@ -9,7 +9,7 @@ public sealed class MaintenancePolicyTests
     [InlineData(MaintenanceActionId.RepairSystemFiles)]
     public void RepairCannotProceedWithoutConfirmedRecovery(MaintenanceActionId repair)
     {
-        var plan = new[] { MaintenanceActionId.ScanWindowsImage, repair };
+        var plan = new[] { repair };
 
         Assert.True(MaintenancePolicy.RequiresRestorePoint(plan));
         Assert.Throws<InvalidOperationException>(() => MaintenancePolicy.EnsureRestorePoint(plan, false));
@@ -63,31 +63,40 @@ public sealed class MaintenancePolicyTests
             MaintenanceActionId.ScanWindowsImage]));
     }
 
-    [Fact]
-    public void ImageRepairPrecedesSystemFileOperationsRegardlessOfSelectionOrder()
+    [Theory]
+    [InlineData(MaintenanceActionId.ScanWindowsImage, MaintenanceActionId.RepairWindowsImage)]
+    [InlineData(MaintenanceActionId.ScanWindowsImage, MaintenanceActionId.RepairSystemFiles)]
+    [InlineData(MaintenanceActionId.VerifySystemFiles, MaintenanceActionId.RepairWindowsImage)]
+    [InlineData(MaintenanceActionId.VerifySystemFiles, MaintenanceActionId.RepairSystemFiles)]
+    public void DiagnosticScansAndRepairsRequireSeparateReviewedPlans(MaintenanceActionId scan, MaintenanceActionId repair)
     {
-        MaintenanceActionId[] expected = [
+        var exception = Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateAndOrder([scan, repair]));
+        Assert.Contains("revise o resultado", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CompatibleScansAndRepairsKeepTheirStableIndependentOrder()
+    {
+        MaintenanceActionId[] scanPlan = [
             MaintenanceActionId.ScanWindowsImage,
-            MaintenanceActionId.RepairWindowsImage,
             MaintenanceActionId.VerifySystemFiles,
-            MaintenanceActionId.RepairSystemFiles,
             MaintenanceActionId.AnalyzeSystemDrive,
             MaintenanceActionId.DefenderQuickScan];
+        MaintenanceActionId[] repairPlan = [MaintenanceActionId.RepairWindowsImage, MaintenanceActionId.RepairSystemFiles];
 
-        Assert.Equal(expected, MaintenancePolicy.ValidateAndOrder(expected.Reverse()));
-        Assert.Equal(expected, MaintenancePolicy.ValidateAndOrder(expected));
-        Assert.Equal(Enum.GetValues<MaintenanceActionId>().Length,
-            MaintenancePolicy.ValidateAndOrder(Enum.GetValues<MaintenanceActionId>()).Count);
+        Assert.Equal(scanPlan, MaintenancePolicy.ValidateAndOrder(scanPlan.Reverse()));
+        Assert.Equal(repairPlan, MaintenancePolicy.ValidateAndOrder(repairPlan.Reverse()));
+        Assert.Equal(Enum.GetValues<MaintenanceActionId>().Length, MaintenanceCatalog.All.Count);
     }
 
     [Fact]
     public void OrderingDoesNotSilentlyAddUnselectedActions()
     {
         var result = MaintenancePolicy.ValidateAndOrder([
-            MaintenanceActionId.RepairSystemFiles,
-            MaintenanceActionId.ScanWindowsImage]);
+            MaintenanceActionId.DefenderQuickScan,
+            MaintenanceActionId.VerifySystemFiles]);
 
-        Assert.Equal(new[] { MaintenanceActionId.ScanWindowsImage, MaintenanceActionId.RepairSystemFiles }, result);
+        Assert.Equal(new[] { MaintenanceActionId.VerifySystemFiles, MaintenanceActionId.DefenderQuickScan }, result);
     }
 
     [Fact]
