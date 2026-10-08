@@ -83,16 +83,32 @@ public sealed class PerformanceHistoryBuffer
     }
 }
 
-/// <summary>Sampling interval based on measured demand; unavailable CPU never means idle.</summary>
+/// <summary>Sampling interval based on the busiest valid CPU, GPU, disk, or network signal.</summary>
 public static class AdaptiveSamplingPolicy
 {
     public static TimeSpan NextInterval(PerformanceObservation observation)
     {
         ArgumentNullException.ThrowIfNull(observation);
-        if (observation.CpuPercent is not { } cpu || !double.IsFinite(cpu)) return TimeSpan.FromSeconds(10);
-        if (cpu >= 75) return TimeSpan.FromSeconds(2);
-        if (cpu >= 35) return TimeSpan.FromSeconds(5);
+        var loadSignals = new List<double>();
+        AddPercent(observation.CpuPercent, loadSignals);
+        foreach (var process in observation.Processes) AddPercent(process.CpuPercent, loadSignals);
+        foreach (var engine in observation.GpuEngines ?? []) AddPercent(engine.UtilizationPercent, loadSignals);
+        foreach (var disk in observation.Disks ?? []) AddPercent(disk.ActivePercent, loadSignals);
+        foreach (var network in observation.Networks ?? [])
+            if (network.BytesPerSecond is { } bytes && network.LinkBitsPerSecond is { } linkBitsPerSecond && linkBitsPerSecond > 0)
+                AddPercent(bytes * 8d / linkBitsPerSecond * 100d, loadSignals);
+
+        if (loadSignals.Count == 0) return TimeSpan.FromSeconds(10);
+        var busiest = loadSignals.Max();
+        if (busiest >= 75) return TimeSpan.FromSeconds(2);
+        if (busiest >= 35) return TimeSpan.FromSeconds(5);
         return TimeSpan.FromSeconds(10);
+    }
+
+    private static void AddPercent(double? value, ICollection<double> values)
+    {
+        if (value is { } percent && double.IsFinite(percent) && percent is >= 0 and <= 100)
+            values.Add(percent);
     }
 }
 

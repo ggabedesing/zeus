@@ -131,6 +131,34 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void AdaptivePolicyRespondsToGpuAndDiskLoadWhenCpuIsUnavailable()
+    {
+        var gpuBusy = Sample(null) with { GpuEngines = [new("gpu", null, "3D", 82)] };
+        var diskBusy = Sample(null) with { Disks = [new("disk", null, 48, null)] };
+
+        Assert.Equal(TimeSpan.FromSeconds(2), AdaptiveSamplingPolicy.NextInterval(gpuBusy));
+        Assert.Equal(TimeSpan.FromSeconds(5), AdaptiveSamplingPolicy.NextInterval(diskBusy));
+    }
+
+    [Fact]
+    public void AdaptivePolicyUsesNormalizedNetworkRateAndIgnoresUnavailableOrInvalidCounters()
+    {
+        var networkBusy = Sample(null) with
+        {
+            Networks = [new("Ethernet", 50_000_000, 1_000_000_000, null, null)]
+        };
+        var unavailable = Sample(null) with
+        {
+            GpuEngines = [new("gpu", null, "3D", 130)],
+            Disks = [new("disk", null, -1, null)],
+            Networks = [new("Ethernet", 50_000_000, null, null, null)]
+        };
+
+        Assert.Equal(TimeSpan.FromSeconds(5), AdaptiveSamplingPolicy.NextInterval(networkBusy));
+        Assert.Equal(TimeSpan.FromSeconds(10), AdaptiveSamplingPolicy.NextInterval(unavailable));
+    }
+
+    [Fact]
     public void ComparisonUsesOnlyValidSamplesAndReportsAverageCpuAndMemoryUse()
     {
         var reference = new[] { Sample(20), Sample(40) };
