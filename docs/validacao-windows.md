@@ -37,6 +37,8 @@ O [resumo da evidência](evidencias/pc-local-2026-10-08.json) preserva o commit 
 
 Na validação local do commit `2a4c718`, `Zeus.SmokeCheck` concluiu a coleta nativa e encontrou contadores de memória GPU para dois adaptadores, com leitura dedicada disponível nos dois. Isso confirma disponibilidade dos contadores neste computador, não pressão de VRAM; nenhum reparo ou restauração foi executado.
 
+No commit `e68f904`, a nova leitura DXGI foi conferida no mesmo PC: dois adaptadores com contador de uso dedicado, um pareamento por LUID com capacidade dedicada e ocupação calculável; o adaptador virtual permaneceu sem porcentagem. Compilação Release sem avisos/erros, 62 testes de hardware aprovados e 39 testes de aceitação aprovados (1 teste administrativo ignorado). Ocupação é uma razão observada, não comprova gargalo ou pressão por si só.
+
 ## Aceitação administrativa em máquinas de teste
 
 Use Windows 11 suportado, snapshots quando disponíveis e backups independentes. Guarde a versão/commit, ação, relatório e resultado após reiniciar. Execute cada cenário separadamente.
