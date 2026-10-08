@@ -108,6 +108,36 @@ public sealed class PerformanceCounterTests
         Assert.Equal(75d, comparison.LaterUsedMemoryPercent!.Value, 6);
         Assert.Equal(2, comparison.ReferenceSampleCount);
         Assert.Equal(2, comparison.LaterSampleCount);
+        Assert.Equal(2, comparison.CpuUsage!.ReferenceAvailableSamples);
+        Assert.Equal(2, comparison.MemoryUsage!.LaterAvailableSamples);
+    }
+
+    [Fact]
+    public void CpuAndMemoryComparisonExposeCoverageAndIgnoreInvalidPercentages()
+    {
+        var reference = new[]
+        {
+            Sample(20),
+            Sample(140),
+            Sample(null) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 }
+        };
+        var later = new[]
+        {
+            Sample(30),
+            Sample(40) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 },
+            Sample(50)
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+
+        Assert.Equal(20d, comparison.ReferenceCpuPercent);
+        Assert.Equal(40d, comparison.LaterCpuPercent);
+        Assert.Equal(1, comparison.CpuUsage!.ReferenceAvailableSamples);
+        Assert.Equal(3, comparison.CpuUsage.LaterAvailableSamples);
+        Assert.Equal(50d, comparison.ReferenceUsedMemoryPercent);
+        Assert.Equal(50d, comparison.LaterUsedMemoryPercent);
+        Assert.Equal(2, comparison.MemoryUsage!.ReferenceAvailableSamples);
+        Assert.Equal(2, comparison.MemoryUsage.LaterAvailableSamples);
     }
 
     [Fact]
@@ -190,6 +220,8 @@ public sealed class PerformanceCounterTests
         Assert.NotNull(comparison);
         Assert.Null(comparison.GpuEnginePeak);
         Assert.Null(comparison.DiskActivityPeak);
+        Assert.Null(comparison.CpuUsage);
+        Assert.Null(comparison.MemoryUsage);
     }
 
     [Fact]

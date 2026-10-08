@@ -13,7 +13,9 @@ public sealed record PerformanceComparison(
     DateTimeOffset LaterEndedAt,
     PerformanceMetricComparison? GpuEnginePeak = null,
     PerformanceMetricComparison? DiskActivityPeak = null,
-    IReadOnlyList<PerformanceGpuMemoryComparison>? GpuMemoryUsage = null);
+    IReadOnlyList<PerformanceGpuMemoryComparison>? GpuMemoryUsage = null,
+    PerformanceMetricComparison? CpuUsage = null,
+    PerformanceMetricComparison? MemoryUsage = null);
 
 public sealed record PerformanceMetricComparison(
     double? ReferencePercent,
@@ -85,11 +87,24 @@ public static class PerformanceComparisonBuilder
         if (reference.Count == 0 || later.Count == 0)
             throw new ArgumentException("São necessárias amostras dos dois períodos para comparar.");
 
-        static double? Average(IEnumerable<double?> values)
+        static PerformanceMetricComparison ComparePercentages(
+            IReadOnlyList<PerformanceObservation> first,
+            IReadOnlyList<PerformanceObservation> second,
+            Func<PerformanceObservation, double?> selector)
         {
-            var valid = values.Where(value => value is { } number && double.IsFinite(number))
-                .Select(value => value!.Value).ToArray();
-            return valid.Length == 0 ? null : valid.Average();
+            static (double? Average, int Count) Summarize(
+                IReadOnlyList<PerformanceObservation> samples,
+                Func<PerformanceObservation, double?> valueSelector)
+            {
+                var valid = samples.Select(valueSelector)
+                    .Where(value => value is { } number && double.IsFinite(number) && number is >= 0 and <= 100)
+                    .Select(value => value!.Value).ToArray();
+                return (valid.Length == 0 ? null : valid.Average(), valid.Length);
+            }
+
+            var left = Summarize(first, selector);
+            var right = Summarize(second, selector);
+            return new(left.Average, right.Average, left.Count, right.Count);
         }
 
         static double? UsedMemoryPercent(PerformanceObservation observation) =>
@@ -155,11 +170,13 @@ public static class PerformanceComparisonBuilder
                 leftOccupancy.Average, rightOccupancy.Average);
         }).ToArray();
 
+        var cpuUsage = ComparePercentages(reference, later, sample => sample.CpuPercent);
+        var memoryUsage = ComparePercentages(reference, later, UsedMemoryPercent);
+
         return new(reference.Count, later.Count,
-            Average(reference.Select(sample => sample.CpuPercent)),
-            Average(later.Select(sample => sample.CpuPercent)),
-            Average(reference.Select(UsedMemoryPercent)),
-            Average(later.Select(UsedMemoryPercent)),
-            reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk, gpuMemory);
+            cpuUsage.ReferencePercent, cpuUsage.LaterPercent,
+            memoryUsage.ReferencePercent, memoryUsage.LaterPercent,
+            reference.Max(sample => sample.CollectedAt), later.Max(sample => sample.CollectedAt), gpu, disk, gpuMemory,
+            cpuUsage, memoryUsage);
     }
 }
