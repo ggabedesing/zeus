@@ -37,6 +37,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private CancellationTokenSource? _readCancellation;
     private HardwareSnapshot? _snapshot;
     private PerformanceObservation? _performance;
+    private PerformanceObservation[] _performanceBaseline = [];
+    private PerformanceComparison? _performanceComparison;
     private CleanupScan? _cleanupScan;
     private bool _isBusy, _isExecuting, _loaded, _historyReadable = true;
     private DesktopTheme _selectedTheme = DesktopTheme.Complete;
@@ -80,6 +82,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public DatabaseHealth? StorageHealth => _storageHealth;
     public PerformanceObservation? Performance => _performance;
     public IReadOnlyList<PerformanceHistoryEntry> PerformanceHistory => _performanceHistory.Snapshot();
+    public bool CanSetPerformanceBaseline => !_isBusy && _performanceHistory.Snapshot().Count >= 3;
+    public bool CanComparePerformance => !_isBusy && _performanceBaseline.Length >= 3 &&
+        _performanceHistory.Snapshot().Count(entry => entry.Observation.CollectedAt > _performanceBaseline[^1].CollectedAt) >= 3;
+    public string PerformanceComparisonSummary => _performanceComparison is not { } comparison
+        ? "Defina uma referência com pelo menos três amostras e colete outras três para comparar."
+        : $"CPU média: {FormatMetric(comparison.ReferenceCpuPercent)} → {FormatMetric(comparison.LaterCpuPercent)} · RAM em uso: {FormatMetric(comparison.ReferenceUsedMemoryPercent)} → {FormatMetric(comparison.LaterUsedMemoryPercent)}. Comparação descritiva; repita a mesma tarefa e condições para interpretar.";
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
     public ObservableCollection<DeviceRow> GraphicsRows { get; } = [];
@@ -370,12 +378,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SetBusy(bool busy)
     {
         _isBusy = busy;
-        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan) }) Notify(p);
+        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
     private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); }
     private static bool IsStorageError(Exception error) => error is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or DbException;
     private static string Available(string? value) => string.IsNullOrWhiteSpace(value) ? "Indisponível" : value;
+    private static string FormatMetric(double? value) => value is { } number ? $"{number:0.#}%" : "indisponível";
     private static string BooleanStatus(bool? value) => value switch { true => "Ativo", false => "Desativado", null => "Indisponível" };
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; Notify(name); return true; }
     private void Notify([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));

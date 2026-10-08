@@ -134,6 +134,8 @@ public partial class MainWindow
     {
         _performance = observation;
         _performanceHistory.Add(new(_performanceSessionId, observation));
+        if (_performanceBaseline.Length > 0 && observation.CollectedAt > _performanceBaseline[^1].CollectedAt)
+            _performanceComparison = null;
         var memory = observation.TotalMemoryBytes == 0 ? "indisponível" : $"{ByteFormatting.Format(observation.AvailableMemoryBytes)} de {ByteFormatting.Format(observation.TotalMemoryBytes)}";
         PerformanceSummary = $"CPU: {(observation.CpuPercent.HasValue ? $"{observation.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · Amostra de {observation.SamplingDuration.TotalSeconds:0.#} s em {observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
         ProcessRows.Clear();
@@ -141,7 +143,30 @@ public partial class MainWindow
             ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · Memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}"));
         foreach (var warning in observation.Warnings)
             if (!Warnings.Contains(warning)) Warnings.Add(warning);
-        Notify(nameof(Performance));
+        Notify(nameof(Performance)); Notify(nameof(CanSetPerformanceBaseline)); Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
+    }
+
+    private void SetPerformanceBaseline_Click(object sender, RoutedEventArgs e)
+    {
+        var observations = _performanceHistory.Snapshot().TakeLast(5).Select(entry => entry.Observation).ToArray();
+        if (observations.Length < 3) return;
+        _performanceBaseline = observations;
+        _performanceComparison = null;
+        Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
+        StatusDetail = $"Referência definida com {observations.Length} amostras. Execute a mesma tarefa em condições semelhantes e colete ao menos três amostras posteriores.";
+    }
+
+    private void ComparePerformance_Click(object sender, RoutedEventArgs e)
+    {
+        var baselineEnd = _performanceBaseline.LastOrDefault()?.CollectedAt;
+        if (_performanceBaseline.Length < 3 || baselineEnd is null) return;
+        var later = _performanceHistory.Snapshot()
+            .Where(entry => entry.Observation.CollectedAt > baselineEnd.Value)
+            .TakeLast(5).Select(entry => entry.Observation).ToArray();
+        if (later.Length < 3) return;
+        _performanceComparison = PerformanceComparisonBuilder.Compare(_performanceBaseline, later);
+        Notify(nameof(PerformanceComparisonSummary));
+        StatusDetail = "Comparação descritiva entre médias de CPU e uso de RAM. Ela não identifica a causa das diferenças nem garante ganho de desempenho.";
     }
 
     private async void ScanCleanup_Click(object sender, RoutedEventArgs e)
@@ -290,7 +315,7 @@ public partial class MainWindow
         if (dialog.ShowDialog(this) != true) return;
         await RunOperationAsync("Exportando relatório", "Guardando inventário, observações e resultados reais.", async _ =>
         {
-            await DesktopStorage.ExportAsync(dialog.FileName, new(3, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(), new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(), _performanceHistory.Snapshot()));
+            await DesktopStorage.ExportAsync(dialog.FileName, new(3, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(), new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(), _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison));
             StatusTitle = "Relatório exportado"; StatusDetail = "O JSON contém nomes de computador, usuários e processos. Revise essas informações antes de compartilhar.";
         });
     }

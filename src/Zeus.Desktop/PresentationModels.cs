@@ -113,4 +113,6 @@ internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset Exported
     IReadOnlyList<MaintenanceReport> Maintenance, PerformanceObservation? Performance = null,
     IReadOnlyList<RecommendationRow>? Plan = null, UserOptimizationPreferences? Preferences = null,
     IReadOnlyList<ChangeRow>? Changes = null, IReadOnlyList<CleanupSessionRow>? Cleanup = null,
-    IReadOnlyList<PerformanceHistoryEntry>? PerformanceHistory = null);
+    IReadOnlyList<PerformanceHistoryEntry>? PerformanceHistory = null,
+    IReadOnlyList<PerformanceObservation>? PerformanceBaseline = null,
+    PerformanceComparison? PerformanceComparison = null);

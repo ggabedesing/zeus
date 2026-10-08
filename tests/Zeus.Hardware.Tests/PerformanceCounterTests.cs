@@ -31,6 +31,37 @@ public sealed class PerformanceCounterTests
         Assert.Equal(TimeSpan.FromSeconds(seconds), AdaptiveSamplingPolicy.NextInterval(Sample(cpu)));
     }
 
+    [Fact]
+    public void ComparisonUsesOnlyValidSamplesAndReportsAverageCpuAndMemoryUse()
+    {
+        var reference = new[] { Sample(20), Sample(40) };
+        var later = new[]
+        {
+            Sample(50) with { AvailableMemoryBytes = 256 },
+            Sample(70) with { AvailableMemoryBytes = 256 }
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+
+        Assert.Equal(30d, comparison.ReferenceCpuPercent!.Value);
+        Assert.Equal(60d, comparison.LaterCpuPercent!.Value);
+        Assert.Equal(50d, comparison.ReferenceUsedMemoryPercent!.Value, 6);
+        Assert.Equal(75d, comparison.LaterUsedMemoryPercent!.Value, 6);
+        Assert.Equal(2, comparison.ReferenceSampleCount);
+        Assert.Equal(2, comparison.LaterSampleCount);
+    }
+
+    [Fact]
+    public void ComparisonKeepsUnavailableCountersUnknown()
+    {
+        var unavailable = Sample(null) with { TotalMemoryBytes = 0, AvailableMemoryBytes = 0 };
+        var comparison = PerformanceComparisonBuilder.Compare([unavailable], [unavailable]);
+        Assert.Null(comparison.ReferenceCpuPercent);
+        Assert.Null(comparison.LaterCpuPercent);
+        Assert.Null(comparison.ReferenceUsedMemoryPercent);
+        Assert.Null(comparison.LaterUsedMemoryPercent);
+    }
+
     private static PerformanceObservation Sample(double? cpu) =>
         new(DateTimeOffset.UnixEpoch, TimeSpan.FromSeconds(2), cpu, 1024, 512, [], []);
 
