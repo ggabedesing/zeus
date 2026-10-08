@@ -1,10 +1,12 @@
 param(
     [ValidateSet('win-x64', 'win-arm64')]
     [string]$Runtime = 'win-x64',
-    [string]$OutputRoot = ''
+    [string]$OutputRoot = '',
+    [string]$ProductVersion = '1.0.0'
 )
 
 $ErrorActionPreference = 'Stop'
+if ($ProductVersion -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw 'ProductVersion must contain three or four numeric fields.' }
 $repository = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repository 'artifacts'
@@ -19,11 +21,11 @@ New-Item -ItemType Directory -Path $destination -Force | Out-Null
 
 Push-Location $repository
 try {
-    dotnet publish src/Zeus.Desktop/Zeus.Desktop.csproj -c Release -r $Runtime --self-contained true -o $destination
+    dotnet publish src/Zeus.Desktop/Zeus.Desktop.csproj -c Release -r $Runtime --self-contained true "-p:Version=$ProductVersion" -o $destination
     if ($LASTEXITCODE -ne 0) { throw 'Desktop publication failed.' }
-    dotnet publish src/Zeus.Maintenance/Zeus.Maintenance.csproj -c Release -r $Runtime --self-contained true -o $destination
+    dotnet publish src/Zeus.Maintenance/Zeus.Maintenance.csproj -c Release -r $Runtime --self-contained true "-p:Version=$ProductVersion" -o $destination
     if ($LASTEXITCODE -ne 0) { throw 'Maintenance helper publication failed.' }
-    Copy-Item README.md, SECURITY.md -Destination $destination
+    Copy-Item README.md, SECURITY.md, CHANGELOG.md -Destination $destination
     Copy-Item docs/validacao-windows.md -Destination $destination
     $files = @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Core.dll', 'Zeus.Windows.dll', 'Zeus.Cleanup.dll')
     $hashes = [ordered]@{}
@@ -41,6 +43,7 @@ try {
         sourceCommit = $sourceCommit
         sourceDirty = $sourceDirty
         runtime = $Runtime
+        productVersion = $ProductVersion
         createdAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
         developmentBuild = $true
         sha256 = $hashes

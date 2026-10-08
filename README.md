@@ -4,6 +4,8 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 
 **Estado: versão de desenvolvimento com módulos integrados; aceitação nativa acompanhada pelo GitHub Actions.** Os resultados de cada execução são registrados. Ganhos de desempenho precisam ser medidos no computador e na tarefa do usuário.
 
+O [histórico de versões](CHANGELOG.md) registra as mudanças entregues. A versão exibida no aplicativo vem dos metadados incorporados ao executável; o pacote também informa a versão, o commit de origem e os hashes em `build-info.json`.
+
 ## Recursos
 
 | Área | O que o aplicativo faz |

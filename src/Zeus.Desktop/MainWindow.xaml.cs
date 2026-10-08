@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Data.Common;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
@@ -95,6 +96,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     public HardwareSnapshot? Snapshot => _snapshot;
+    public string BuildVersion { get; } = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Indisponível";
     public OptimizationPlan? FormalOptimizationPlan => _optimizationPlan;
     public DatabaseHealth? StorageHealth => _storageHealth;
     public PerformanceObservation? Performance => _performance;

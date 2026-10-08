@@ -88,6 +88,7 @@ public sealed class WpfExperienceTests
         Assert.Equal(Visibility.Collapsed, window.FirstRunSetupVisibility);
         Assert.True((await new DesktopStorage(fixture).ReadPreferencesAsync()).FirstRunSetupComplete);
         Assert.Same(window, window.DataContext);
+        Assert.False(string.IsNullOrWhiteSpace(window.BuildVersion));
         Assert.Same(Application.Current.Resources["BackgroundBrush"], window.Background);
         Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);
         Assert.NotEmpty(window.HardwareCards);

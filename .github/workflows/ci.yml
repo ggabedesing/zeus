@@ -101,11 +101,12 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: pwsh
         run: |
-          ./scripts/publish-windows.ps1
+          $version = "1.0.$env:GITHUB_RUN_NUMBER"
+          ./scripts/publish-windows.ps1 -ProductVersion $version
           ./scripts/package-windows-tests.ps1
           $payload = Get-ChildItem artifacts -Directory -Filter 'zeus-win-x64-*' | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
           if ($null -eq $payload) { throw 'Published x64 application payload not found.' }
-          ./scripts/build-installer.ps1 -PayloadDirectory $payload.FullName -ProductVersion "1.0.$env:GITHUB_RUN_NUMBER"
+          ./scripts/build-installer.ps1 -PayloadDirectory $payload.FullName -ProductVersion $version
       - name: Install, upgrade, and uninstall MSI on the disposable runner
         id: installerTest
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
