@@ -25,6 +25,23 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Desktop publication failed.' }
     dotnet publish src/Zeus.Maintenance/Zeus.Maintenance.csproj -c Release -r $Runtime --self-contained true "-p:Version=$ProductVersion" -o $destination
     if ($LASTEXITCODE -ne 0) { throw 'Maintenance helper publication failed.' }
+    foreach ($assemblyName in @('Zeus.Desktop.dll', 'Zeus.Maintenance.dll')) {
+        $assemblyPath = Join-Path $destination $assemblyName
+        if (!(Test-Path -LiteralPath $assemblyPath -PathType Leaf)) { throw "Required versioned assembly missing: $assemblyName" }
+        $assembly = [Reflection.Assembly]::LoadFrom($assemblyPath)
+        $versionAttribute = [System.Reflection.CustomAttributeExtensions]::GetCustomAttribute(
+            $assembly, [Reflection.AssemblyInformationalVersionAttribute])
+        if ($null -eq $versionAttribute -or $versionAttribute.InformationalVersion -notmatch "^$([regex]::Escape($ProductVersion))(?:\+.*)?$") {
+            throw "Published $assemblyName does not report ProductVersion $ProductVersion."
+        }
+    }
+    foreach ($executableName in @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe')) {
+        $executablePath = Join-Path $destination $executableName
+        $executableVersion = (Get-Item -LiteralPath $executablePath).VersionInfo.ProductVersion
+        if ($executableVersion -notmatch "^$([regex]::Escape($ProductVersion))(?:\+.*)?$") {
+            throw "Published $executableName does not report ProductVersion $ProductVersion."
+        }
+    }
     Copy-Item README.md, SECURITY.md, CHANGELOG.md -Destination $destination
     Copy-Item docs/validacao-windows.md -Destination $destination
     $files = @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Core.dll', 'Zeus.Windows.dll', 'Zeus.Cleanup.dll')
