@@ -5,6 +5,35 @@ namespace Zeus.Hardware.Tests;
 
 public sealed class PerformanceCounterTests
 {
+    [Fact]
+    public void HistoryBufferRetainsOnlyNewestEntriesAndPreservesSessions()
+    {
+        var buffer = new PerformanceHistoryBuffer(2);
+        var firstSession = Guid.NewGuid();
+        var secondSession = Guid.NewGuid();
+        buffer.Add(new(firstSession, Sample(10)));
+        buffer.Add(new(firstSession, Sample(20)));
+        buffer.Add(new(secondSession, Sample(30)));
+
+        var snapshot = buffer.Snapshot();
+        Assert.Equal(2, snapshot.Count);
+        Assert.Equal(new double?[] { 20d, 30d }, snapshot.Select(entry => entry.Observation.CpuPercent).ToArray());
+        Assert.Equal(secondSession, snapshot[1].SessionId);
+    }
+
+    [Theory]
+    [InlineData(90d, 2)]
+    [InlineData(50d, 5)]
+    [InlineData(10d, 10)]
+    [InlineData(null, 10)]
+    public void AdaptivePolicySamplesMoreOftenUnderHigherLoad(double? cpu, int seconds)
+    {
+        Assert.Equal(TimeSpan.FromSeconds(seconds), AdaptiveSamplingPolicy.NextInterval(Sample(cpu)));
+    }
+
+    private static PerformanceObservation Sample(double? cpu) =>
+        new(DateTimeOffset.UnixEpoch, TimeSpan.FromSeconds(2), cpu, 1024, 512, [], []);
+
     [Theory]
     [InlineData(0U, false)]
     [InlineData(1U, true)]

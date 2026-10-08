@@ -112,4 +112,5 @@ internal sealed record DesktopPreferences(bool IsMinimal, DesktopTheme Theme = D
 internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset ExportedAt, HardwareSnapshot? Diagnostics,
     IReadOnlyList<MaintenanceReport> Maintenance, PerformanceObservation? Performance = null,
     IReadOnlyList<RecommendationRow>? Plan = null, UserOptimizationPreferences? Preferences = null,
-    IReadOnlyList<ChangeRow>? Changes = null, IReadOnlyList<CleanupSessionRow>? Cleanup = null);
+    IReadOnlyList<ChangeRow>? Changes = null, IReadOnlyList<CleanupSessionRow>? Cleanup = null,
+    IReadOnlyList<PerformanceHistoryEntry>? PerformanceHistory = null);

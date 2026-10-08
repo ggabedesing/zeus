@@ -20,6 +20,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly IHardwareDiagnostics _diagnostics = new WindowsHardwareDiagnostics();
     private readonly ElevatedMaintenanceExecutor _executor = new();
     private readonly WindowsPerformanceProbe _performanceProbe = new();
+    private readonly PerformanceHistoryBuffer _performanceHistory = new();
+    private Guid _performanceSessionId = Guid.NewGuid();
     private readonly WindowsUpdateService _windowsUpdate = new();
     private readonly PendingMaintenanceSessions _pendingSessions = new();
     private readonly UserOptimizationService _userOptimization;
@@ -77,6 +79,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public HardwareSnapshot? Snapshot => _snapshot;
     public DatabaseHealth? StorageHealth => _storageHealth;
     public PerformanceObservation? Performance => _performance;
+    public IReadOnlyList<PerformanceHistoryEntry> PerformanceHistory => _performanceHistory.Snapshot();
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
     public ObservableCollection<DeviceRow> GraphicsRows { get; } = [];

@@ -105,15 +105,43 @@ public partial class MainWindow
     {
         await RunOperationAsync("Medindo carga real", "Amostrando CPU, memória e processos por cinco segundos.", async token =>
         {
-            _performance = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(5), token);
-            var memory = _performance.TotalMemoryBytes == 0 ? "indisponível" : $"{ByteFormatting.Format(_performance.AvailableMemoryBytes)} de {ByteFormatting.Format(_performance.TotalMemoryBytes)}";
-            PerformanceSummary = $"CPU: {(_performance.CpuPercent.HasValue ? $"{_performance.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · Amostra de {_performance.SamplingDuration.TotalSeconds:0.#} s em {_performance.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
-            ProcessRows.Clear();
-            foreach (var p in _performance.Processes) ProcessRows.Add(new($"{p.Name} · PID {p.Id}", $"CPU: {(p.CpuPercent.HasValue ? $"{p.CpuPercent:0.#}%" : "indisponível")} · Memória residente: {ByteFormatting.Format(p.WorkingSetBytes)}"));
-            foreach (var w in _performance.Warnings) Warnings.Add(w);
+            _performanceSessionId = Guid.NewGuid();
+            var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(5), token);
+            DisplayPerformanceObservation(observation);
             BuildPersonalPlan(); Notify(nameof(Performance));
             StatusTitle = "Medição concluída"; StatusDetail = "A amostra registra esta carga. Repita durante a tarefa para comparar condições equivalentes.";
         }, cancellable: true);
+    }
+
+    private async void StartObserver_Click(object sender, RoutedEventArgs e)
+    {
+        _performanceSessionId = Guid.NewGuid();
+        await RunOperationAsync("Observando desempenho", "Amostras adaptativas de CPU, memória e processos. Use Cancelar leitura para encerrar.", async token =>
+        {
+            while (true)
+            {
+                var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(2), token);
+                DisplayPerformanceObservation(observation);
+                var interval = AdaptiveSamplingPolicy.NextInterval(observation);
+                PerformanceSummary += $" · próxima amostra em {interval.TotalSeconds:0} s";
+                StatusDetail = $"Sessão {_performanceSessionId:N} · {_performanceHistory.Snapshot().Count} amostras guardadas em memória. Cancele para encerrar e exporte o relatório para preservar os dados.";
+                await Task.Delay(interval, token);
+            }
+        }, cancellable: true);
+    }
+
+    private void DisplayPerformanceObservation(PerformanceObservation observation)
+    {
+        _performance = observation;
+        _performanceHistory.Add(new(_performanceSessionId, observation));
+        var memory = observation.TotalMemoryBytes == 0 ? "indisponível" : $"{ByteFormatting.Format(observation.AvailableMemoryBytes)} de {ByteFormatting.Format(observation.TotalMemoryBytes)}";
+        PerformanceSummary = $"CPU: {(observation.CpuPercent.HasValue ? $"{observation.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · Amostra de {observation.SamplingDuration.TotalSeconds:0.#} s em {observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
+        ProcessRows.Clear();
+        foreach (var process in observation.Processes)
+            ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · Memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}"));
+        foreach (var warning in observation.Warnings)
+            if (!Warnings.Contains(warning)) Warnings.Add(warning);
+        Notify(nameof(Performance));
     }
 
     private async void ScanCleanup_Click(object sender, RoutedEventArgs e)
@@ -262,7 +290,7 @@ public partial class MainWindow
         if (dialog.ShowDialog(this) != true) return;
         await RunOperationAsync("Exportando relatório", "Guardando inventário, observações e resultados reais.", async _ =>
         {
-            await DesktopStorage.ExportAsync(dialog.FileName, new(2, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(), new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray()));
+            await DesktopStorage.ExportAsync(dialog.FileName, new(3, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(), new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(), _performanceHistory.Snapshot()));
             StatusTitle = "Relatório exportado"; StatusDetail = "O JSON contém nomes de computador, usuários e processos. Revise essas informações antes de compartilhar.";
         });
     }
