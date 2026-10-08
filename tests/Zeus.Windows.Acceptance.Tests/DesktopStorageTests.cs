@@ -106,6 +106,23 @@ public sealed class DesktopStorageTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(() => storage.SaveHistoryAsync([invalid]));
     }
 
+    [Fact]
+    public async Task ReportSchemaSixExportsReportedDriverSignatureAndPnpPresence()
+    {
+        var inventory = new WindowsInventoryInfo([], [new("Display", "Fixture", "1.2.3", "2025-01-02", "Fixture Signer", false)],
+            [new("Display", "Display", "OK", null, "USB\\VID_1234&PID_5678\\A1", true)], [], [], [], [], [], null, null, null, []);
+        var snapshot = new HardwareSnapshot(DateTimeOffset.UtcNow, "Windows fixture", "fixture", null, null, [], [], [], null, [],
+            WindowsInventory: inventory);
+        var path = Path.Combine(_root, "export.json");
+        await DesktopStorage.ExportAsync(path, new ExportDocument(6, DateTimeOffset.UtcNow, snapshot, []));
+
+        using var export = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        var diagnostics = export.RootElement.GetProperty("Diagnostics").GetProperty("WindowsInventory");
+        Assert.Equal(6, export.RootElement.GetProperty("SchemaVersion").GetInt32());
+        Assert.False(diagnostics.GetProperty("Drivers")[0].GetProperty("IsSigned").GetBoolean());
+        Assert.True(diagnostics.GetProperty("PnpDevices")[0].GetProperty("IsPresent").GetBoolean());
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

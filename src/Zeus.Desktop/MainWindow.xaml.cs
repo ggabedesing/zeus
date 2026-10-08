@@ -167,6 +167,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<ChangeRow> UserChanges { get; } = [];
     public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
+    public ObservableCollection<DeviceRow> InstalledDriverRows { get; } = [];
     public ObservableCollection<DriverRollbackChoice> RollbackDriverChoices { get; } = [];
     public ObservableCollection<WingetUpdateRow> WingetUpdates { get; } = [];
     public ObservableCollection<WindowsUpdateRow> PendingWindowsUpdates { get; } = [];
@@ -206,6 +207,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string StartupSummary { get => _startupSummary; private set => Set(ref _startupSummary, value); }
     public string ProfileSummary { get => _profileSummary; private set => Set(ref _profileSummary, value); }
     public string DriverSummary { get => _driverSummary; private set => Set(ref _driverSummary, value); }
+    public string DriverInventorySummary { get; private set; } = "Inventário de drivers disponível após a coleta do Windows.";
     public string WingetSummary { get => _wingetSummary; private set => Set(ref _wingetSummary, value); }
     private string _windowsUpdateSummary = "A busca online só começa quando você solicitar. Não baixa nem instala atualizações.";
     public string WindowsUpdateSummary { get => _windowsUpdateSummary; private set => Set(ref _windowsUpdateSummary, value); }
@@ -337,6 +339,30 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void DisplaySnapshot(HardwareSnapshot snapshot)
     {
+        InstalledDriverRows.Clear();
+        var driverInventory = snapshot.WindowsInventory;
+        if (driverInventory is null)
+            DriverInventorySummary = "Indisponível: o inventário detalhado do Windows não foi obtido nesta coleta.";
+        else if (driverInventory.Warnings.Any(warning => warning.StartsWith("Drivers:", StringComparison.OrdinalIgnoreCase)))
+            DriverInventorySummary = "Indisponível: a fonte Win32_PnPSignedDriver não respondeu. Consulte os avisos e atualize o diagnóstico.";
+        else
+        {
+            var orderedDrivers = driverInventory.Drivers.OrderBy(driver => driver.Device, StringComparer.OrdinalIgnoreCase).ToArray();
+            var shownDrivers = orderedDrivers.Take(100).ToArray();
+            foreach (var driver in shownDrivers)
+            {
+                var signature = driver.IsSigned switch { true => "Sim (reportado pelo Windows)", false => "Não (reportado pelo Windows)", _ => "Indisponível" };
+                InstalledDriverRows.Add(new(Available(driver.Device),
+                    $"Fornecedor: {Available(driver.Provider)} · Versão: {Available(driver.Version)} · Data: {Available(driver.Date)}\nAssinatura reportada: {signature} · Signatário informado: {Available(driver.Signer)}"));
+            }
+            var signed = orderedDrivers.Count(driver => driver.IsSigned == true);
+            var unsigned = orderedDrivers.Count(driver => driver.IsSigned == false);
+            var unknown = orderedDrivers.Length - signed - unsigned;
+            DriverInventorySummary = $"{orderedDrivers.Length} driver(s) retornado(s) por Win32_PnPSignedDriver · assinatura reportada: {signed} sim, {unsigned} não, {unknown} indisponível" +
+                (orderedDrivers.Length > shownDrivers.Length ? $" · exibindo {shownDrivers.Length}; a lista completa está no relatório JSON" : string.Empty) +
+                ". Esse campo é o valor informado pelo Windows; não é uma verificação independente da cadeia de confiança ou do arquivo instalado.";
+        }
+        Notify(nameof(DriverInventorySummary));
         RollbackDriverChoices.Clear();
         var pnpInventory = snapshot.WindowsInventory?.PnpDevices;
         if (pnpInventory is null) RollbackDriverSummary = "Inventário PnP indisponível; não é possível identificar alvos para reversão.";

@@ -118,7 +118,7 @@ try {
   if ([string]::IsNullOrWhiteSpace($proxyBypass)) { $proxyBypass = $null }
   $proxyAvailable = $true
 } catch { $warnings.Add('Proxy do usuário: configurações do Registro HKCU indisponíveis.') }
-$drivers = Read-Part 'Drivers' { Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop | Select-Object DeviceName,DriverProviderName,DriverVersion,@{n='Date';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}else{$null}}},Signer }
+$drivers = Read-Part 'Drivers' { Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop | Select-Object DeviceName,DriverProviderName,DriverVersion,@{n='Date';e={if($_.DriverDate){$_.DriverDate.ToString('yyyy-MM-dd')}else{$null}}},Signer,IsSigned }
 $pnp = Read-Part 'Dispositivos PnP' { Get-CimInstance Win32_PnPEntity -ErrorAction Stop | Select-Object Name,PNPClass,Status,PNPDeviceID,@{n='ProblemCode';e={if($_.ConfigManagerErrorCode -ne 0){[string]$_.ConfigManagerErrorCode}else{$null}}} }
 $presentPnp = $null
 try { $presentPnp = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase); Get-PnpDevice -PresentOnly -ErrorAction Stop | ForEach-Object { if (![string]::IsNullOrWhiteSpace([string]$_.InstanceId)) { [void]$presentPnp.Add([string]$_.InstanceId) } } } catch { $warnings.Add('Presença de dispositivos PnP: fonte Get-PnpDevice indisponível; reversão de driver desativada.') }
@@ -136,7 +136,7 @@ $updates = $null; $warnings.Add('Windows Update: atualizações pendentes não f
 $inventory = [pscustomobject]@{
  NetworkConfiguration=@($network | ForEach-Object { $ifIndex=$_.InterfaceIndex; [pscustomobject]@{Adapter=[string]$_.Adapter;Addresses=@($_.Addresses);DnsServers=@($_.DnsServers);Gateways=@($_.Gateways);Status=[string]$_.Status;Routes=@($routes | Where-Object AdapterIndex -eq $ifIndex | ForEach-Object Route);Proxy=$proxy} });
  ProxyConfiguration=[pscustomobject]@{ManualProxyEnabled=$proxyEnabled;ManualProxyServer=$proxy;AutoConfigUrl=$proxyPac;AutoDetectEnabled=$proxyAutoDetect;BypassList=$proxyBypass;IsAvailable=$proxyAvailable};
- Drivers=@($drivers | ForEach-Object { [pscustomobject]@{Device=[string]$_.DeviceName;Provider=[string]$_.DriverProviderName;Version=[string]$_.DriverVersion;Date=$_.Date;Signer=$_.Signer} });
+ Drivers=@($drivers | ForEach-Object { $signed=$null; if ($null -ne $_.IsSigned) { $signed=[bool]$_.IsSigned }; [pscustomobject]@{Device=[string]$_.DeviceName;Provider=[string]$_.DriverProviderName;Version=[string]$_.DriverVersion;Date=$_.Date;Signer=$_.Signer;IsSigned=$signed} });
  PnpDevices=@($pnp | ForEach-Object { $instanceId=[string]$_.PNPDeviceID; $isPresent=$null; if ($null -ne $presentPnp -and ![string]::IsNullOrWhiteSpace($instanceId)) { $isPresent=$presentPnp.Contains($instanceId) }; [pscustomobject]@{Name=[string]$_.Name;Class=[string]$_.PNPClass;Status=[string]$_.Status;ProblemCode=$_.ProblemCode;InstanceId=$instanceId;IsPresent=$isPresent} });
  Processes=@($processes | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Id=[int]$_.Id;CpuSeconds=$_.CpuSeconds;WorkingSetBytes=$_.WorkingSetBytes} });
  Services=@($services | ForEach-Object { $serviceName=[string]$_.Name; $hasDependencies=$null -ne $dependencyMap -and $dependencyMap.ContainsKey($serviceName); $dependencies=[string[]]@(); if ($hasDependencies) { $dependencies=[string[]]$dependencyMap[$serviceName] }; [pscustomobject]@{Name=$serviceName;DisplayName=[string]$_.DisplayName;Status=[string]$_.State;StartType=[string]$_.StartMode;DependenciesAvailable=$hasDependencies;Dependencies=$dependencies} });

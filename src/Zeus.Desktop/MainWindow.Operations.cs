@@ -711,7 +711,7 @@ public partial class MainWindow
         if (dialog.ShowDialog(this) != true) return;
         await RunOperationAsync("Exportando relatório", "Guardando inventário, observações e resultados reais.", async _ =>
         {
-            await DesktopStorage.ExportAsync(dialog.FileName, new(5, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(), new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(), _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan));
+            await DesktopStorage.ExportAsync(dialog.FileName, new(6, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(), new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(), _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan));
             StatusTitle = "Relatório exportado"; StatusDetail = "O JSON contém nomes de computador, usuários e processos. Revise essas informações antes de compartilhar.";
         });
     }
