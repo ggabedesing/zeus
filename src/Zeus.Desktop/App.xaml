@@ -148,7 +148,7 @@
                             <Popup x:Name="PART_Popup" Placement="Bottom"
                                    PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
                                    IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False"
-                                   PopupAnimation="Fade">
+                                   PopupAnimation="None">
                                 <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="1" CornerRadius="6" Margin="0,3,0,0"
                                         MaxHeight="{TemplateBinding MaxDropDownHeight}">

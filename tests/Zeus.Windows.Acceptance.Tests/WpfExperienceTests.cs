@@ -4,6 +4,7 @@ using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Zeus.Desktop;
@@ -94,6 +95,8 @@ public sealed class WpfExperienceTests
         Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);
         var themeSelector = Assert.IsType<ComboBox>(window.FindName("ThemeSelector"));
         Assert.Equal("theme-selector", AutomationProperties.GetAutomationId(themeSelector));
+        var themePopup = Assert.IsType<Popup>(themeSelector.Template.FindName("PART_Popup", themeSelector));
+        Assert.Equal(PopupAnimation.None, themePopup.PopupAnimation);
         var themeSelectorPeer = Assert.IsAssignableFrom<ComboBoxAutomationPeer>(UIElementAutomationPeer.CreatePeerForElement(themeSelector));
         Assert.Equal("Tema do aplicativo", themeSelectorPeer.GetName());
         var expandCollapse = Assert.IsAssignableFrom<IExpandCollapseProvider>(themeSelectorPeer.GetPattern(PatternInterface.ExpandCollapse));
