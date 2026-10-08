@@ -62,6 +62,19 @@ public sealed class MaintenanceRequestProtocolTests
     {
         Assert.Throws<ArgumentException>(() => MaintenanceRequestProtocol.Encode([
             new(MaintenanceActionId.InstallDriverUpdate, DriverId, false, 3)]));
+        Assert.Throws<ArgumentException>(() => MaintenanceRequestProtocol.Encode([
+            new(MaintenanceActionId.InstallDriverUpdate, DriverId, false, 3, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")]));
+    }
+
+    [Fact]
+    public void DriverInstallPreservesOnlyTheKnownMicrosoftUpdateServiceId()
+    {
+        var selected = new[] { new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, DriverId, false, 3,
+            MaintenanceRequestProtocol.MicrosoftUpdateServiceId) };
+        var encoded = MaintenanceRequestProtocol.Encode(selected);
+
+        Assert.True(MaintenanceRequestProtocol.TryReadArguments(["--session", SessionId, "--requests", encoded], out _, out var requests));
+        Assert.Equal(selected, requests);
     }
 
     [Theory]

@@ -204,7 +204,8 @@ internal static class CommandRunner
         // The interpolated data has already been parsed to GUIDs, integers and a boolean.
         // Installation re-queries the exact WUA identity and server selection; titles are never matched.
         var expectedServerSelection = request.UpdateServerSelection!.Value;
-        var script = $"$expectedId = '{updateId:D}'; $expectedRevision = {revision}; $expectedServerSelection = {expectedServerSelection}; $acceptEula = " +
+        var expectedServiceId = request.UpdateServiceId is null ? string.Empty : Guid.Parse(request.UpdateServiceId).ToString("D");
+        var script = $"$expectedId = '{updateId:D}'; $expectedRevision = {revision}; $expectedServerSelection = {expectedServerSelection}; $expectedServiceId = '{expectedServiceId}'; $acceptEula = " +
             (request.EulaAccepted ? "$true; " : "$false; ") + DriverInstallScript;
         var result = await RunAsync(sessionId, $"driver-{updateId:N}-{revision}.log",
             TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility), Timeout.InfiniteTimeSpan);
@@ -271,7 +272,9 @@ internal static class CommandRunner
         $query = "IsInstalled=0 and Type='Driver' and IsHidden=0 and UpdateID='" + $expectedId + "' and RevisionNumber=" + $expectedRevision;
         $searcher = $session.CreateUpdateSearcher();
         $actualServerSelection = [int]$searcher.ServerSelection;
-        if ($actualServerSelection -ne $expectedServerSelection) {
+        $actualServiceId = if ($actualServerSelection -eq 3) { [string]$searcher.ServiceID } else { '' };
+        if ($actualServerSelection -ne $expectedServerSelection -or
+            ($expectedServerSelection -eq 3 -and [guid]$actualServiceId -ne [guid]$expectedServiceId)) {
             throw 'A origem configurada do Windows Update mudou desde a busca. Nenhum download ou instalação foi iniciado; faça uma nova consulta.';
         };
         $search = $searcher.Search($query);

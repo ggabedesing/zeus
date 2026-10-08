@@ -8,6 +8,7 @@ namespace Zeus.Core;
 public static class MaintenanceRequestProtocol
 {
     public const int MaximumPayloadBytes = 8192;
+    public const string MicrosoftUpdateServiceId = "7971f918-a847-4430-9279-4a52d1efe18d";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public static string Encode(IReadOnlyCollection<MaintenanceRequest> requests)
@@ -16,7 +17,7 @@ public static class MaintenanceRequestProtocol
         var payload = JsonSerializer.SerializeToUtf8Bytes(validated.Select(request => new
         {
             Action = request.Action.ToString(), request.TargetId, request.EulaAccepted,
-            request.UpdateServerSelection
+            request.UpdateServerSelection, request.UpdateServiceId
         }));
         if (payload.Length > MaximumPayloadBytes)
             throw new ArgumentException("O plano excede o tamanho permitido.", nameof(requests));
@@ -50,6 +51,7 @@ public static class MaintenanceRequestProtocol
                 string? actionName = null;
                 string? target = null;
                 int? serverSelection = null;
+                string? serviceId = null;
                 var accepted = false;
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in element.EnumerateObject())
@@ -71,12 +73,15 @@ public static class MaintenanceRequestProtocol
                             break;
                         case "UpdateServerSelection" when property.Value.ValueKind == JsonValueKind.Null:
                             break;
+                        case "UpdateServiceId" when property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Null:
+                            serviceId = property.Value.GetString();
+                            break;
                         default:
                             return false;
                     }
                 }
                 if (!TryParseAction(actionName, out var action)) return false;
-                selected.Add(new MaintenanceRequest(action, target, accepted, serverSelection));
+                selected.Add(new MaintenanceRequest(action, target, accepted, serverSelection, serviceId));
             }
             requests = MaintenancePolicy.ValidateRequests(selected);
             return true;

@@ -87,6 +87,7 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
         0 => "Windows Update Agent · servidor padrão (origem efetiva desconhecida)",
         1 => "Windows Update Agent · servidor gerenciado",
         2 => "Windows Update · serviço público",
+        3 when string.Equals(Candidate.UpdateServiceId, Zeus.Core.MaintenanceRequestProtocol.MicrosoftUpdateServiceId, StringComparison.OrdinalIgnoreCase) => "Microsoft Update · fonte lógica oficial; servidor efetivo desconhecido",
         3 when Zeus.Core.MaintenanceRequestProtocol.TryParseUpdateServiceId(Candidate.UpdateServiceId) => $"Windows Update Agent · serviço adicional não permitido ({Candidate.UpdateServiceId})",
         _ => "Windows Update Agent · origem indisponível"
     };
@@ -110,7 +111,8 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
 
     private bool HasTargetIdentity => !string.IsNullOrWhiteSpace(Candidate.Manufacturer) && !string.IsNullOrWhiteSpace(Candidate.DeviceName);
     private bool HasUsableDate => Candidate.DriverDate is { Year: >= 1980 } date && date <= DateOnly.FromDateTime(DateTime.Today);
-    private bool HasUsableSource => Candidate.UpdateServerSelection is 0 or 1 or 2 && Candidate.UpdateServiceId is null;
+    private bool HasUsableSource => Candidate.UpdateServerSelection is 0 or 1 or 2 && Candidate.UpdateServiceId is null ||
+        Candidate.UpdateServerSelection == 3 && string.Equals(Candidate.UpdateServiceId, Zeus.Core.MaintenanceRequestProtocol.MicrosoftUpdateServiceId, StringComparison.OrdinalIgnoreCase);
 
     private static string ClassifyProvider(string? provider, string? manufacturer)
     {

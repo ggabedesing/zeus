@@ -188,6 +188,11 @@ public sealed class WpfExperienceTests
         Assert.False(invalidSource.CanSelectForInstall);
         Assert.Contains("origem", invalidSource.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("serviço adicional não permitido", invalidSource.DriverSource, StringComparison.OrdinalIgnoreCase);
+        var microsoftUpdate = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":7", "Microsoft Update fixture", "Fixture", "Fixture adapter", null, false,
+            DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 3,
+            UpdateServiceId: Zeus.Core.MaintenanceRequestProtocol.MicrosoftUpdateServiceId));
+        Assert.True(microsoftUpdate.CanSelectForInstall);
+        Assert.Contains("Microsoft Update", microsoftUpdate.DriverSource, StringComparison.Ordinal);
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
         licensed.IsSelected = true; unlicensed.IsSelected = true;
         Assert.False(window.CanInstallDriver);

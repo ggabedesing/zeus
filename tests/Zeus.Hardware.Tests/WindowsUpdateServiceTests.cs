@@ -75,7 +75,21 @@ public sealed class WindowsUpdateServiceTests
         var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
 
         Assert.Single(result.Updates);
-        Assert.Contains(result.Warnings, warning => warning.Contains("não é permitida", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Warnings, warning => warning.Contains("não é reconhecida", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void MicrosoftUpdateServiceIdIsAcceptedButUnrelatedAdditionalServiceIsNot()
+    {
+        var microsoftPayload = $$"""{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"Vendor","DeviceName":"Device","RequiresEula":false,"DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":3,"ServiceId":"{{Zeus.Core.MaintenanceRequestProtocol.MicrosoftUpdateServiceId}}"}""";
+        var unrelatedPayload = microsoftPayload.Replace(Zeus.Core.MaintenanceRequestProtocol.MicrosoftUpdateServiceId,
+            "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", StringComparison.OrdinalIgnoreCase);
+
+        var accepted = WindowsUpdateService.ParseDriverUpdatesPayload(microsoftPayload);
+        var blocked = WindowsUpdateService.ParseDriverUpdatesPayload(unrelatedPayload);
+
+        Assert.DoesNotContain(accepted.Warnings, warning => warning.Contains("não é reconhecida", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(blocked.Warnings, warning => warning.Contains("não é reconhecida", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
