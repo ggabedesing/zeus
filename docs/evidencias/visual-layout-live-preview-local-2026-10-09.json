@@ -1,0 +1,35 @@
+{
+  "evidenceType": "visual-layout-live-preview-and-portable-exe-smoke",
+  "date": "2026-10-09",
+  "sourceCommit": "94d5424339657b068ffd537c0e98b47ce8aa8437",
+  "sourceTreeDirtyAtBuild": true,
+  "change": "Selecting a visual profile previews its theme across the actual ZEUS window. Confirm persists the profile; cancel restores the saved palette without changing persisted theme, accent, profile, or desktop clock.",
+  "tests": {
+    "project": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+    "passed": 72,
+    "failed": 0,
+    "skipped": 2,
+    "total": 74,
+    "coverage": [
+      "preview updates actual application palette while preserving selected saved theme and accent",
+      "preview selection does not persist theme, accent, or preset before confirmation",
+      "cancel restores the existing palette",
+      "confirm applies each of the nine visual profiles",
+      "existing theme contrast, keyboard focus, and WPF screens"
+    ],
+    "skippedReason": "Two protected-session acceptance cases require administrative privileges."
+  },
+  "portablePackage": {
+    "path": "artifacts/theme-preview-package/zeus-win-x64.zip",
+    "sha256": "99578cc00b1cd9e0c208a8338c31cebabb07daddc860993cb149dc7bbcbabac9",
+    "desktopExePath": "artifacts/theme-preview-package/zeus-win-x64-94d542433965-20261009T105448640Z-f7b08248/Zeus.Desktop.exe",
+    "desktopExeSha256": "570e749af94434fca8a6baacc737464cd933c08965fc5209dd304a3021ad755f",
+    "runtime": "win-x64",
+    "smoke": "Main window opened, responded, and closed cleanly."
+  },
+  "limitations": [
+    "The package was built from a working tree with the preview changes before this increment was committed.",
+    "The executable is an unsigned development build, not a production-signed release.",
+    "The automated WPF clock check confirms preferences are not modified; physical multi-monitor and mixed-DPI behavior is not covered by this preview test."
+  ]
+}

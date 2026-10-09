@@ -334,11 +334,36 @@ public sealed class WpfExperienceTests
         Assert.Equal("visual-layout-preview", AutomationProperties.GetAutomationId(visualLayoutPreview));
         var applyVisualLayoutButton = Assert.IsType<Button>(window.FindName("ApplyVisualLayoutButton"));
         Assert.Equal("apply-visual-layout", AutomationProperties.GetAutomationId(applyVisualLayoutButton));
+        var cancelVisualLayoutPreviewButton = Assert.IsType<Button>(window.FindName("CancelVisualLayoutPreviewButton"));
+        Assert.Equal("cancel-visual-layout-preview", AutomationProperties.GetAutomationId(cancelVisualLayoutPreviewButton));
+        var originalTheme = window.SelectedTheme;
+        var originalAccent = window.SelectedAccentColor;
+        var originalBackground = Assert.IsType<SolidColorBrush>(Application.Current.Resources["BackgroundBrush"]).Color;
+        var storedAppearanceBeforePreview = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        var cancelCandidate = window.VisualLayoutPresets.Last(preset => preset.Theme != originalTheme || preset.Accent != originalAccent);
+        window.SelectedVisualLayoutPreset = cancelCandidate;
+        Assert.True(window.IsVisualLayoutPreviewing);
+        Assert.True(cancelVisualLayoutPreviewButton.IsEnabled);
+        Assert.Equal(originalTheme, window.SelectedTheme);
+        Assert.Equal(originalAccent, window.SelectedAccentColor);
+        Assert.Equal(Assert.IsType<SolidColorBrush>(window.SelectedVisualLayoutPreview.BackgroundBrush).Color,
+            Assert.IsType<SolidColorBrush>(Application.Current.Resources["BackgroundBrush"]).Color);
+        var storedAppearanceDuringPreview = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        Assert.Equal(storedAppearanceBeforePreview.Theme, storedAppearanceDuringPreview.Theme);
+        Assert.Equal(storedAppearanceBeforePreview.AccentColor, storedAppearanceDuringPreview.AccentColor);
+        Assert.Equal(storedAppearanceBeforePreview.VisualLayoutPresetId, storedAppearanceDuringPreview.VisualLayoutPresetId);
+        cancelVisualLayoutPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, cancelVisualLayoutPreviewButton));
+        Assert.False(window.IsVisualLayoutPreviewing);
+        Assert.Equal(originalBackground, Assert.IsType<SolidColorBrush>(Application.Current.Resources["BackgroundBrush"]).Color);
         foreach (var visualPreset in window.VisualLayoutPresets)
         {
             var themeBeforePreview = window.SelectedTheme;
             window.SelectedVisualLayoutPreset = visualPreset;
             Assert.Equal(themeBeforePreview, window.SelectedTheme);
+            Assert.Equal(visualPreset.Theme != window.SelectedTheme || visualPreset.Accent != window.SelectedAccentColor,
+                window.IsVisualLayoutPreviewing);
+            Assert.Equal(Assert.IsType<SolidColorBrush>(window.SelectedVisualLayoutPreview.BackgroundBrush).Color,
+                Assert.IsType<SolidColorBrush>(Application.Current.Resources["BackgroundBrush"]).Color);
             Assert.Equal(visualPreset.Name, window.SelectedVisualLayoutPreview.Name);
             Assert.NotNull(window.SelectedVisualLayoutPreview.BackgroundBrush);
             Assert.NotNull(window.SelectedVisualLayoutPreview.PanelBrush);

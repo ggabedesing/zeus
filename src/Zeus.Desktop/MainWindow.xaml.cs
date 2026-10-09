@@ -60,6 +60,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private DesktopTheme _selectedTheme = DesktopTheme.Complete;
     private AppAccentColor _selectedAccentColor = AppAccentColor.ThemeDefault;
     private VisualLayoutPreset? _selectedVisualLayoutPreset;
+    private bool _visualLayoutPreviewActive;
+    private string? _savedVisualLayoutPresetId;
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop, _desktopClockHideDuringFullscreen = true, _desktopClockUse24HourFormat = true;
@@ -389,10 +391,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             if (value is null || !VisualLayoutPresets.Contains(value) || !Set(ref _selectedVisualLayoutPreset, value)) return;
             Notify(nameof(SelectedVisualLayoutPreview));
-            QueuePreferencesSave();
+            if (_loaded)
+            {
+                _visualLayoutPreviewActive = value.Theme != SelectedTheme || value.Accent != SelectedAccentColor;
+                ApplyTheme(value.Theme, value.Accent);
+                Notify(nameof(IsVisualLayoutPreviewing));
+                Notify(nameof(VisualLayoutPreviewState));
+            }
+            Notify(nameof(CanConfirmVisualLayout));
         }
     }
     public VisualLayoutPreview SelectedVisualLayoutPreview => CreateVisualLayoutPreview(SelectedVisualLayoutPreset);
+    public bool IsVisualLayoutPreviewing => _visualLayoutPreviewActive;
+    public bool CanConfirmVisualLayout => CanChooseActions &&
+        (_visualLayoutPreviewActive ||
+         (SelectedVisualLayoutPreset.Theme == SelectedTheme && SelectedVisualLayoutPreset.Accent == SelectedAccentColor &&
+          !string.Equals(SelectedVisualLayoutPreset.Id, _savedVisualLayoutPresetId, StringComparison.Ordinal)));
+    public string VisualLayoutPreviewState => SystemParameters.HighContrast
+        ? "O alto contraste do Windows prevalece; confirme o perfil para salvar ou cancele a prévia."
+        : _visualLayoutPreviewActive
+            ? "Prévia temporária ativa nesta interface. O tema salvo e o relógio da Área de Trabalho não foram alterados."
+            : "Escolha um perfil para pré-visualizar nesta interface; confirme para salvar ou cancele a prévia.";
     public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
     public bool IsTechnicalMode { get => _isTechnicalMode; set { if (Set(ref _isTechnicalMode, value)) { Notify(nameof(DetailedVisibility)); QueuePreferencesSave(); } } }
     public DesktopTheme SelectedTheme
@@ -401,7 +420,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (!Enum.IsDefined(value) || !Set(ref _selectedTheme, value)) return;
-            ApplyTheme(); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption));
+            _visualLayoutPreviewActive = false;
+            ApplyTheme(); Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout)); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption));
             UpdateAppearanceStatus();
             QueuePreferencesSave();
         }
@@ -412,7 +432,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (!Enum.IsDefined(value) || !Set(ref _selectedAccentColor, value)) return;
+            _visualLayoutPreviewActive = false;
             ApplyTheme();
+            Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout));
             UpdateAppearanceStatus();
             QueuePreferencesSave();
         }
@@ -487,6 +509,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 SelectedAccentColor = Enum.IsDefined(p.AccentColor) ? p.AccentColor : AppAccentColor.ThemeDefault;
                 SelectedVisualLayoutPreset = VisualLayoutPresets.FirstOrDefault(preset =>
                     string.Equals(preset.Id, p.VisualLayoutPresetId, StringComparison.Ordinal)) ?? VisualLayoutPresets[0];
+                _savedVisualLayoutPresetId = p.VisualLayoutPresetId;
                 SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency;
                 IsTechnicalMode = p.IsTechnicalMode;
                 FirstRunSetupComplete = p.FirstRunSetupComplete;
@@ -911,16 +934,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (pending.Length > 0) await Task.WhenAll(pending).WaitAsync(cancellationToken);
     }
 
-    private void ApplyTheme()
+    private void ApplyTheme(DesktopTheme? previewTheme = null, AppAccentColor? previewAccent = null)
     {
         if (SystemParameters.HighContrast) return;
-        var colors = GetThemePalette(SelectedTheme, SelectedAccentColor);
+        var theme = previewTheme ?? SelectedTheme;
+        var colors = GetThemePalette(theme, previewAccent ?? SelectedAccentColor);
         var keys = new[] { "BackgroundBrush", "PanelBrush", "BorderBrush", "TextBrush", "MutedBrush", "AccentBrush", "ButtonBrush", "SelectedTabBrush", "LogBackgroundBrush" };
         for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = BrushFromHex(colors[i]);
         Application.Current.Resources["PrimaryButtonBrush"] = Application.Current.Resources["AccentBrush"];
         Application.Current.Resources["SelectedTabTextBrush"] = Application.Current.Resources["AccentBrush"];
         Application.Current.Resources["ButtonTextBrush"] = Application.Current.Resources["TextBrush"];
-        if (SelectedTheme == DesktopTheme.Light)
+        if (theme == DesktopTheme.Light)
         {
             Application.Current.Resources["WarningBrush"] = BrushFromHex("#805400");
             Application.Current.Resources["WarningPanelBrush"] = BrushFromHex("#FFF6DF");
@@ -936,7 +960,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Application.Current.Resources["LogTextBrush"] = BrushFromHex("#C8D8E8");
             Application.Current.Resources["PrimaryTextBrush"] = BrushFromHex("#071623");
         }
-        if (_loaded && DesktopClockEnabled) SyncDesktopClock();
+        if (previewTheme is null && _loaded && DesktopClockEnabled) SyncDesktopClock();
     }
 
     private static string[] GetThemePalette(DesktopTheme theme, AppAccentColor accent)
@@ -1120,7 +1144,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SetBusy(bool busy)
     {
         _isBusy = busy;
-        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanVerifyPendingDriverUpdates), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
+        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanConfirmVisualLayout), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanVerifyPendingDriverUpdates), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
     private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanRollbackDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanApplyDesktopOrganization)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }

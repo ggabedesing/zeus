@@ -713,12 +713,30 @@ public partial class MainWindow
 
     private void ApplyVisualLayout_Click(object sender, RoutedEventArgs e)
     {
-        if (!CanChooseActions) return;
+        if (!CanChooseActions || !CanConfirmVisualLayout) return;
         var preset = SelectedVisualLayoutPreset;
+        _visualLayoutPreviewActive = false;
+        _savedVisualLayoutPresetId = preset.Id;
         SelectedTheme = preset.Theme;
         SelectedAccentColor = preset.Accent;
+        QueuePreferencesSave();
+        Notify(nameof(IsVisualLayoutPreviewing));
+        Notify(nameof(VisualLayoutPreviewState));
+        Notify(nameof(CanConfirmVisualLayout));
         StatusTitle = "Perfil visual aplicado";
         StatusDetail = $"{preset.Name} foi aplicado somente à interface do ZEUS. Papel de parede, relógio, animações e configurações do Windows permanecem independentes.";
+    }
+
+    private void CancelVisualLayoutPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanChooseActions || !_visualLayoutPreviewActive) return;
+        _visualLayoutPreviewActive = false;
+        ApplyTheme();
+        Notify(nameof(IsVisualLayoutPreviewing));
+        Notify(nameof(VisualLayoutPreviewState));
+        Notify(nameof(CanConfirmVisualLayout));
+        StatusTitle = "Prévia cancelada";
+        StatusDetail = "O tema salvo e o relógio da Área de Trabalho foram mantidos.";
     }
 
     private void ChooseWallpaper_Click(object sender, RoutedEventArgs e)
