@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "portable-package-third-party-notices",
+  "recordedAtUtc": "2026-10-09T07:30:39Z",
+  "sourceCommit": "c9d7c8d9d4abce581d89f0452d8049d8023e3b35",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "outcome": "success",
+  "portableApplicationSmoke": {
+    "opened": true,
+    "responded": true,
+    "closedCleanly": true
+  },
+  "packageContents": {
+    "nugetRuntimePackages": 8,
+    "spdxLicenseTexts": ["MIT", "Apache-2.0"],
+    "dotnetRuntimeThirdPartyNotices": true,
+    "additionalNugetNoticeFiles": [
+      "THIRD-PARTY-NOTICES-System.CodeDom-10.0.0.txt",
+      "THIRD-PARTY-NOTICES-System.Management-10.0.0.txt"
+    ],
+    "noticeManifest": "THIRD-PARTY-NOTICES.md",
+    "productionAuthenticodeSigned": false
+  },
+  "zip": {
+    "file": "artifacts/exe-final/zeus-win-x64.zip",
+    "sha256": "c117c0fcc003b7472877599735c16648ff7201465ebd5ba2b9331103baa010fa"
+  },
+  "limitations": [
+    "This third-party inventory does not license ZEUS source or branding; the project LICENSE remains unselected.",
+    "The development package is unsigned; this does not validate a production release signature."
+  ]
+}
