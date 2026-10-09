@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "collectedAtLocal": "2026-10-09T12:16:18-03:00",
+  "sourceCommit": "3949faa226ec8ff4fd26225133fad649108201d0",
+  "sourceDirty": false,
+  "validation": {
+    "testProject": "tests/Zeus.UserOptimization.Tests/Zeus.UserOptimization.Tests.csproj",
+    "testName": "RealUserVisualSettingsAreBackedUpAppliedAndRestored",
+    "passed": 45,
+    "failed": 0,
+    "skipped": 0,
+    "elevation": false,
+    "visualSettingsRestored": true,
+    "powerPlanUnchanged": true,
+    "trx": "artifacts/TestResults/zeus-user-optimization-local-20261009/zeus-user-optimization-local.trx"
+  },
+  "portablePackage": {
+    "runtime": "win-x64",
+    "selfContained": true,
+    "windowOpenedAndResponded": true,
+    "closedNormally": true,
+    "buildInfoSourceDirty": false,
+    "packageZip": "artifacts/zeus-exe-acceptance-local-20261009/zeus-win-x64.zip",
+    "packageSha256": "efa45256e146810fd61788a4c4dced19875a15cf88bced1bc6892c47978d1aab",
+    "executable": "artifacts/zeus-exe-acceptance-local-20261009/zeus-win-x64-3949faa226ec-20261009T151534946Z-0292520c/Zeus.Desktop.exe",
+    "executableSha256": "72F591DD3E84DAED3DBDDD6A1C99F7E9EF2CA434BC58E54F9B4C94495A8E868D",
+    "productionAuthenticodeSignature": false
+  },
+  "windowsChangesLeftBehind": false
+}
