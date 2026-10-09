@@ -9,6 +9,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
+if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'O ciclo de instalação do MSI exige um PowerShell elevado. Execute novamente como administrador; nenhum instalador foi iniciado.'
+}
 $PreviousInstaller = [IO.Path]::GetFullPath($PreviousInstaller)
 $CurrentInstaller = [IO.Path]::GetFullPath($CurrentInstaller)
 if ($ExpectedVersion -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw 'ExpectedVersion must contain three or four numeric fields.' }
