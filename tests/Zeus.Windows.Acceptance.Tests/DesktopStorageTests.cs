@@ -32,7 +32,7 @@ public sealed class DesktopStorageTests : IDisposable
         var preferencesPath = Path.Combine(_root, "preferences.json");
         var historyJson = JsonSerializer.Serialize(new[] { report }, DesktopStorage.JsonOptions);
         var preferencesJson = """
-            {"IsMinimal":true,"Theme":"Minimal","Profile":"Gaming","ReduceAnimations":true,"ReduceTransparency":false,"NeedsBluetooth":true,"NeedsPrinting":false,"NeedsCloudSync":true,"NeedsVirtualization":false}
+            {"IsMinimal":true,"Theme":"Minimal","Profile":"Gaming","ReduceAnimations":true,"ReduceTransparency":false,"NeedsBluetooth":true,"NeedsPrinting":false,"NeedsCloudSync":true,"NeedsVirtualization":false,"Clock":{"Enabled":false,"ShowDate":true,"ShowSeconds":false,"AlwaysOnTop":false,"Opacity":0.88,"Left":40,"Top":80}}
             """;
         await File.WriteAllTextAsync(historyPath, historyJson);
         await File.WriteAllTextAsync(preferencesPath, preferencesJson);
@@ -50,6 +50,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.True(migratedPreferences.IsMinimal);
         Assert.False(migratedPreferences.IsTechnicalMode, "Older preferences must retain the default non-technical mode when the new field is absent.");
         Assert.Equal(AppAccentColor.ThemeDefault, migratedPreferences.AccentColor);
+        Assert.True(migratedPreferences.Clock!.Use24HourFormat, "Older clock preferences without a format field must default to 24-hour time.");
         Assert.Equal(UsageProfile.Gaming, migratedPreferences.Profile);
         Assert.True(migratedPreferences.FirstRunSetupComplete);
         Assert.True(File.Exists(historyPath));

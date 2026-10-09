@@ -466,6 +466,7 @@ public sealed class WpfExperienceTests
         }
         window.DesktopClockShowDate = false;
         window.DesktopClockShowSeconds = true;
+        window.DesktopClockUse24HourFormat = false;
         window.DesktopClockAlwaysOnTop = true;
         window.DesktopClockOpacity = 0.72;
         window.DesktopClockEnabled = true;
@@ -476,12 +477,18 @@ public sealed class WpfExperienceTests
             await Task.Delay(25);
             clockPreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
         } while (clockPreferences.Clock?.Enabled != true && DateTimeOffset.UtcNow < clockDeadline);
-        Assert.Equal(new DesktopClockPreferences(true, false, true, true, 0.72, clockPreferences.Clock!.Left, clockPreferences.Clock.Top), clockPreferences.Clock);
+        Assert.Equal(new DesktopClockPreferences(true, false, true, true, 0.72, clockPreferences.Clock!.Left, clockPreferences.Clock.Top) { Use24HourFormat = false }, clockPreferences.Clock);
         var desktopClock = Assert.Single(Application.Current!.Windows.OfType<DesktopClockWindow>());
         Assert.True(desktopClock.IsVisible);
         Assert.True(desktopClock.Topmost);
         Assert.Equal(0.72, desktopClock.Opacity);
         var clockLabels = FindVisualDescendants<TextBlock>(desktopClock).ToArray();
+        Assert.Matches(@"^\d{2}:\d{2}:\d{2}\s+\S+$", clockLabels[0].Text);
+        window.DesktopClockUse24HourFormat = true;
+        Assert.Matches(@"^\d{2}:\d{2}:\d{2}$", clockLabels[0].Text);
+        var clockFormatToggle = Assert.IsType<CheckBox>(window.FindName("DesktopClockUse24HourFormatToggle"));
+        Assert.Equal("clock-use-24-hour", AutomationProperties.GetAutomationId(clockFormatToggle));
+        Assert.Equal("Relógio: formato 24 horas", AutomationProperties.GetName(clockFormatToggle));
         window.SelectedAccentColor = AppAccentColor.Blue;
         Assert.Equal(Color.FromRgb(0x60, 0xA5, 0xFA), Assert.IsType<SolidColorBrush>(clockLabels[0].Foreground).Color);
         window.SelectedAccentColor = AppAccentColor.ThemeDefault;

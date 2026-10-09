@@ -221,7 +221,10 @@ internal sealed record DesktopPreferences(bool IsMinimal, DesktopTheme Theme = D
     AppAccentColor AccentColor = AppAccentColor.ThemeDefault);
 
 internal sealed record DesktopClockPreferences(bool Enabled = false, bool ShowDate = true, bool ShowSeconds = false,
-    bool AlwaysOnTop = false, double Opacity = 0.88, double Left = 40, double Top = 80);
+    bool AlwaysOnTop = false, double Opacity = 0.88, double Left = 40, double Top = 80)
+{
+    public bool Use24HourFormat { get; init; } = true;
+}
 
 // Export deliberately excludes startup command strings, raw logs and process environment.
 internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset ExportedAt, HardwareSnapshot? Diagnostics,

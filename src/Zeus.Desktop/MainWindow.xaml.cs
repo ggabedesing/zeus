@@ -60,7 +60,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private AppAccentColor _selectedAccentColor = AppAccentColor.ThemeDefault;
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
-    private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop;
+    private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop, _desktopClockUse24HourFormat = true;
     private double _desktopClockOpacity = 0.88, _desktopClockLeft = 40, _desktopClockTop = 80;
     private DesktopClockWindow? _desktopClock;
     private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
@@ -300,6 +300,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool DesktopClockEnabled { get => _desktopClockEnabled; set { if (Set(ref _desktopClockEnabled, value)) ClockChanged(); } }
     public bool DesktopClockShowDate { get => _desktopClockShowDate; set { if (Set(ref _desktopClockShowDate, value)) ClockChanged(); } }
     public bool DesktopClockShowSeconds { get => _desktopClockShowSeconds; set { if (Set(ref _desktopClockShowSeconds, value)) ClockChanged(); } }
+    public bool DesktopClockUse24HourFormat { get => _desktopClockUse24HourFormat; set { if (Set(ref _desktopClockUse24HourFormat, value)) ClockChanged(); } }
     public bool DesktopClockAlwaysOnTop { get => _desktopClockAlwaysOnTop; set { if (Set(ref _desktopClockAlwaysOnTop, value)) ClockChanged(); } }
     public double DesktopClockOpacity { get => _desktopClockOpacity; set { if (Set(ref _desktopClockOpacity, Math.Clamp(value, 0.45, 1))) ClockChanged(); } }
     public bool FirstRunSetupComplete { get => _firstRunSetupComplete; private set { if (Set(ref _firstRunSetupComplete, value)) Notify(nameof(FirstRunSetupVisibility)); } }
@@ -331,6 +332,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 NeedsBluetooth = p.NeedsBluetooth; NeedsPrinting = p.NeedsPrinting; NeedsCloudSync = p.NeedsCloudSync; NeedsVirtualization = p.NeedsVirtualization;
                 var clock = p.Clock ?? new();
                 _desktopClockEnabled = clock.Enabled; _desktopClockShowDate = clock.ShowDate; _desktopClockShowSeconds = clock.ShowSeconds;
+                _desktopClockUse24HourFormat = clock.Use24HourFormat;
                 _desktopClockAlwaysOnTop = clock.AlwaysOnTop; _desktopClockOpacity = Math.Clamp(clock.Opacity, 0.45, 1);
                 _desktopClockLeft = clock.Left; _desktopClockTop = clock.Top;
             }
@@ -626,7 +628,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
-        new(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop), SelectedAccentColor);
+        new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor);
     private void ClockChanged() { if (_loaded) { SyncDesktopClock(); QueuePreferencesSave(); } }
     private void SyncDesktopClock(bool? highContrastOverride = null)
     {
@@ -645,7 +647,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _desktopClock.Show();
         }
         var accentBrush = Application.Current.Resources["AccentBrush"] as Brush ?? SystemColors.WindowTextBrush;
-        _desktopClock.Configure(DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, accentBrush, highContrastOverride ?? SystemParameters.HighContrast);
+        _desktopClock.Configure(DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockUse24HourFormat, DesktopClockAlwaysOnTop, DesktopClockOpacity, accentBrush, highContrastOverride ?? SystemParameters.HighContrast);
     }
     private void QueuePreferencesSave() { if (_loaded) _ = SavePreferencesAsync(); }
     private async Task SavePreferencesAsync()
