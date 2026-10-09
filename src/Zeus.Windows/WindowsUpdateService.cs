@@ -10,7 +10,8 @@ public sealed record DriverUpdateCandidate(string Id, string Title, string? Manu
     int? UpdateServerSelection = null, string? UpdateServiceId = null);
 
 public sealed record DriverUpdateSearch(DateTimeOffset CheckedAt,
-    bool IsComplete, IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
+    bool IsComplete, int? UpdateServerSelection, string? UpdateServiceId,
+    IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
 
 public sealed record PendingWindowsUpdate(string Title, IReadOnlyList<string> KnowledgeBaseIds, bool Downloaded, string UpdateId);
 public sealed record PendingWindowsUpdateSearch(DateTimeOffset CheckedAt, bool IsComplete,
@@ -367,7 +368,7 @@ public sealed class WindowsUpdateService
     }
 
     private static DriverUpdateSearch Failed(string message) =>
-        new(DateTimeOffset.UtcNow, false, [], [message]);
+        new(DateTimeOffset.UtcNow, false, null, null, [], [message]);
 
     private static PendingWindowsUpdateSearch FailedPending(string message) =>
         new(DateTimeOffset.UtcNow, false, [], [message]);
@@ -451,7 +452,8 @@ public sealed class WindowsUpdateService
         }
         warnings.Add("As ofertas seguem as fontes configuradas no Windows Update. Em notebooks, confira a recomendação do fabricante antes de instalar.");
         warnings.Add("O Windows Update informa fornecedor, classe e data do driver, mas não uma versão numérica nem hash/assinatura do arquivo nesta busca; esses itens permanecem indisponíveis e não são inferidos do título.");
-        return new(DateTimeOffset.UtcNow, result.IsComplete.Value && !malformed, drivers.AsReadOnly(), warnings.AsReadOnly());
+        return new(DateTimeOffset.UtcNow, result.IsComplete.Value && !malformed, result.ServerSelection, result.ServiceId,
+            drivers.AsReadOnly(), warnings.AsReadOnly());
     }
 
     private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

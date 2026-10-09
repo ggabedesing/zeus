@@ -1044,7 +1044,8 @@ public partial class MainWindow
             var search = await _windowsUpdate.SearchDriverUpdatesAsync(token); DriverCandidates.Clear();
             foreach (var candidate in search.Updates) { var choice = new DriverChoice(candidate, search.IsComplete); choice.PropertyChanged += (_, _) => NotifyActionState(); DriverCandidates.Add(choice); }
             var completeness = search.IsComplete ? "Busca concluída" : "Resultado incompleto";
-            DriverSummary = $"{completeness} · {search.Updates.Count} candidato(s) em {search.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}. " + string.Join(" ", search.Warnings);
+            var source = Zeus.Core.WindowsUpdateSourcePolicy.Describe(search.UpdateServerSelection, search.UpdateServiceId);
+            DriverSummary = $"{completeness} · {source} · {search.Updates.Count} candidato(s) em {search.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}. " + string.Join(" ", search.Warnings);
             StatusTitle = "Consulta de drivers encerrada"; StatusDetail = DriverSummary;
         }, cancellable: true);
     }

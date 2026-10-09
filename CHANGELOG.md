@@ -72,4 +72,4 @@
 - Consultas de atualização do ZEUS agora registram respostas HTTP malsucedidas como inconclusivas, sem oferecer o link de release como resultado confirmado.
 - Comparações antes/depois do Observador agora mostram os rótulos declarados das sessões e alertam quando os nomes diferem; rótulos continuam sem comprovar condições equivalentes.
 - A reversão de papéis de parede em vários monitores agora compensa mudanças parciais quando o Windows rejeita uma etapa; o histórico continua como aplicada quando o estado anterior à tentativa é confirmado, e exige revisão se a compensação não puder ser verificada.
-- A consulta de drivers agora registra se o Windows Update concluiu a busca; a interface distingue resultado completo de parcial e não apresenta contagem zero como resultado completo quando o provedor reporta dados incompletos.
+- A consulta de drivers agora registra completude e fonte configurada mesmo sem ofertas; a interface distingue resultado completo de parcial e bloqueia candidatos vindos de buscas incompletas.

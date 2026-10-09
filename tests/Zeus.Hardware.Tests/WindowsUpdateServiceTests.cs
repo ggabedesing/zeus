@@ -72,6 +72,8 @@ public sealed class WindowsUpdateServiceTests
 
         var candidate = Assert.Single(result.Updates);
         Assert.True(result.IsComplete);
+        Assert.Equal(2, result.UpdateServerSelection);
+        Assert.Null(result.UpdateServiceId);
         Assert.Equal("NVIDIA", candidate.DriverProvider);
         Assert.Equal("Display", candidate.DriverClass);
         Assert.Equal(new DateOnly(2025, 11, 4), candidate.DriverDate);
@@ -166,6 +168,19 @@ public sealed class WindowsUpdateServiceTests
         Assert.Contains("fonte parcial", result.Warnings);
         Assert.Throws<InvalidDataException>(() => WindowsUpdateService.ParseDriverUpdatesPayload(
             """{"Updates":[],"Warnings":[]}"""));
+    }
+
+    [Fact]
+    public void EmptyDriverSearchRetainsCompletenessAndConfiguredSource()
+    {
+        var payload = """{"IsComplete":true,"Updates":[],"Warnings":[],"ServerSelection":1,"ServiceId":null}""";
+
+        var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
+
+        Assert.True(result.IsComplete);
+        Assert.Empty(result.Updates);
+        Assert.Equal(1, result.UpdateServerSelection);
+        Assert.Equal("Windows Update Agent · servidor gerenciado", Zeus.Core.WindowsUpdateSourcePolicy.Describe(result.UpdateServerSelection, result.UpdateServiceId));
     }
 
     [Fact]
