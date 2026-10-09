@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "b70fcc7",
+  "sourceDirty": false,
+  "test": "controlled-process-cpu-observation",
+  "environment": "Windows local; short synthetic single-thread CPU load",
+  "samplingDurationSeconds": 4.0282769,
+  "observedProcessMatched": true,
+  "processCpuPercentOfMachine": 6.292379951551625,
+  "processEquivalentCores": 1.00678079224826,
+  "systemCpuPercent": 13.468992248062014,
+  "displayedProcessCount": 50,
+  "workloadStopped": true,
+  "windowsConfigurationChanged": false,
+  "limitations": [
+    "Validates real process CPU-time collection under a bounded synthetic workload, not game or OBS performance.",
+    "One sample does not establish a baseline, sustained bottleneck, or optimization benefit.",
+    "Process identity and names are omitted from the evidence.",
+    "The product UI was not exercised by this direct service probe."
+  ]
+}
