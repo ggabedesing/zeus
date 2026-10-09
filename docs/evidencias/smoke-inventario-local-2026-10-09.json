@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "phase-2-local-read-only-inventory-smoke",
+  "recordedAtUtc": "2026-10-09T05:22:00Z",
+  "sourceCommit": "9c04a32bcbb30332a2f2267e43d1a3b894f8b99a",
+  "elevation": "not requested",
+  "outcome": "success",
+  "tests": {
+    "windowsInventoryAcceptance": "passed",
+    "nativePerformanceAcceptance": "passed",
+    "passed": 2,
+    "failed": 0
+  },
+  "checks": {
+    "cpuMemoryVolumes": true,
+    "extendedWindowsInventory": true,
+    "networkConfigurationAndProxyContainers": true,
+    "processesAndServices": true,
+    "securityStateContainer": true,
+    "recentEventsSanitized": true,
+    "nativeGpuMemoryAdapters": 2,
+    "dedicatedGpuUsageAvailable": 2,
+    "dedicatedGpuCapacityAvailable": 1,
+    "dedicatedGpuOccupancyAvailable": 1,
+    "gpuProcessMemoryInstances": 40,
+    "gpuProcessNamesMapped": 40,
+    "physicalDisks": 1,
+    "memoryModules": 2,
+    "firmwareDeclaredMemorySlots": 4,
+    "memoryChannelsInferred": false
+  },
+  "unavailableOrLimited": {
+    "storageTemperature": "unavailable for 1/1 disk",
+    "storageWear": "unavailable for 1/1 disk",
+    "storagePowerOnHours": "unavailable for 1/1 disk",
+    "storageReadWriteErrorCounters": "unavailable for 1/1 disk",
+    "perProcessGpuBudget": "unavailable",
+    "obsEncoderActivity": "unavailable in this sample",
+    "memoryPressure": "insufficient evidence; only one valid sample",
+    "memoryChannels": "not inferred from module count",
+    "windowsRestart": "registry indicates pending file renames; not a complete restart guarantee"
+  },
+  "warnings": 6,
+  "maintenancePerformed": false,
+  "limitations": [
+    "This is a local read-only smoke, not a complete hardware matrix or physical multi-vendor GPU validation.",
+    "Missing storage provider counters are unavailable, not zero and not evidence of disk health.",
+    "The process snapshot cannot prove that a game or OBS is closed or that a live stream is running.",
+    "A single performance sample cannot establish pressure, a bottleneck, or a performance improvement.",
+    "Computer/model names, process names, network addresses, and device identifiers are intentionally omitted.",
+    "No restore point, repair, driver change, restart, or system setting change was performed."
+  ]
+}
