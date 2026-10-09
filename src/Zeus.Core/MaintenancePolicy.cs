@@ -89,6 +89,41 @@ public static class MaintenancePolicy
         return Array.AsReadOnly(supplied.OrderBy(request => GetOrder(request.Action)).ToArray());
     }
 
+    /// <summary>Finds matching prior attempts whose outcome still needs verification before retry.</summary>
+    public static IReadOnlyList<UnresolvedMaintenanceAttempt> FindUnresolvedAttempts(
+        IEnumerable<MaintenanceRequest> requests, IEnumerable<MaintenanceReport> reports)
+    {
+        var selected = ValidateRequests(requests);
+        ArgumentNullException.ThrowIfNull(reports);
+        var matches = new List<UnresolvedMaintenanceAttempt>();
+        foreach (var report in reports)
+        {
+            if (report is null || report.Steps is null) continue;
+            foreach (var step in report.Steps)
+            {
+                if (step is null || !selected.Any(request => Matches(request, step))) continue;
+                var unresolved = step.Verification is MaintenanceVerificationStatus.Pending or
+                    MaintenanceVerificationStatus.ManualReviewRequired ||
+                    !report.IsComplete && step.Verification is (MaintenanceVerificationStatus.NotRecorded or
+                        MaintenanceVerificationStatus.NotStarted);
+                if (unresolved)
+                    matches.Add(new(report.SessionId, report.StartedAt, step.Action, step.TargetId, step.Verification));
+            }
+        }
+        return Array.AsReadOnly(matches.OrderByDescending(attempt => attempt.StartedAt).ToArray());
+    }
+
+    private static bool Matches(MaintenanceRequest request, MaintenanceStepResult step)
+    {
+        if (request.Action != step.Action) return false;
+        if (request.Action is not MaintenanceActionId.InstallDriverUpdate and not MaintenanceActionId.RollbackDriver)
+            return true;
+        if (!string.Equals(request.TargetId, step.TargetId, StringComparison.OrdinalIgnoreCase)) return false;
+        return request.Action != MaintenanceActionId.InstallDriverUpdate ||
+            request.UpdateServerSelection == step.UpdateServerSelection &&
+            string.Equals(request.UpdateServiceId, step.UpdateServiceId, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static void EnsureScansAndRepairsAreSeparate(IEnumerable<MaintenanceActionId> actions, string parameterName)
     {
         var selected = actions.ToHashSet();
@@ -119,3 +154,10 @@ public static class MaintenancePolicy
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Ação desconhecida.")
     };
 }
+
+public sealed record UnresolvedMaintenanceAttempt(
+    Guid SessionId,
+    DateTimeOffset StartedAt,
+    MaintenanceActionId Action,
+    string? TargetId,
+    MaintenanceVerificationStatus Verification);

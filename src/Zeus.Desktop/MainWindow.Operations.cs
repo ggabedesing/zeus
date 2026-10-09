@@ -119,6 +119,25 @@ public partial class MainWindow
         if (ordered.Any(r => r.Action == MaintenanceActionId.RollbackDriver)) text.Append($"Dispositivo: {ordered.Single().TargetId}\nO ZEUS exportará o pacote atualmente instalado antes de pedir ao Windows a reversão deste único dispositivo. O Windows pode não manter uma versão anterior; nesse caso, nada será alterado. A reinicialização, se solicitada, será manual. Confira se o backup exportado está preservado.\n\n");
         if (ordered.Any(r => r.Action is MaintenanceActionId.DefenderQuickScan or MaintenanceActionId.DefenderFullScan or MaintenanceActionId.DefenderOfflineScan)) text.Append("O Defender segue as políticas de remediação de ameaças do Windows. Consulte os resultados em Segurança do Windows.\n\n");
         if (ordered.Any(r => r.Action == MaintenanceActionId.DefenderOfflineScan)) text.Append("ATENÇÃO: a verificação offline pode reiniciar este computador imediatamente. Salve seu trabalho. Tenha a recuperação do BitLocker disponível se a unidade estiver criptografada.\n\n");
+        var unresolvedAttempts = MaintenancePolicy.FindUnresolvedAttempts(ordered, _reports);
+        if (unresolvedAttempts.Count > 0)
+        {
+            text.Append("ATENÇÃO: o histórico contém uma tentativa anterior desta mesma ação sem resultado confirmado:\n\n");
+            foreach (var attempt in unresolvedAttempts.Take(3))
+            {
+                var target = string.IsNullOrWhiteSpace(attempt.TargetId) ? string.Empty : $" · {attempt.TargetId}";
+                var verification = attempt.Verification switch
+                {
+                    MaintenanceVerificationStatus.Pending => "verificação pendente",
+                    MaintenanceVerificationStatus.ManualReviewRequired => "revisão manual necessária",
+                    MaintenanceVerificationStatus.NotStarted => "não iniciada",
+                    _ => "resultado não registrado"
+                };
+                text.AppendLine($"• {MaintenanceCatalog.Get(attempt.Action).Title}{target} · sessão {attempt.SessionId:D} · {verification}");
+            }
+            if (unresolvedAttempts.Count > 3) text.AppendLine($"• Mais {unresolvedAttempts.Count - 3} tentativa(s) no histórico.");
+            text.Append("Confira o relatório e os logs antes de repetir. Se ainda quiser iniciar uma nova sessão, confirme abaixo.\n\n");
+        }
         text.Append("Executar este plano agora?");
         if (!Confirm(text.ToString(), "Revisar manutenção")) return;
         await RunOperationAsync("Manutenção em andamento", "Aguarde o auxiliar e o relatório real da execução.", async _ =>

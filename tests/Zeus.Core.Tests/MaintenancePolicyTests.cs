@@ -100,6 +100,53 @@ public sealed class MaintenancePolicyTests
     }
 
     [Fact]
+    public void FindsOnlyUnresolvedPriorAttemptsForTheSameActionBeforeRetry()
+    {
+        var started = DateTimeOffset.UtcNow;
+        var matching = new MaintenanceReport(Guid.NewGuid(), started, started, false,
+            [new(MaintenanceActionId.RepairWindowsImage, StepOutcome.Skipped,
+                "Resultado não confirmado", Verification: MaintenanceVerificationStatus.ManualReviewRequired)],
+            IsComplete: false);
+        var completed = matching with
+        {
+            SessionId = Guid.NewGuid(),
+            IsComplete = true,
+            Steps = [new(MaintenanceActionId.RepairWindowsImage, StepOutcome.Succeeded,
+                "Verificada", Verification: MaintenanceVerificationStatus.ProviderConfirmed)]
+        };
+        var otherAction = matching with
+        {
+            SessionId = Guid.NewGuid(),
+            Steps = [new(MaintenanceActionId.ScanWindowsImage, StepOutcome.Skipped,
+                "Outra ação", Verification: MaintenanceVerificationStatus.ManualReviewRequired)]
+        };
+
+        var unresolved = Assert.Single(MaintenancePolicy.FindUnresolvedAttempts(
+            [new(MaintenanceActionId.RepairWindowsImage)], [matching, completed, otherAction]));
+
+        Assert.Equal(matching.SessionId, unresolved.SessionId);
+        Assert.Equal(MaintenanceVerificationStatus.ManualReviewRequired, unresolved.Verification);
+    }
+
+    [Fact]
+    public void DriverRetryWarningRequiresTheSameCandidateAndUpdateSource()
+    {
+        const string candidate = "12345678-1234-1234-1234-123456789abc:2";
+        var request = new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, candidate, true, 2);
+        var started = DateTimeOffset.UtcNow;
+        var report = new MaintenanceReport(Guid.NewGuid(), started, started, true,
+            [new(MaintenanceActionId.InstallDriverUpdate, StepOutcome.Skipped, "Pendente",
+                TargetId: candidate, Verification: MaintenanceVerificationStatus.Pending, UpdateServerSelection: 2)],
+            IsComplete: false);
+
+        Assert.Single(MaintenancePolicy.FindUnresolvedAttempts([request], [report]));
+        Assert.Empty(MaintenancePolicy.FindUnresolvedAttempts(
+            [request with { TargetId = "12345678-1234-1234-1234-123456789abc:3" }], [report]));
+        Assert.Empty(MaintenancePolicy.FindUnresolvedAttempts(
+            [request with { UpdateServerSelection = 1 }], [report]));
+    }
+
+    [Fact]
     public void CatalogAndValidatedPlanCannotBeMutatedByConsumers()
     {
         var catalog = Assert.IsAssignableFrom<IList<MaintenanceActionDefinition>>(MaintenanceCatalog.All);
