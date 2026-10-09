@@ -51,6 +51,9 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.False(migratedPreferences.IsTechnicalMode, "Older preferences must retain the default non-technical mode when the new field is absent.");
         Assert.Equal(AppAccentColor.ThemeDefault, migratedPreferences.AccentColor);
         Assert.True(migratedPreferences.Clock!.Use24HourFormat, "Older clock preferences without a format field must default to 24-hour time.");
+        Assert.Null(migratedPreferences.Clock.Size);
+        Assert.Equal(DesktopClockSize.Medium, MainWindow.ResolveClockSize(migratedPreferences.Clock.Size));
+        Assert.Equal(DesktopClockSize.Medium, MainWindow.ResolveClockSize((DesktopClockSize)999));
         Assert.Equal(UsageProfile.Gaming, migratedPreferences.Profile);
         Assert.True(migratedPreferences.FirstRunSetupComplete);
         Assert.True(File.Exists(historyPath));
