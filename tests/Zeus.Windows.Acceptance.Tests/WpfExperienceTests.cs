@@ -775,6 +775,10 @@ public sealed class WpfExperienceTests
         Assert.True(window.WindowsUpdateHistorySummary.StartsWith("Leitura concluída", StringComparison.Ordinal) ||
             window.WindowsUpdateHistorySummary.StartsWith("Histórico incompleto/desconhecido", StringComparison.Ordinal),
             window.WindowsUpdateHistorySummary);
+        var idleDeadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (!window.CanRefresh && DateTimeOffset.UtcNow < idleDeadline) await Task.Delay(25);
+        Assert.True(window.CanRefresh,
+            $"A consulta do histórico deveria terminar antes da revisão do backup. Estado: {window.StatusTitle} · {window.StatusDetail}");
         var verifyDriverButton = Assert.IsType<Button>(window.FindName("VerifyPendingDriverUpdatesButton"));
         Assert.Equal("verify-pending-driver-updates", AutomationProperties.GetAutomationId(verifyDriverButton));
         Assert.False(verifyDriverButton.IsEnabled, "A reconsulta de driver só fica disponível para histórico pendente com origem registrada.");
