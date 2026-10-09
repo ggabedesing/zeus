@@ -214,8 +214,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     .OrderByDescending(item => Math.Max(item.LaterDedicatedBytes ?? -1, item.ReferenceDedicatedBytes ?? -1))
                     .Take(5).Select(item => $"{item.ProcessName} · PID {item.ProcessId} · {item.AdapterInstance}: {FormatByteQuantity(item.ReferenceDedicatedBytes)} ({item.ReferenceAvailableSamples}/{comparison.ReferenceSampleCount}; capacidade {FormatMetric(item.ReferenceCapacitySharePercent)} em {item.ReferenceCapacityShareSamples} amostra(s)) → {FormatByteQuantity(item.LaterDedicatedBytes)} ({item.LaterAvailableSamples}/{comparison.LaterSampleCount}; capacidade {FormatMetric(item.LaterCapacitySharePercent)} em {item.LaterCapacityShareSamples} amostra(s))"))
                 : "Memória GPU dedicada por processo: indisponível (PID, horário de início e adaptador não confirmados nos períodos)";
+            var taskLabels = FormatPerformanceComparisonTaskLabels(comparison, _performanceSessionExports);
             return string.Join(Environment.NewLine,
                 $"Sessão de referência: até {comparison.ReferenceEndedAt.ToLocalTime():dd/MM HH:mm:ss} ({comparison.ReferenceSampleCount} amostras) → sessão posterior: até {comparison.LaterEndedAt.ToLocalTime():dd/MM HH:mm:ss} ({comparison.LaterSampleCount} amostras).",
+                taskLabels,
                 $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}",
                 diskIo,
                 gpuMemory,
@@ -225,6 +227,40 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 processes,
                 "Interpretação: cobertura mostra amostras válidas sobre o total; engines individuais não são uso total da GPU, ocupação não comprova gargalo e o contexto heurístico não confirma partida ou transmissão. Comparação descritiva, sem atribuir causa ou ganho.");
         }
+    }
+
+    internal static string FormatPerformanceComparisonTaskLabels(
+        PerformanceComparison comparison, IReadOnlyList<PerformanceSessionExport> sessions)
+    {
+        ArgumentNullException.ThrowIfNull(comparison);
+        ArgumentNullException.ThrowIfNull(sessions);
+
+        static string? DeclaredActivity(PerformanceSessionExport? session)
+        {
+            if (session is null) return null;
+            const string separator = " · ";
+            var index = session.Label.IndexOf(separator, StringComparison.Ordinal);
+            if (index < 0) return null;
+            var value = session.Label[(index + separator.Length)..].Trim();
+            return value.Length == 0 ? null : value;
+        }
+
+        static PerformanceSessionExport? FindSession(
+            IReadOnlyList<PerformanceSessionExport> source, DateTimeOffset observedAt, bool reference) => source
+            .Where(session => session.IsReference == reference && session.StartedAt <= observedAt &&
+                (session.FinishedAt is null || session.FinishedAt.Value >= observedAt))
+            .OrderByDescending(session => session.StartedAt)
+            .FirstOrDefault();
+
+        var reference = DeclaredActivity(FindSession(sessions, comparison.ReferenceEndedAt, reference: true));
+        var later = DeclaredActivity(FindSession(sessions, comparison.LaterEndedAt, reference: false));
+        if (reference is null && later is null)
+            return "Atividade informada: sem rótulo em ambos os períodos; isso não confirma que as tarefas foram iguais.";
+        if (reference is null || later is null)
+            return $"Atividade informada: {reference ?? "sem rótulo"} → {later ?? "sem rótulo"}. A equivalência das tarefas não foi confirmada.";
+        if (!string.Equals(reference, later, StringComparison.OrdinalIgnoreCase))
+            return $"Rótulos de atividade diferentes: “{reference}” → “{later}”. Confira se os períodos são comparáveis.";
+        return $"Atividade informada nos dois períodos: “{reference}”. O rótulo não comprova que as condições foram equivalentes.";
     }
 
     private static string FormatRate(double? bytesPerSecond) => bytesPerSecond is { } value && double.IsFinite(value) && value >= 0
