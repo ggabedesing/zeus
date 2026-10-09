@@ -86,6 +86,9 @@ public sealed class WindowsInventoryTests
         Assert.NotNull(snapshot.WindowsInventory.Warnings);
         Assert.NotNull(snapshot.WindowsInventory.ProxyConfiguration);
         Assert.NotNull(snapshot.WindowsInventory.WinHttpProxyConfiguration);
+        Assert.NotNull(snapshot.WindowsInventory.FirmwareBoot);
+        if (snapshot.WindowsInventory.FirmwareBoot is { IsAvailable: false })
+            Assert.Contains(snapshot.WindowsInventory.Warnings, warning => warning.StartsWith("Modo de inicialização firmware:", StringComparison.Ordinal));
         if (snapshot.WindowsInventory.WinHttpProxyConfiguration is { IsAvailable: false })
             Assert.Contains(snapshot.WindowsInventory.Warnings, warning => warning.StartsWith("Proxy WinHTTP padrão:", StringComparison.Ordinal));
         Assert.NotNull(snapshot.WindowsInventory.RecentEvents);

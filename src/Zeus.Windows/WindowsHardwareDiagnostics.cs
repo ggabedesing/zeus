@@ -164,7 +164,10 @@ $inventory = [pscustomobject]@{
         var winHttpProxy = WinHttpProxyReader.Read();
         if (!winHttpProxy.IsAvailable)
             warnings.Add("Proxy WinHTTP padrão: API de configuração indisponível nesta coleta.");
-        return inventory with { Warnings = warnings, WinHttpProxyConfiguration = winHttpProxy };
+        var firmwareBoot = WindowsFirmwareBootReader.Read();
+        if (!firmwareBoot.IsAvailable)
+            warnings.Add("Modo de inicialização firmware: GetFirmwareType indisponível nesta coleta.");
+        return inventory with { Warnings = warnings, WinHttpProxyConfiguration = winHttpProxy, FirmwareBoot = firmwareBoot };
     }
 
     private static ManagementObjectCollection Query(string query)

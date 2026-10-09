@@ -377,6 +377,8 @@ public sealed class WpfExperienceTests
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Proxy do usuário (HKCU)");
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Proxy WinHTTP padrão" &&
             row.Detail.Contains(window.Snapshot.WindowsInventory?.WinHttpProxyConfiguration is { IsAvailable: true } ? "Fonte: configuração WinHTTP padrão" : "Estado indisponível", StringComparison.Ordinal));
+        Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Modo de inicialização firmware" &&
+            row.Detail.Contains(window.Snapshot.WindowsInventory?.FirmwareBoot is { IsAvailable: true } ? "reportada pelo Windows" : "Indisponível", StringComparison.Ordinal));
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Programas instalados" && row.Detail.Contains("Win32/Appx-MSIX", StringComparison.Ordinal));
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Reinicialização pendente");
         var inventory = window.Snapshot.WindowsInventory!;

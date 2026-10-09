@@ -617,6 +617,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 ExtendedHardwareRows.Add(new("Rede · configuração IP/DNS/rotas", "O provedor de configuração não retornou interfaces nesta coleta. IP, DNS, gateway e rotas estão indisponíveis; isso não confirma ausência de adaptadores."));
             ExtendedHardwareRows.Add(new("Proxy do usuário (HKCU)", FormatProxyConfiguration(inventory.ProxyConfiguration)));
             ExtendedHardwareRows.Add(new("Proxy WinHTTP padrão", FormatWinHttpProxyConfiguration(inventory.WinHttpProxyConfiguration)));
+            ExtendedHardwareRows.Add(new("Modo de inicialização firmware", FormatFirmwareBoot(inventory.FirmwareBoot)));
             ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
             ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
             ExtendedHardwareRows.Add(new("Reinicialização pendente", FormatRestartState(WindowsRestartStateParser.Evaluate(inventory.RestartIndicators))));
@@ -1054,6 +1055,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var bypass = string.IsNullOrWhiteSpace(proxy.BypassList) ? "exceções não informadas" : $"exceções: {proxy.BypassList}";
         return $"{state} · {server} · {bypass}. Fonte: configuração WinHTTP padrão; sessões e aplicativos podem sobrescrever esse valor.";
     }
+
+    private static string FormatFirmwareBoot(FirmwareBootInfo? firmware) => firmware is not { IsAvailable: true }
+        ? "Indisponível nesta coleta; o modo de inicialização não foi confirmado."
+        : firmware.Mode switch
+        {
+            WindowsFirmwareBootMode.Uefi => "Inicialização em UEFI, reportada pelo Windows.",
+            WindowsFirmwareBootMode.LegacyBios => "Inicialização em BIOS legado, reportada pelo Windows.",
+            _ => "Tipo de firmware desconhecido segundo o Windows."
+        };
 
     private static string FormatRestartState(WindowsRestartState state) => state.IsPending switch
     {

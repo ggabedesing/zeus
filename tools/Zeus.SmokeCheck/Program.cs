@@ -30,6 +30,8 @@ try
     Console.WriteLine($"Pending restart indicators: {restartState.IsPending?.ToString() ?? "unknown"}; checked={restartState.CheckedSourceCount}/{restartState.TotalSourceCount}; positive sources={(restartState.Sources.Count == 0 ? "none" : string.Join(", ", restartState.Sources))}. This is registry evidence, not a complete Windows restart guarantee.");
     var winHttpProxy = snapshot.WindowsInventory?.WinHttpProxyConfiguration;
     Console.WriteLine($"Default WinHTTP proxy: {(winHttpProxy is not { IsAvailable: true } ? "unavailable" : winHttpProxy.NamedProxyEnabled switch { true => "named proxy configured", false => "direct access configured", null => "access type unknown" })}; server and bypass values omitted.");
+    var firmwareBoot = snapshot.WindowsInventory?.FirmwareBoot;
+    Console.WriteLine($"Firmware boot mode: {(firmwareBoot is not { IsAvailable: true } ? "unavailable" : firmwareBoot.Mode switch { Zeus.Core.WindowsFirmwareBootMode.Uefi => "UEFI", Zeus.Core.WindowsFirmwareBootMode.LegacyBios => "legacy BIOS", _ => "unknown" })}; this reports the mode used to start Windows.");
     Console.WriteLine($"GPU memory counters: adapters={performance.GpuMemory?.Count ?? 0}; dedicated usage={performance.GpuMemory?.Count(item => item.DedicatedUsageBytes.HasValue) ?? 0}; capacity={performance.GpuMemory?.Count(item => item.DedicatedCapacityBytes.HasValue) ?? 0}; occupancy={performance.GpuMemory?.Count(item => item.DedicatedOccupancyPercent.HasValue) ?? 0}; occupancy is descriptive and not a standalone pressure diagnosis.");
     var processGpuMemory = performance.GpuProcessMemory ?? [];
     var processCapacityShares = processGpuMemory.Count(item =>

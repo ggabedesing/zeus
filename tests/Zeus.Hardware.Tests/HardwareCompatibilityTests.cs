@@ -105,4 +105,17 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(restored.NamedProxyEnabled);
         Assert.Null(restored.ProxyServer);
     }
+
+    [Theory]
+    [InlineData(1, WindowsFirmwareBootMode.LegacyBios, true)]
+    [InlineData(2, WindowsFirmwareBootMode.Uefi, true)]
+    [InlineData(0, WindowsFirmwareBootMode.Unknown, true)]
+    [InlineData(3, WindowsFirmwareBootMode.Unknown, false)]
+    public void FirmwareBootParserMapsOnlyDocumentedModes(uint nativeType, WindowsFirmwareBootMode expected, bool available)
+    {
+        var result = Zeus.Windows.WindowsFirmwareBootReader.FromNative(nativeType);
+
+        Assert.Equal(expected, result.Mode);
+        Assert.Equal(available, result.IsAvailable);
+    }
 }
