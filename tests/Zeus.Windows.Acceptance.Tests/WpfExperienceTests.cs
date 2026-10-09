@@ -94,6 +94,12 @@ public sealed class WpfExperienceTests
                         }) { Width = 1440, Height = 1024 };
                         window.Show();
                         await VerifyExperienceAsync(window, fixture, openedUris);
+                        var constrainedWindow = new MainWindow(fixture, _ => { }, new Size(800, 450));
+                        Assert.Equal(800, constrainedWindow.MinWidth);
+                        Assert.Equal(450, constrainedWindow.MinHeight);
+                        Assert.Equal(800, constrainedWindow.MaxWidth);
+                        Assert.Equal(450, constrainedWindow.MaxHeight);
+                        constrainedWindow.Close();
                         Assert.Empty(bindingErrors.Errors);
                         completion.TrySetResult();
                     }

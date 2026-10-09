@@ -95,9 +95,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _networkProbeTarget = string.Empty;
     private string _networkProbeSummary = "A medição só começa quando você informa um IP ou host e solicita o teste.";
 
-    public MainWindow() : this(null) { }
+    public MainWindow() : this(null, null, null) { }
 
-    public MainWindow(string? storageRoot, Action<string>? openUri = null)
+    public MainWindow(string? storageRoot, Action<string>? openUri = null) : this(storageRoot, openUri, null) { }
+
+    internal MainWindow(string? storageRoot, Action<string>? openUri, Size? workAreaOverride)
     {
         _isFixture = storageRoot is not null;
         _openUri = openUri ?? OpenSystemUri;
@@ -107,8 +109,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _cleanup = new(storageRoot is null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp") : Path.Combine(storageRoot, "Temporary"),
             Path.Combine(storageRoot ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zeus"), "Cleanup"));
         InitializeComponent();
-        var workArea = SystemParameters.WorkArea;
-        var minimumSize = ClampMinimumWindowSize(new Size(MinWidth, MinHeight), new Size(workArea.Width, workArea.Height));
+        var systemWorkArea = SystemParameters.WorkArea;
+        var workArea = workAreaOverride ?? new Size(systemWorkArea.Width, systemWorkArea.Height);
+        var minimumSize = ClampMinimumWindowSize(new Size(MinWidth, MinHeight), workArea);
         MinWidth = minimumSize.Width; MinHeight = minimumSize.Height;
         MaxWidth = Math.Max(MinWidth, workArea.Width); MaxHeight = Math.Max(MinHeight, workArea.Height);
         foreach (var definition in MaintenanceCatalog.All.Where(d => d.Id is not MaintenanceActionId.InstallDriverUpdate and not MaintenanceActionId.RollbackDriver and not MaintenanceActionId.DefenderOfflineScan))
