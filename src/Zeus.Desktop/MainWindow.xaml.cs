@@ -38,6 +38,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly OptimizationRuleEngine _ruleEngine = new();
     private readonly DesktopStorage _storage;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly ObservableCollection<VisualLayoutPreset> _visualLayoutPresets = new(VisualLayoutCatalog.Load());
     private readonly SemaphoreSlim _preferenceLock = new(1, 1);
     private readonly List<MaintenanceReport> _reports = [];
     private readonly List<string> _startupWarnings = [];
@@ -62,6 +63,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private VisualLayoutPreset? _selectedVisualLayoutPreset;
     private bool _visualLayoutPreviewActive;
     private string? _savedVisualLayoutPresetId;
+    private string? _customVisualLayoutsJson;
+    private string _visualLayoutCatalogStatus = "Perfis personalizados aceitam somente cores e temas do ZEUS; nenhum código ou imagem será executado.";
+    private readonly List<VisualLayoutPreset> _customVisualLayoutPresets = [];
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop, _desktopClockHideDuringFullscreen = true, _desktopClockUse24HourFormat = true;
@@ -285,7 +289,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         new(DesktopTheme.RetroAmber, "Retrô âmbar", "Paleta escura inspirada em terminais e monitores clássicos, com destaque âmbar."),
         new(DesktopTheme.Monochrome, "Monocromático", "Interface em tons neutros, sem depender de cores fortes para indicar navegação.")
     ];
-    public IReadOnlyList<VisualLayoutPreset> VisualLayoutPresets { get; } = VisualLayoutCatalog.Load();
+    public ObservableCollection<VisualLayoutPreset> VisualLayoutPresets => _visualLayoutPresets;
     public IReadOnlyList<AppearanceCapabilityRow> AppearanceCapabilities { get; } =
     [
         new("Tema e cor de destaque", "Neste aplicativo", "Aplica a paleta escolhida na interface ZEUS e salva a preferência localmente."),
@@ -402,6 +406,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
     public VisualLayoutPreview SelectedVisualLayoutPreview => CreateVisualLayoutPreview(SelectedVisualLayoutPreset);
+    public string VisualLayoutCatalogStatus => _visualLayoutCatalogStatus;
     public bool IsVisualLayoutPreviewing => _visualLayoutPreviewActive;
     public bool CanConfirmVisualLayout => CanChooseActions &&
         (_visualLayoutPreviewActive ||
@@ -411,6 +416,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ? "O alto contraste do Windows prevalece; confirme o perfil para salvar ou cancele a prévia."
         : _visualLayoutPreviewActive
             ? "Prévia temporária ativa nesta interface. O tema salvo e o relógio da Área de Trabalho não foram alterados."
+            : CanConfirmVisualLayout
+                ? "Este perfil já corresponde às cores atuais; confirmar salva o perfil sem mudar as cores."
             : "Escolha um perfil para pré-visualizar nesta interface; confirme para salvar ou cancele a prévia.";
     public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
     public bool IsTechnicalMode { get => _isTechnicalMode; set { if (Set(ref _isTechnicalMode, value)) { Notify(nameof(DetailedVisibility)); QueuePreferencesSave(); } } }
@@ -507,6 +514,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 var p = await _storage.ReadPreferencesAsync();
                 SelectedTheme = p.IsMinimal ? DesktopTheme.Minimal : p.Theme;
                 SelectedAccentColor = Enum.IsDefined(p.AccentColor) ? p.AccentColor : AppAccentColor.ThemeDefault;
+                _customVisualLayoutsJson = p.CustomVisualLayoutsJson;
+                if (!string.IsNullOrWhiteSpace(_customVisualLayoutsJson))
+                {
+                    try
+                    {
+                        _customVisualLayoutPresets.AddRange(VisualLayoutCatalog.ParseCustom(_customVisualLayoutsJson, _visualLayoutPresets.ToArray()));
+                        foreach (var preset in _customVisualLayoutPresets) _visualLayoutPresets.Add(preset);
+                    }
+                    catch (JsonException)
+                    {
+                        _visualLayoutCatalogStatus = "Um catálogo personalizado salvo não passou na validação e foi preservado. Importe um arquivo válido para substituí-lo.";
+                        Notify(nameof(VisualLayoutCatalogStatus));
+                    }
+                }
                 SelectedVisualLayoutPreset = VisualLayoutPresets.FirstOrDefault(preset =>
                     string.Equals(preset.Id, p.VisualLayoutPresetId, StringComparison.Ordinal)) ?? VisualLayoutPresets[0];
                 _savedVisualLayoutPresetId = p.VisualLayoutPresetId;
@@ -890,7 +911,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
-        new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop, SelectedDesktopClockSize, DesktopClockHideDuringFullscreen) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor, SelectedVisualLayoutPreset.Id);
+        new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop, SelectedDesktopClockSize, DesktopClockHideDuringFullscreen) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
     internal static Point ResolveInitialClockPosition(double left, double top, double width, double height, Rect virtualScreen) =>

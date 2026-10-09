@@ -1,0 +1,43 @@
+{
+  "evidenceType": "custom-visual-layout-import-storage-and-portable-exe-smoke",
+  "date": "2026-10-09",
+  "sourceCommit": "ed149d83618959c9696113cac04d8105fcaa167e",
+  "sourceTreeDirtyAtBuild": true,
+  "implementation": {
+    "catalogSchemaVersion": 1,
+    "customProfileLimit": 20,
+    "maxInputSizeBytes": 65536,
+    "requiredScope": "zeus-ui",
+    "allowedProperties": ["id", "name", "theme", "accent", "description", "scope"],
+    "persistedIn": "local SQLite desktop.preferences setting",
+    "importBehavior": "Validate the full manifest before mutation, save locally, then open the actual-interface preview. Confirm applies the profile; Cancel abandons only the preview."
+  },
+  "tests": {
+    "solutionCommand": "dotnet test Zeus.slnx -c Release --no-restore --nologo",
+    "passed": 488,
+    "failed": 0,
+    "skipped": 10,
+    "total": 498,
+    "coverage": [
+      "strict schema rejects commands and unknown properties",
+      "custom profile IDs and names cannot collide with built-ins",
+      "input size limit and custom profile ID rules",
+      "SQLite round-trip preserves the custom catalog",
+      "WPF import previews a custom profile, confirmation saves it, and reopening restores the catalog"
+    ],
+    "skippedReason": "Seven cleanup link tests, two protected-session tests, and one real Windows visual-preference test require privileges or opt-in."
+  },
+  "portablePackage": {
+    "path": "artifacts/custom-visual-layout-package/zeus-win-x64.zip",
+    "sha256": "2db8d050bb09a0b063fe3b15ed9f772f557c916bb1fcde0648afd2ae2ac4a268",
+    "desktopExePath": "artifacts/custom-visual-layout-package/zeus-win-x64-ed149d836189-20261009T110432787Z-73ab8283/Zeus.Desktop.exe",
+    "desktopExeSha256": "d74b7bb35ec5f840af869db6a1e6bec285679eb096d138c64fac9351da8d0c0a",
+    "runtime": "win-x64",
+    "smoke": "Main window opened, responded, and closed cleanly."
+  },
+  "limitations": [
+    "Profiles select from the ZEUS built-in themes and accent colors; they do not define arbitrary colors or include external image assets.",
+    "The package was built from a working tree containing the implementation before commit.",
+    "The portable development build is not signed with a production Authenticode certificate."
+  ]
+}

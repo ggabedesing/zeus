@@ -163,6 +163,8 @@ No checkout `zeus-dev`, branch `feat/zeus-windows-mvp`, já existem temas/cor da
 
 O relógio recebeu nesta sequência uma correção para não ser puxado à área do monitor principal ao mudar de preferência. O teste unitário com retângulo multi-monitor simulado passou, e `scripts/publish-windows.ps1` abriu o `Zeus.Desktop.exe` local, verificou uma janela responsiva e o encerramento normal. Isso não comprova comportamento físico em monitores com DPI misto.
 
+Na continuação da implementação, o catálogo passou a aceitar perfis JSON declarativos do usuário, limitados a temas/acento existentes no escopo `zeus-ui`; o arquivo não executa código nem carrega imagens. A validação rejeita propriedades desconhecidas, limita tamanho e quantidade, armazena no SQLite local e reutiliza prévia/confirmar/cancelar. Isso implementa a primeira versão de temas locais declarativos sem prometer cores arbitrárias, licenciamento de assets ou personalização do shell.
+
 Na hora desta pesquisa, o workflow Windows do commit `fa4661cae1640a600dc56dfab50020c4462bf08b` estava `in_progress`; a execução anterior para `ce73aa89e3853182262142b9947829322104b406` estava `success`. Consultar novamente o workflow antes de usar a validação remota como evidência final.
 
 ## I. Lacunas e limites da pesquisa

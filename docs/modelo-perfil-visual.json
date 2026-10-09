@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "presets": [
+    {
+      "id": "custom-meu-tema",
+      "name": "Meu tema",
+      "theme": "Complete",
+      "accent": "ThemeDefault",
+      "description": "Meu perfil de cores do ZEUS.",
+      "scope": "zeus-ui"
+    }
+  ]
+}

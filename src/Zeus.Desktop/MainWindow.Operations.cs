@@ -739,6 +739,91 @@ public partial class MainWindow
         StatusDetail = "O tema salvo e o relógio da Área de Trabalho foram mantidos.";
     }
 
+    private async void ImportVisualLayout_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanChooseActions) return;
+        var dialog = new OpenFileDialog
+        {
+            Title = "Importar perfis visuais declarativos",
+            Filter = "Catálogo visual ZEUS (JSON)|*.json",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var info = new FileInfo(dialog.FileName);
+            if (info.Length > 64 * 1024)
+            {
+                SetVisualLayoutCatalogStatus("O arquivo excede 64 KB e foi rejeitado. Nenhuma preferência foi alterada.");
+                return;
+            }
+            var result = await TryImportVisualLayoutManifestAsync(File.ReadAllText(dialog.FileName));
+            if (result is not null)
+                SetVisualLayoutCatalogStatus(result);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            SetVisualLayoutCatalogStatus("Não foi possível ler o arquivo escolhido. Nenhum perfil foi importado.");
+        }
+    }
+
+    private void SaveVisualLayoutTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Salvar modelo de perfil visual ZEUS",
+            FileName = "meu-perfil-zeus.json",
+            Filter = "Arquivo JSON|*.json",
+            AddExtension = true,
+            DefaultExt = ".json",
+            OverwritePrompt = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            File.WriteAllText(dialog.FileName, VisualLayoutCatalog.CreateTemplate());
+            SetVisualLayoutCatalogStatus("Modelo salvo. Edite apenas ID, nome, descrição, tema e cor de destaque antes de importar.");
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            SetVisualLayoutCatalogStatus("Não foi possível salvar o modelo escolhido.");
+        }
+    }
+
+    internal async Task<string?> TryImportVisualLayoutManifestAsync(string json)
+    {
+        try
+        {
+            var imported = VisualLayoutCatalog.ParseCustom(json, _visualLayoutPresets.ToArray());
+            if (_customVisualLayoutPresets.Count + imported.Count > 20)
+                throw new JsonException("O ZEUS permite até 20 perfis personalizados no total.");
+            var combined = _customVisualLayoutPresets.Concat(imported).ToArray();
+            var serialized = VisualLayoutCatalog.SerializeCustom(combined);
+            _ = VisualLayoutCatalog.ParseCustom(serialized, VisualLayoutCatalog.Load());
+
+            _customVisualLayoutPresets.Clear();
+            _customVisualLayoutPresets.AddRange(combined);
+            foreach (var preset in imported) _visualLayoutPresets.Add(preset);
+            _customVisualLayoutsJson = serialized;
+            var result = $"{imported.Count} perfil(is) personalizado(s) importado(s). Revise a prévia e confirme para aplicar.";
+            SetVisualLayoutCatalogStatus(result);
+            await SavePreferencesAsync();
+            SelectedVisualLayoutPreset = imported[0];
+            return null;
+        }
+        catch (JsonException error)
+        {
+            return $"Catálogo rejeitado: {error.Message} Nenhum perfil foi importado.";
+        }
+    }
+
+    private void SetVisualLayoutCatalogStatus(string value)
+    {
+        _visualLayoutCatalogStatus = value;
+        Notify(nameof(VisualLayoutCatalogStatus));
+    }
+
     private void ChooseWallpaper_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog

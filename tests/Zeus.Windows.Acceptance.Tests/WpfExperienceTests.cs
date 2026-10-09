@@ -148,6 +148,16 @@ public sealed class WpfExperienceTests
 
         const string unexpectedCommand = """{"schemaVersion":1,"presets":[{"id":"teste","name":"Teste","theme":"Complete","accent":"ThemeDefault","description":"Perfil de teste","scope":"zeus-ui","command":"powershell"}]}""";
         Assert.Throws<JsonException>(() => VisualLayoutCatalog.Parse(unexpectedCommand));
+        const string customJson = """{"schemaVersion":1,"presets":[{"id":"custom-criacao","name":"Criação pessoal","theme":"Cyberpunk","accent":"Violet","description":"Perfil local do ZEUS.","scope":"zeus-ui"}]}""";
+        var custom = Assert.Single(VisualLayoutCatalog.ParseCustom(customJson, presets));
+        Assert.Equal("custom-criacao", custom.Id);
+        Assert.Contains("custom-criacao", VisualLayoutCatalog.SerializeCustom([custom]), StringComparison.Ordinal);
+        const string unsafeId = """{"schemaVersion":1,"presets":[{"id":"custom-../run","name":"Inseguro","theme":"Complete","accent":"ThemeDefault","description":"Teste","scope":"zeus-ui"}]}""";
+        Assert.Throws<JsonException>(() => VisualLayoutCatalog.ParseCustom(unsafeId, presets));
+        const string duplicateName = """{"schemaVersion":1,"presets":[{"id":"custom-aurora","name":"Aurora","theme":"Complete","accent":"ThemeDefault","description":"Teste","scope":"zeus-ui"}]}""";
+        Assert.Throws<JsonException>(() => VisualLayoutCatalog.ParseCustom(duplicateName, presets));
+        Assert.Throws<JsonException>(() => VisualLayoutCatalog.Parse(new string(' ', 65 * 1024)));
+        Assert.DoesNotContain("command", VisualLayoutCatalog.CreateTemplate(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -230,6 +240,7 @@ public sealed class WpfExperienceTests
                             await Task.Delay(50);
                         Assert.Equal("Diagnóstico concluído", restoredWindow.StatusTitle);
                         Assert.Equal("aurora", restoredWindow.SelectedVisualLayoutPreset.Id);
+                        Assert.Contains(restoredWindow.VisualLayoutPresets, preset => preset.Id == "custom-criacao");
                         Assert.Equal(800, restoredWindow.MinWidth);
                         Assert.Equal(450, restoredWindow.MinHeight);
                         Assert.InRange(restoredWindow.ActualWidth, 1, 800);
@@ -377,6 +388,19 @@ public sealed class WpfExperienceTests
             Assert.Equal(transparencyBeforeThemeChange, window.ReduceTransparency);
             Assert.Equal(wallpaperBeforeThemeChange, window.SelectedWallpaperPath);
         }
+        const string importedVisualLayout = """{"schemaVersion":1,"presets":[{"id":"custom-criacao","name":"Criação pessoal","theme":"GamingNeon","accent":"Green","description":"Paleta criada localmente para o ZEUS.","scope":"zeus-ui"}]}""";
+        Assert.Null(await window.TryImportVisualLayoutManifestAsync(importedVisualLayout));
+        Assert.Equal(10, window.VisualLayoutPresets.Count);
+        Assert.Equal("custom-criacao", window.SelectedVisualLayoutPreset.Id);
+        Assert.True(window.IsVisualLayoutPreviewing);
+        Assert.True(applyVisualLayoutButton.IsEnabled);
+        var storedBeforeCustomConfirm = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        Assert.Contains("custom-criacao", storedBeforeCustomConfirm.CustomVisualLayoutsJson, StringComparison.Ordinal);
+        Assert.Equal("monocromatico", storedBeforeCustomConfirm.VisualLayoutPresetId);
+        applyVisualLayoutButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, applyVisualLayoutButton));
+        var storedAfterCustomConfirm = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        Assert.Equal("custom-criacao", storedAfterCustomConfirm.VisualLayoutPresetId);
+        Assert.Equal(DesktopTheme.GamingNeon, storedAfterCustomConfirm.Theme);
         window.SelectedVisualLayoutPreset = window.VisualLayoutPresets.Single(preset => preset.Id == "aurora");
         applyVisualLayoutButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var accentSelector = Assert.IsType<ComboBox>(window.FindName("AccentColorSelector"));
