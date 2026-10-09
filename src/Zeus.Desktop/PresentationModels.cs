@@ -165,6 +165,7 @@ public sealed record WingetUpdateRow(WingetUpdateCandidate Candidate, bool Pendi
 }
 
 public sealed record WindowsUpdateRow(string Title, string KnowledgeBase, string DownloadState, string UpdateId);
+public sealed record WindowsUpdateHistoryRow(string Date, string Title, string Operation, string Result, string HResult);
 
 public sealed record ChangeRow(Guid Id, string Title, string Detail, bool CanRestore);
 public sealed record CleanupSessionRow(Guid Id, string Title, string Detail, bool CanRestore, bool CanPurge);

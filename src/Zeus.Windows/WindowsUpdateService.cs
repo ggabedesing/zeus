@@ -15,12 +15,34 @@ public sealed record DriverUpdateSearch(DateTimeOffset CheckedAt,
 public sealed record PendingWindowsUpdate(string Title, IReadOnlyList<string> KnowledgeBaseIds, bool Downloaded, string UpdateId);
 public sealed record PendingWindowsUpdateSearch(DateTimeOffset CheckedAt, bool IsComplete,
     IReadOnlyList<PendingWindowsUpdate> Updates, IReadOnlyList<string> Warnings);
+public sealed record WindowsUpdateHistoryEntry(DateTimeOffset Date, string Title, string Operation, string Result, string? HResult);
+public sealed record WindowsUpdateHistorySearch(DateTimeOffset CheckedAt, bool IsComplete,
+    IReadOnlyList<WindowsUpdateHistoryEntry> Entries, IReadOnlyList<string> Warnings);
 public sealed record InstalledDriverUpdateVerification(DateTimeOffset CheckedAt, bool IsComplete, bool? IsInstalled,
     bool? SourceMatches, IReadOnlyList<string> Warnings);
 
 /// <summary>Read-only discovery through the native Windows Update Agent and its configured trusted sources.</summary>
 public sealed class WindowsUpdateService
 {
+    public const int WindowsUpdateHistoryLimit = 50;
+
+    private const string SearchHistoryScript = """
+        $session = [System.Activator]::CreateInstance([System.Type]::GetTypeFromProgID('Microsoft.Update.Session'));
+        $session.ClientApplicationID = 'ZEUS';
+        $searcher = $session.CreateUpdateSearcher();
+        $history = $searcher.QueryHistory(0, 50);
+        $entries = [System.Collections.Generic.List[object]]::new();
+        for ($i = 0; $i -lt $history.Count; $i++) {
+            $entry = $history.Item($i);
+            $operation = switch ([int]$entry.Operation) { 1 { 'Instalação' } 2 { 'Desinstalação' } default { 'Operação desconhecida (' + [int]$entry.Operation + ')' } };
+            $result = switch ([int]$entry.ResultCode) { 0 { 'Não iniciado' } 1 { 'Em andamento' } 2 { 'Concluído' } 3 { 'Concluído com avisos' } 4 { 'Falhou' } 5 { 'Cancelado' } default { 'Resultado desconhecido (' + [int]$entry.ResultCode + ')' } };
+            $hresult = if ($null -ne $entry.HResult) { '0x' + ('{0:X8}' -f [int]$entry.HResult) } else { $null };
+            $entries.Add([pscustomobject]@{ DateUtc=([datetime]$entry.Date).ToUniversalTime().ToString('O'); Title=[string]$entry.Title; Operation=$operation; Result=$result; HResult=$hresult });
+        };
+        [pscustomobject]@{ IsComplete=$true; Entries=@($entries.ToArray()); Warnings=@() } |
+            Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 4 -Compress;
+        """;
+
     private const string SearchPendingScript = """
         $session = [System.Activator]::CreateInstance([System.Type]::GetTypeFromProgID('Microsoft.Update.Session'));
         $session.ClientApplicationID = 'ZEUS';
@@ -256,6 +278,72 @@ public sealed class WindowsUpdateService
         }
     }
 
+    /// <summary>Reads only the newest local Windows Update Agent history entries; it does not contact an update source or change system state.</summary>
+    public async Task<WindowsUpdateHistorySearch> ReadHistoryAsync(CancellationToken cancellationToken = default)
+    {
+        if (!OperatingSystem.IsWindows()) return FailedHistory("O histórico do Windows Update requer Windows.");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(45));
+        using var process = new Process { StartInfo = TrustedPowerShell.Create(SearchHistoryScript, WindowsPowerShellModule.Utility) };
+        try
+        {
+            if (!process.Start()) return FailedHistory("A leitura do histórico do Windows Update não iniciou.");
+            var outputTask = ReadBoundedAsync(process.StandardOutput, 1024 * 1024, timeout.Token);
+            var errorTask = ReadBoundedAsync(process.StandardError, 16 * 1024, timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            var output = await outputTask;
+            var diagnostic = await errorTask;
+            if (process.ExitCode != 0) return FailedHistory("Não foi possível ler o histórico local do Windows Update. " + diagnostic.Trim());
+            var parsed = ParseHistoryPayload(output);
+            var warnings = parsed.Warnings.ToList();
+            warnings.Add("Histórico local somente leitura, limitado aos 50 registros mais recentes; não houve contato com servidores, download, instalação ou alteração do Windows.");
+            return parsed with { CheckedAt = DateTimeOffset.UtcNow, Warnings = warnings.AsReadOnly() };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return FailedHistory("A leitura excedeu 45 segundos. O estado do histórico permanece desconhecido.");
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            return FailedHistory("Não foi possível ler o histórico local do Windows Update: " + exception.Message);
+        }
+        finally
+        {
+            try { if (process.Id > 0 && !process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) { }
+        }
+    }
+
+    public static WindowsUpdateHistorySearch ParseHistoryPayload(string output)
+    {
+        var result = JsonSerializer.Deserialize<HistorySearchPayload>(output)
+            ?? throw new InvalidDataException("Resposta vazia do histórico do Windows Update.");
+        if (result.Entries is null || result.Warnings is null)
+            throw new InvalidDataException("Resposta incompleta do histórico do Windows Update.");
+        var warnings = result.Warnings.ToList();
+        var entries = new List<WindowsUpdateHistoryEntry>();
+        var malformed = result.Entries.Count > WindowsUpdateHistoryLimit;
+        foreach (var entry in result.Entries.Take(WindowsUpdateHistoryLimit))
+        {
+            if (entry is null || string.IsNullOrWhiteSpace(entry.Title) || entry.Title.Length > 500 ||
+                !DateTimeOffset.TryParse(entry.DateUtc, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var date) ||
+                string.IsNullOrWhiteSpace(entry.Operation) || entry.Operation.Length > 80 ||
+                string.IsNullOrWhiteSpace(entry.Result) || entry.Result.Length > 100 ||
+                (entry.HResult is not null && (entry.HResult.Length != 10 || !entry.HResult.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ||
+                    !uint.TryParse(entry.HResult.AsSpan(2), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out _))))
+            {
+                malformed = true;
+                warnings.Add("Um registro foi omitido porque o Windows retornou data, título ou resultado inválido.");
+                continue;
+            }
+            entries.Add(new(date, entry.Title, entry.Operation, entry.Result, entry.HResult?.ToUpperInvariant()));
+        }
+        if (result.Entries.Count > WindowsUpdateHistoryLimit)
+            warnings.Add("A resposta excedeu o limite de registros e foi cortada; a leitura é considerada parcial.");
+        return new(DateTimeOffset.UtcNow, result.IsComplete && !malformed, entries.AsReadOnly(), warnings.AsReadOnly());
+    }
+
     public static PendingWindowsUpdateSearch ParsePendingSoftwareUpdatesPayload(string output)
     {
         var result = JsonSerializer.Deserialize<PendingSearchPayload>(output)
@@ -284,6 +372,9 @@ public sealed class WindowsUpdateService
     private static PendingWindowsUpdateSearch FailedPending(string message) =>
         new(DateTimeOffset.UtcNow, false, [], [message]);
 
+    private static WindowsUpdateHistorySearch FailedHistory(string message) =>
+        new(DateTimeOffset.UtcNow, false, [], [message]);
+
     private static InstalledDriverUpdateVerification FailedDriverVerification(string message) =>
         new(DateTimeOffset.UtcNow, false, null, null, [message]);
 
@@ -306,6 +397,8 @@ public sealed class WindowsUpdateService
         string? DeviceName, string? DriverVersion, bool RequiresEula, string? EulaText,
         string? DriverProvider, string? DriverClass, string? DriverDate);
     private sealed record PendingSearchPayload(bool IsComplete, IReadOnlyList<PendingWindowsUpdate>? Updates, IReadOnlyList<string>? Warnings);
+    private sealed record HistorySearchPayload(bool IsComplete, IReadOnlyList<HistoryEntryPayload?>? Entries, IReadOnlyList<string>? Warnings);
+    private sealed record HistoryEntryPayload(string? DateUtc, string? Title, string? Operation, string? Result, string? HResult);
     private sealed record InstalledDriverVerificationPayload(bool IsComplete, bool? IsInstalled, bool SourceMatches, IReadOnlyList<string>? Warnings);
 
     internal static DriverUpdateSearch ParseDriverUpdatesPayload(string output)

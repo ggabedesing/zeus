@@ -2,6 +2,9 @@
 
 ## Não lançado
 
+- A aba de atualizações agora pode ler, sob solicitação, o histórico local do Windows Update: somente leitura, sem rede, limitada aos 50 eventos recentes e sem inferir saúde atual ou instalação presente.
+- O validador do histórico do Windows Update rejeita registros malformados, preserva resultados desconhecidos e sinaliza quando a resposta ultrapassa o limite.
+- A documentação de recursos agora inclui cor hexadecimal personalizada na interface do ZEUS, com prévia, confirmação/cancelamento, contraste mínimo e precedência do alto contraste do Windows.
 - A aceitação administrativa cobre a recuperação de progresso durável `Pending`: uma sessão interrompida continua incompleta e exige revisão antes de qualquer nova tentativa.
 - O Observador explica na própria tela a diferença entre CPU do computador e núcleos equivalentes, e esclarece que uso medido não comprova gargalo.
 - A comparação do Observador agora apresenta núcleos equivalentes com unidade própria, sem formatá-los como porcentagem.

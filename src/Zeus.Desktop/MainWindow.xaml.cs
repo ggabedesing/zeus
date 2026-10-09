@@ -280,6 +280,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<DriverRollbackChoice> RollbackDriverChoices { get; } = [];
     public ObservableCollection<WingetUpdateRow> WingetUpdates { get; } = [];
     public ObservableCollection<WindowsUpdateRow> PendingWindowsUpdates { get; } = [];
+    public ObservableCollection<WindowsUpdateHistoryRow> WindowsUpdateHistory { get; } = [];
     public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
     public IReadOnlyList<ThemeOption> ThemeOptions { get; } =
     [
@@ -359,6 +360,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string ZeusReleaseSummary { get => _zeusReleaseSummary; private set => Set(ref _zeusReleaseSummary, value); }
     private string _windowsUpdateSummary = "A busca online só começa quando você solicitar. Não baixa nem instala atualizações.";
     public string WindowsUpdateSummary { get => _windowsUpdateSummary; private set => Set(ref _windowsUpdateSummary, value); }
+    private string _windowsUpdateHistorySummary = "O histórico local só será consultado quando você solicitar.";
+    public string WindowsUpdateHistorySummary { get => _windowsUpdateHistorySummary; private set => Set(ref _windowsUpdateHistorySummary, value); }
     public string PerformanceSummary { get => _performanceSummary; private set => Set(ref _performanceSummary, value); }
     public string PerformanceActivityLabel { get => _performanceActivityLabel; set => Set(ref _performanceActivityLabel, value ?? string.Empty); }
     public string PerformanceSessionHistorySummary { get => _performanceSessionHistorySummary; private set => Set(ref _performanceSessionHistorySummary, value); }

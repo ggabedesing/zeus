@@ -741,6 +741,10 @@ public sealed class WpfExperienceTests
         var updateSearchButton = Assert.IsType<Button>(window.FindName("SearchPendingWindowsUpdatesButton"));
         Assert.Equal("search-pending-windows-updates", AutomationProperties.GetAutomationId(updateSearchButton));
         Assert.True(updateSearchButton.IsEnabled, "A busca online somente leitura deve exigir ação explícita do usuário.");
+        var updateHistoryButton = Assert.IsType<Button>(window.FindName("ReadWindowsUpdateHistoryButton"));
+        Assert.Equal("read-windows-update-history", AutomationProperties.GetAutomationId(updateHistoryButton));
+        Assert.True(updateHistoryButton.IsEnabled, "A consulta local somente leitura do histórico também deve exigir ação explícita.");
+        Assert.Contains("consultado quando você solicitar", window.WindowsUpdateHistorySummary, StringComparison.OrdinalIgnoreCase);
         var verifyDriverButton = Assert.IsType<Button>(window.FindName("VerifyPendingDriverUpdatesButton"));
         Assert.Equal("verify-pending-driver-updates", AutomationProperties.GetAutomationId(verifyDriverButton));
         Assert.False(verifyDriverButton.IsEnabled, "A reconsulta de driver só fica disponível para histórico pendente com origem registrada.");

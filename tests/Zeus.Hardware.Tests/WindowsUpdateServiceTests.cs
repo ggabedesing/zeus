@@ -187,4 +187,58 @@ public sealed class WindowsUpdateServiceTests
         Assert.Single(result.Updates);
         Assert.Contains(result.Warnings, warning => warning.Contains("inválida ou repetida", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void ParsesLocalUpdateHistoryAndKeepsUnknownResultCodesExplicit()
+    {
+        var payload = """{"IsComplete":true,"Entries":[{"DateUtc":"2026-10-09T12:34:56Z","Title":"Atualização cumulativa","Operation":"Instalação","Result":"Resultado desconhecido (99)","HResult":"0x80070005"}],"Warnings":[]}""";
+
+        var result = WindowsUpdateService.ParseHistoryPayload(payload);
+
+        Assert.True(result.IsComplete);
+        var entry = Assert.Single(result.Entries);
+        Assert.Equal(new DateTimeOffset(2026, 10, 9, 12, 34, 56, TimeSpan.Zero), entry.Date);
+        Assert.Equal("Atualização cumulativa", entry.Title);
+        Assert.Equal("Instalação", entry.Operation);
+        Assert.Equal("Resultado desconhecido (99)", entry.Result);
+        Assert.Equal("0X80070005", entry.HResult);
+    }
+
+    [Fact]
+    public void InvalidHistoryRecordsAreOmittedAndMarkTheResultIncomplete()
+    {
+        var payload = """{"IsComplete":true,"Entries":[{"DateUtc":"not-a-date","Title":"Atualização","Operation":"Instalação","Result":"Concluído","HResult":null}],"Warnings":[]}""";
+
+        var result = WindowsUpdateService.ParseHistoryPayload(payload);
+
+        Assert.False(result.IsComplete);
+        Assert.Empty(result.Entries);
+        Assert.Contains(result.Warnings, warning => warning.Contains("data, título ou resultado inválido", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void HistoryPayloadCannotExceedTheBoundedReadLimitSilently()
+    {
+        var entries = string.Join(',', Enumerable.Range(0, WindowsUpdateService.WindowsUpdateHistoryLimit + 1).Select(index =>
+            $"{{\"DateUtc\":\"2026-10-09T12:34:{index % 60:00}Z\",\"Title\":\"Update {index}\",\"Operation\":\"Instalação\",\"Result\":\"Concluído\",\"HResult\":null}}"));
+        var payload = $"{{\"IsComplete\":true,\"Entries\":[{entries}],\"Warnings\":[]}}";
+
+        var result = WindowsUpdateService.ParseHistoryPayload(payload);
+
+        Assert.False(result.IsComplete);
+        Assert.Equal(WindowsUpdateService.WindowsUpdateHistoryLimit, result.Entries.Count);
+        Assert.Contains(result.Warnings, warning => warning.Contains("excedeu o limite", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ReadsOnlyTheBoundedLocalWindowsUpdateHistory()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var result = await new WindowsUpdateService().ReadHistoryAsync();
+
+        Assert.True(result.IsComplete, string.Join(" ", result.Warnings));
+        Assert.True(result.Entries.Count <= WindowsUpdateService.WindowsUpdateHistoryLimit);
+        Assert.Contains(result.Warnings, warning => warning.Contains("Histórico local somente leitura", StringComparison.OrdinalIgnoreCase));
+    }
 }

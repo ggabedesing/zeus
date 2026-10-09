@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-09",
+  "feature": "local-windows-update-history",
+  "repository": "ggabedesing/zeus",
+  "branch": "feat/zeus-windows-mvp",
+  "sourceCommit": "94c511791882d6c3b86a62dc36e160d6ff1bcc62",
+  "sourceTreeDirtyAtBuild": true,
+  "runtime": "win-x64",
+  "dataSource": "Windows Update Agent local IUpdateSearcher.QueryHistory",
+  "dataScope": {
+    "maximumEntries": 50,
+    "networkAccess": false,
+    "downloadsOrInstalls": false,
+    "restartOrSystemMutation": false,
+    "interpretsCurrentHealth": false,
+    "confirmsUpdateRemainsInstalled": false
+  },
+  "validation": {
+    "windowsUpdateServiceTests": {
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0
+    },
+    "localWindowsUpdateAgentCall": "passed on this Windows PC; result remained within the configured 50-entry cap",
+    "wpfAcceptance": "passed; history query control is present and requires explicit user action",
+    "fullReleaseSuite": {
+      "passed": 512,
+      "failed": 0,
+      "skipped": 10,
+      "total": 522
+    },
+    "portableExeSmoke": "passed: main window opened, responded, and closed cleanly",
+    "diffCheck": "passed"
+  },
+  "package": {
+    "zip": "artifacts/windows-update-history-package/zeus-win-x64.zip",
+    "zipSha256": "E0A512F4E23A6BE1BF08E14C806ABCB2726DE3EB59CE14BB0CE4A27F70669E2D",
+    "executable": "artifacts/windows-update-history-package/zeus-win-x64-94c511791882-20261009T114845399Z-5a403bfa/Zeus.Desktop.exe",
+    "executableSha256": "381986A716D7EF16C2A5987FE5E376D0E976947616193C18D7FBC9902CDF3121",
+    "developmentBuild": true,
+    "authenticodeProductionSignature": false
+  },
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesearcher-queryhistory",
+    "https://learn.microsoft.com/en-us/windows/win32/wua_sdk/iupdatehistoryentry-properties"
+  ],
+  "limitations": [
+    "Windows administrative and UAC validation was not part of this read-only feature check.",
+    "The portable development executable is unsigned for production distribution."
+  ]
+}

@@ -1081,6 +1081,23 @@ public partial class MainWindow
         }, cancellable: true);
     }
 
+    private async void ReadWindowsUpdateHistory_Click(object sender, RoutedEventArgs e)
+    {
+        await RunOperationAsync("Lendo histórico do Windows Update", "Consulta local, somente leitura, limitada aos 50 registros mais recentes. Nenhum servidor será consultado e nenhuma atualização será alterada.", async token =>
+        {
+            var search = await _windowsUpdate.ReadHistoryAsync(token);
+            QueueActivity(new(DateTimeOffset.UtcNow, "windows-update", "history-read", search.IsComplete ? "info" : "warning",
+                $"Leitura do histórico local {(search.IsComplete ? "concluída" : "incompleta")}: {search.Entries.Count} registro(s)",
+                JsonSerializer.Serialize(new { search.CheckedAt, search.IsComplete, count = search.Entries.Count, search.Warnings })));
+            WindowsUpdateHistory.Clear();
+            foreach (var entry in search.Entries)
+                WindowsUpdateHistory.Add(new(entry.Date.ToLocalTime().ToString("dd/MM/yyyy HH:mm"), entry.Title, entry.Operation, entry.Result, entry.HResult ?? "Não informado"));
+            WindowsUpdateHistorySummary = $"{(search.IsComplete ? "Leitura concluída" : "Histórico incompleto/desconhecido")} · {search.Entries.Count} de até {WindowsUpdateService.WindowsUpdateHistoryLimit} registros · {search.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}. " + string.Join(" ", search.Warnings);
+            StatusTitle = search.IsComplete ? "Histórico do Windows Update lido" : "Histórico do Windows Update incompleto";
+            StatusDetail = WindowsUpdateHistorySummary;
+        }, cancellable: true);
+    }
+
     private async void UpgradeWinget_Click(object sender, RoutedEventArgs e)
     {
         if (_isBusy || sender is not FrameworkElement { Tag: WingetUpdateRow row } || !row.CanInstall || !_wingetAuditReadable) return;
