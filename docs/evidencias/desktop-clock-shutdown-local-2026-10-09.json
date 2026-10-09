@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "evidenceType": "wpf-shutdown-with-floating-clock",
-  "recordedAtUtc": "2026-10-09T07:04:09Z",
-  "sourceCommit": "672304e5e67205690f3bdd7cb6a5726d875bd0c4",
+  "recordedAtUtc": "2026-10-09T07:07:55Z",
+  "sourceCommit": "5bd51ce6a4bcc1371534174146360f3aae5261b9",
   "outcome": "success",
   "regression": {
     "priorCommit": "0158e4ba1aadba0973d286284ddefaf120d11bcc",
@@ -21,7 +21,8 @@
   "package": {
     "runtime": "win-x64",
     "sourceDirty": false,
-    "productionAuthenticodeSigned": false
+    "productionAuthenticodeSigned": false,
+    "zipSha256": "32588fde80e59788f7f60ec82c7d5b1c44a84c6516dddb3993b0b05ec3c704d4"
   },
   "limitations": [
     "The smoke validates launch and shutdown on this Windows PC; it is not a full hardware, installer, or administrative maintenance acceptance."
