@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "windows-suite-local",
+  "recordedAtUtc": "2026-10-09T08:50:00Z",
+  "sourceCommit": "f988aef",
+  "command": "dotnet test Zeus.slnx -c Release --no-restore",
+  "outcome": "success-with-skips",
+  "totals": { "passed": 461, "failed": 0, "skipped": 9 },
+  "projects": [
+    { "name": "Zeus.Core.Tests", "passed": 102, "failed": 0, "skipped": 0 },
+    { "name": "Zeus.Maintenance.Protocol.Tests", "passed": 75, "failed": 0, "skipped": 0 },
+    { "name": "Zeus.Storage.Tests", "passed": 18, "failed": 0, "skipped": 0 },
+    { "name": "Zeus.Cleanup.Tests", "passed": 35, "failed": 0, "skipped": 7 },
+    { "name": "Zeus.Hardware.Tests", "passed": 137, "failed": 0, "skipped": 0 },
+    { "name": "Zeus.UserOptimization.Tests", "passed": 39, "failed": 0, "skipped": 1 },
+    { "name": "Zeus.Windows.Acceptance.Tests", "passed": 55, "failed": 0, "skipped": 1 }
+  ],
+  "elevationRequested": false,
+  "limitations": [
+    "Seven cleanup link-safety tests require Windows privileges unavailable to this local run.",
+    "One real visual-preferences test and one protected-session ACL test were skipped due to local privilege/environment requirements.",
+    "This run does not replace the elevated disposable-runner acceptance required for MSI install/upgrade/uninstall."
+  ]
+}
