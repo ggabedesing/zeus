@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "2123f5c608491e6befc9af4e08c409b45bb04b85",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "productionSigned": false,
+  "validation": {
+    "releaseBuildWarnings": 0,
+    "releaseBuildErrors": 0,
+    "fullSolutionTestsPassed": 599,
+    "fullSolutionTestsSkipped": 11,
+    "fullSolutionTestsFailed": 0,
+    "fullSolutionTestsTotal": 610,
+    "focusedHardwareIoTestsPassed": 18,
+    "focusedNativeAndPresentationTestsPassed": 3,
+    "finalWpfTestsPassed": 33,
+    "finalIoAcceptanceTestsPassed": 2,
+    "portableExeOpenedRespondedClosed": true,
+    "independentReadOnlyReview": true
+  },
+  "controlledNativeTest": {
+    "ownTemporaryFileBytes": 1048576,
+    "readAndWriteCountersIncreasedByAtLeastPayload": true,
+    "positiveRatesAndOwnInterval": true,
+    "fileRemovedInFinally": true,
+    "otherWindowsChangesApplied": false
+  },
+  "readOnlyLocalSample": {
+    "rankedProcesses": 30,
+    "maximum": 30,
+    "readRatesAvailable": 30,
+    "writeRatesAvailable": 30,
+    "otherRatesAvailable": 30,
+    "ownIntervalsAvailable": 30,
+    "namesAndPidsOmitted": true
+  },
+  "contracts": [
+    "PID plus creation time; native counters and creation from same disposed handle.",
+    "Own monotonic interval; null for missing, reused identity or invalid interval; zero remains valid.",
+    "Counter reset invalidates affected field only.",
+    "Independent top 30 I/O ranking; bounded SQLite history and JSON export schema 10.",
+    "Arithmetic mean of sample rates; separate coverage; no duplicate or recycled PID attribution."
+  ],
+  "package": {
+    "directory": "artifacts/process-io-exe/zeus-win-x64-2123f5c60849-20261009T170750412Z-f5f8a687",
+    "exeSha256": "26675c163a6b96ee1a0755d7caa389545bf8dfb12ace6f49d3d179b3ec59734f",
+    "zipSha256": "25D470211284EE398FBE1C8049E04B752221A18906BF241AD4C1B42E53990B15"
+  },
+  "limitations": [
+    "Process accounting includes files, network and devices, not physical disk/volume attribution or proof of contention.",
+    "Sample-rate mean is not total bytes divided by total period time.",
+    "Eleven elevated or opt-in tests skipped; no repair, driver operation or restart.",
+    "Production signing and remaining roadmap phases are pending."
+  ]
+}
