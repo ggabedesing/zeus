@@ -27,7 +27,8 @@ public sealed record PhysicalDiskInfo(
     ulong? ReadErrorsTotal = null,
     ulong? ReadErrorsUncorrected = null,
     ulong? WriteErrorsTotal = null,
-    ulong? WriteErrorsUncorrected = null);
+    ulong? WriteErrorsUncorrected = null,
+    int? DiskNumber = null);
 
 public sealed record BatteryInfo(string Name, int? ChargePercent, string Status);
 

@@ -59,6 +59,10 @@ try
     Console.WriteLine($"Process inventory: collected={inventoriedProcesses.Count}; maximum=200; truncated={processesTruncated}; names omitted.");
     Console.WriteLine($"Route inventory: associated={inventoriedRoutes}; maximum=300; truncated={routesTruncated}; addresses omitted.");
     Console.WriteLine($"Storage provider counters: temperature={physicalDisks.Count(disk => disk.TemperatureCelsius.HasValue)}/{physicalDisks.Count}; wear={physicalDisks.Count(disk => disk.Wear.HasValue)}/{physicalDisks.Count}; power-on hours={physicalDisks.Count(disk => disk.PowerOnHours.HasValue)}/{physicalDisks.Count}; read/write error counters={physicalDisks.Count(disk => disk.ReadErrorsTotal.HasValue || disk.WriteErrorsTotal.HasValue)}/{physicalDisks.Count}. Missing values are unavailable, not zero.");
+    var mappedVolumes = snapshot.Disks.Where(disk => disk.PhysicalDiskNumbers is { Count: > 0 }).ToArray();
+    var volumeAssociations = string.Join(", ", mappedVolumes.Select(disk =>
+        $"{disk.DriveLetter.TrimEnd('\\')}→{string.Join('+', disk.PhysicalDiskNumbers!.Select(number => $"#{number}"))}"));
+    Console.WriteLine($"Volume-to-disk association: confirmed={mappedVolumes.Length}/{snapshot.Disks.Count}; assignments={(volumeAssociations.Length == 0 ? "none" : volumeAssociations)}; physical provider disk numbers={physicalDisks.Count(disk => disk.DiskNumber.HasValue)}/{physicalDisks.Count}. Unmatched relationships stay unavailable.");
     Console.WriteLine($"Memory inventory: modules={snapshot.MemoryModules?.Count.ToString() ?? "unavailable"}; firmware-declared slots={snapshot.MemoryArraySlotsReported?.ToString() ?? "unavailable"}; channels=not inferred.");
     Console.WriteLine($"Optional warnings: {snapshot.Warnings.Count}. No repair or restore operation executed.");
     return 0;

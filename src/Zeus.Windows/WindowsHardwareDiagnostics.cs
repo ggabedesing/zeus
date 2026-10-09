@@ -54,6 +54,8 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         var memoryTask = Read<MemoryInfo?>("Memória", ReadMemory, null);
         var graphicsTask = Read<IReadOnlyList<GpuInfo>>("Placas de vídeo", ReadGraphics, []);
         var disksTask = Read<IReadOnlyList<DiskInfo>>("Volumes", token => ReadDisks(token, warnings), []);
+        var volumeDiskMapTask = ReadAsync<IReadOnlyDictionary<string, int[]>>("Associação entre volumes e discos físicos",
+            token => ReadVolumeDiskNumbersAsync(token), new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase));
         var startupTask = Read<IReadOnlyList<StartupInfo>>("Inicialização", ReadStartup, []);
         var boardTask = Read<BoardInfo?>("Placa-mãe", ReadBoard, null);
         var biosTask = Read<BiosInfo?>("BIOS", ReadBios, null);
@@ -73,12 +75,21 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
                 return await Read<IReadOnlyList<PhysicalDiskInfo>>("Discos físicos (Win32_DiskDrive)", token => ReadPhysicalDisksFallback(token, warnings), []);
             }
         }, []);
-        await Task.WhenAll(cpuTask, memoryTask, graphicsTask, disksTask, startupTask, boardTask,
+        await Task.WhenAll(cpuTask, memoryTask, graphicsTask, disksTask, volumeDiskMapTask, startupTask, boardTask,
             biosTask, modulesTask, memorySlotsTask, batteriesTask, networkTask, windowsVersionTask, securityTask, physicalTask);
         cancellationToken.ThrowIfCancellationRequested();
         if (await windowsVersionTask is not { IsAvailable: true })
             warnings.Enqueue("Versão/edição do Windows: Win32_OperatingSystem não forneceu os detalhes nesta coleta.");
         var physical = await physicalTask;
+        var volumeDiskMap = await volumeDiskMapTask;
+        var volumes = (await disksTask).Select(volume =>
+        {
+            var key = volume.DriveLetter.TrimEnd('\\').ToUpperInvariant();
+            if (volumeDiskMap.TryGetValue(key, out var diskNumbers))
+                return volume with { PhysicalDiskNumbers = diskNumbers };
+            warnings.Enqueue($"Volume {volume.DriveLetter}: associação com disco físico não confirmada nesta coleta.");
+            return volume;
+        }).ToArray();
         // Run the broad, optional inventory after the focused hardware providers. Starting
         // another large PowerShell query alongside every WMI/PowerShell probe can starve it
         // and turn one slow source into a missing inventory for the whole diagnostic.
@@ -90,7 +101,7 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
             : "Temperaturas de CPU/GPU e consumo não são coletados; nenhum sensor de temperatura de disco foi disponibilizado pelo provedor.");
         warnings.Enqueue("Saúde e desgaste dos discos refletem somente o provedor consultado; não substituem backup ou inspeção física. Frequência de RAM não determina dual channel; velocidade de rede não mede a Internet.");
         return new HardwareSnapshot(DateTimeOffset.UtcNow, Environment.OSVersion.VersionString,
-            Environment.MachineName, await cpuTask, await memoryTask, await graphicsTask, await disksTask,
+            Environment.MachineName, await cpuTask, await memoryTask, await graphicsTask, volumes,
             await startupTask, await securityTask, warnings.ToArray(), await boardTask, await biosTask,
             await modulesTask, physical, await batteriesTask, await networkTask, inventory, await memorySlotsTask, await windowsVersionTask);
     }
@@ -212,6 +223,10 @@ $inventory = [pscustomobject]@{
         row[field] is { } value && ulong.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture),
             NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
 
+    private static int? NullableInt32(ManagementBaseObject row, string field) =>
+        row[field] is { } value && int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture),
+            NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed >= 0 ? parsed : null;
+
     private static CpuInfo? ReadCpu(CancellationToken token)
     {
         using var rows = Query("SELECT Name,NumberOfCores,NumberOfLogicalProcessors FROM Win32_Processor");
@@ -298,6 +313,33 @@ $inventory = [pscustomobject]@{
             }
         }
         return result;
+    }
+
+    private static async Task<IReadOnlyDictionary<string, int[]>> ReadVolumeDiskNumbersAsync(CancellationToken token)
+    {
+        const string script = "& { $items = @(); foreach ($p in @(Storage\\Get-Partition -ErrorAction Stop)) { " +
+            "if ($null -ne $p.DriveLetter -and ![string]::IsNullOrWhiteSpace([string]$p.DriveLetter) -and $null -ne $p.DiskNumber) { " +
+            "$items += [pscustomobject]@{ Volume = ([string]$p.DriveLetter).ToUpperInvariant() + ':'; DiskNumber = [int]$p.DiskNumber } } }; " +
+            "[pscustomobject]@{ Mappings = @($items) } | Microsoft.PowerShell.Utility\\ConvertTo-Json -Depth 4 -Compress }";
+        using var json = await RunPowerShellJsonAsync(script, token, WindowsPowerShellModule.Utility, WindowsPowerShellModule.Storage);
+        return ParseVolumeDiskNumbers(json.RootElement);
+    }
+
+    internal static IReadOnlyDictionary<string, int[]> ParseVolumeDiskNumbers(JsonElement root)
+    {
+        var result = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+        if (!root.TryGetProperty("Mappings", out var mappings) || mappings.ValueKind != JsonValueKind.Array) return new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var mapping in mappings.EnumerateArray())
+        {
+            if (!mapping.TryGetProperty("Volume", out var volumeValue) || volumeValue.ValueKind != JsonValueKind.String ||
+                !mapping.TryGetProperty("DiskNumber", out var numberValue) || !numberValue.TryGetInt32(out var number) || number < 0)
+                continue;
+            var volume = volumeValue.GetString()?.Trim().TrimEnd('\\').ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(volume)) continue;
+            if (!result.TryGetValue(volume, out var numbers)) result[volume] = numbers = [];
+            numbers.Add(number);
+        }
+        return result.ToDictionary(pair => pair.Key, pair => pair.Value.Order().ToArray(), StringComparer.OrdinalIgnoreCase);
     }
 
     internal static string? GetVolumeType(DriveType driveType) => driveType switch
@@ -447,7 +489,7 @@ $inventory = [pscustomobject]@{
 
     private static IReadOnlyList<PhysicalDiskInfo> ReadPhysicalDisksFallback(CancellationToken token, ConcurrentQueue<string> warnings)
     {
-        using var rows = Query("SELECT Model,Size,InterfaceType,MediaType,Status FROM Win32_DiskDrive");
+        using var rows = Query("SELECT Model,Size,InterfaceType,MediaType,Status,Index FROM Win32_DiskDrive");
         var result = new List<PhysicalDiskInfo>();
         foreach (ManagementObject row in rows)
         {
@@ -460,7 +502,8 @@ $inventory = [pscustomobject]@{
                 // can report SCSI for NVMe. Preserve the fallback provider limitation.
                 result.Add(new PhysicalDiskInfo(name, StringValue(row, "MediaType"),
                     StringValue(row, "InterfaceType") + " (Win32_DiskDrive)", bytes,
-                    StringValue(row, "Status") + " (Win32_DiskDrive)", null, null));
+                    StringValue(row, "Status") + " (Win32_DiskDrive)", null, null,
+                    DiskNumber: NullableInt32(row, "Index")));
             }
         }
         return result;
@@ -470,11 +513,13 @@ $inventory = [pscustomobject]@{
         ConcurrentQueue<string> warnings, CancellationToken token)
     {
         const string script = "& { $items = @(); $notes = @(); " +
+            "$logicalDisks = @(); try { $logicalDisks = @(Storage\\Get-Disk -ErrorAction Stop) } catch { $notes += 'Número do disco indisponível para correlacionar o provedor de sensores.' }; " +
             "foreach ($d in @(Storage\\Get-PhysicalDisk -ErrorAction Stop)) { " +
+            "$diskNumber = $null; if ([string]$d.DeviceId -match '^\\d+$') { $diskCandidates = @($logicalDisks | Where-Object { [string]$_.Number -eq [string]$d.DeviceId -and [string]$_.FriendlyName -eq [string]$d.FriendlyName }); if ($diskCandidates.Count -eq 1) { $diskNumber = [int]$diskCandidates[0].Number } }; " +
             "$r = $null; try { $r = $d | Storage\\Get-StorageReliabilityCounter -ErrorAction Stop } " +
             "catch { $notes += ('Sensores de confiabilidade indisponíveis para ' + [string]$d.FriendlyName + '.'); }; " +
             "$items += [pscustomobject]@{ Name = [string]$d.FriendlyName; MediaType = [string]$d.MediaType; " +
-            "BusType = [string]$d.BusType; SizeBytes = [uint64]$d.Size; HealthStatus = [string]$d.HealthStatus; " +
+            "BusType = [string]$d.BusType; SizeBytes = [uint64]$d.Size; HealthStatus = [string]$d.HealthStatus; DiskNumber = $diskNumber; " +
             "TemperatureCelsius = if ($null -ne $r -and $null -ne $r.Temperature -and $r.Temperature -gt 0 -and $r.Temperature -le 125) { [double]$r.Temperature } else { $null }; " +
             "TemperatureMaxCelsius = if ($null -ne $r -and $null -ne $r.TemperatureMax -and $r.TemperatureMax -gt 0 -and $r.TemperatureMax -le 125) { [double]$r.TemperatureMax } else { $null }; " +
             "Wear = if ($null -ne $r -and $null -ne $r.Wear) { [uint64]$r.Wear } else { $null }; " +
@@ -509,7 +554,8 @@ $inventory = [pscustomobject]@{
             JsonText(disk, "HealthStatus"), NullableDouble(disk, "TemperatureCelsius"), wear,
             NullableDouble(disk, "TemperatureMaxCelsius"), NullableUInt64(disk, "PowerOnHours"),
             NullableUInt64(disk, "ReadErrorsTotal"), NullableUInt64(disk, "ReadErrorsUncorrected"),
-            NullableUInt64(disk, "WriteErrorsTotal"), NullableUInt64(disk, "WriteErrorsUncorrected"));
+            NullableUInt64(disk, "WriteErrorsTotal"), NullableUInt64(disk, "WriteErrorsUncorrected"),
+            NullableInt32(disk, "DiskNumber"));
     }
 
     internal static bool TryReadCapacity(ulong? reported, string component, ConcurrentQueue<string> warnings, out ulong bytes)
@@ -531,6 +577,10 @@ $inventory = [pscustomobject]@{
     private static ulong? NullableUInt64(JsonElement value, string property) =>
         value.TryGetProperty(property, out var field) && field.ValueKind == JsonValueKind.Number &&
         field.TryGetUInt64(out var number) ? number : null;
+
+    private static int? NullableInt32(JsonElement value, string property) =>
+        value.TryGetProperty(property, out var field) && field.ValueKind == JsonValueKind.Number &&
+        field.TryGetInt32(out var number) && number >= 0 ? number : null;
 
     private static async Task<SecurityInfo?> ReadSecurityAsync(CancellationToken token)
     {

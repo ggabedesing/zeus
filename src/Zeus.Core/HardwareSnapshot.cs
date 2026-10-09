@@ -12,7 +12,8 @@ public sealed record DiskInfo(
     ulong TotalBytes,
     ulong FreeBytes,
     string FileSystem,
-    string? VolumeType = null);
+    string? VolumeType = null,
+    IReadOnlyList<int>? PhysicalDiskNumbers = null);
 
 public sealed record StartupInfo(string Name, string Location, string User);
 

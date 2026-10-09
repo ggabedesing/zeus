@@ -78,7 +78,7 @@ public sealed class StorageProviderTests
     [Fact]
     public void ReliabilityCountersArePreservedWithoutInferringMissingValues()
     {
-        using var json = JsonDocument.Parse("{\"Name\":\"Disco\",\"SizeBytes\":512000000000,\"TemperatureMaxCelsius\":70,\"PowerOnHours\":1234,\"ReadErrorsTotal\":7,\"ReadErrorsUncorrected\":2,\"WriteErrorsTotal\":0,\"WriteErrorsUncorrected\":null}");
+        using var json = JsonDocument.Parse("{\"Name\":\"Disco\",\"SizeBytes\":512000000000,\"TemperatureMaxCelsius\":70,\"PowerOnHours\":1234,\"ReadErrorsTotal\":7,\"ReadErrorsUncorrected\":2,\"WriteErrorsTotal\":0,\"WriteErrorsUncorrected\":null,\"DiskNumber\":2}");
         var disk = WindowsHardwareDiagnostics.ParsePhysicalDisk(json.RootElement, new ConcurrentQueue<string>())!;
 
         Assert.Equal(70, disk.TemperatureMaxCelsius);
@@ -87,5 +87,29 @@ public sealed class StorageProviderTests
         Assert.Equal(2UL, disk.ReadErrorsUncorrected);
         Assert.Equal(0UL, disk.WriteErrorsTotal);
         Assert.Null(disk.WriteErrorsUncorrected);
+        Assert.Equal(2, disk.DiskNumber);
+    }
+
+    [Fact]
+    public void VolumeDiskMappingsKeepMultiplePhysicalDiskNumbersAndIgnoreInvalidRows()
+    {
+        using var json = JsonDocument.Parse("""
+            {"Mappings":[{"Volume":"C:","DiskNumber":0},{"Volume":"C:","DiskNumber":2},{"Volume":"c:","DiskNumber":2},{"Volume":"D:","DiskNumber":5},{"Volume":"E:","DiskNumber":-1},{"Volume":" ","DiskNumber":4},{"Volume":"F:"}]}
+            """);
+
+        var mappings = WindowsHardwareDiagnostics.ParseVolumeDiskNumbers(json.RootElement);
+
+        Assert.Equal(new[] { 0, 2 }, mappings["C:"]);
+        Assert.Equal(new[] { 5 }, mappings["D:"]);
+        Assert.DoesNotContain("E:", mappings.Keys);
+        Assert.DoesNotContain("F:", mappings.Keys);
+    }
+
+    [Fact]
+    public void MissingVolumeDiskMappingRemainsUnknown()
+    {
+        using var json = JsonDocument.Parse("{}");
+
+        Assert.Empty(WindowsHardwareDiagnostics.ParseVolumeDiskNumbers(json.RootElement));
     }
 }

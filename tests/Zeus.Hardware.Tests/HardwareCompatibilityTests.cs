@@ -21,6 +21,7 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(snapshot.Bios);
         Assert.Null(snapshot.MemoryModules);
         Assert.Null(snapshot.PhysicalDisks![0].PowerOnHours);
+        Assert.Null(snapshot.PhysicalDisks[0].DiskNumber);
         Assert.Null(snapshot.PhysicalDisks[0].ReadErrorsTotal);
         Assert.Null(snapshot.PhysicalDisks[0].WriteErrorsTotal);
         Assert.Null(snapshot.Batteries);
@@ -29,16 +30,17 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(snapshot.WindowsInventory);
         Assert.Null(snapshot.WindowsVersion);
         Assert.Null(snapshot.Disks[0].VolumeType);
+        Assert.Null(snapshot.Disks[0].PhysicalDiskNumbers);
     }
 
     [Fact]
     public void InventoryJsonPreservesUnknownSensorsAndObservedValues()
     {
         var snapshot = new HardwareSnapshot(DateTimeOffset.UtcNow, "Windows", "PC", null, null, [],
-            [new DiskInfo("USB", "E:\\", 1000, 500, "exFAT", "Removível")], [], null, [],
+            [new DiskInfo("USB", "E:\\", 1000, 500, "exFAT", "Removível", [3, 4])], [], null, [],
             new BoardInfo("Fabricante", "Modelo"), new BiosInfo("Fabricante", "1.0", null),
             [new MemoryModuleInfo("ChannelA-DIMM0", 8UL * 1024 * 1024 * 1024, null, "Fabricante", 1, 2)],
-            [new PhysicalDiskInfo("NVMe", "SSD", "NVMe", 512UL * 1024 * 1024 * 1024, "Healthy", null, null),
+            [new PhysicalDiskInfo("NVMe", "SSD", "NVMe", 512UL * 1024 * 1024 * 1024, "Healthy", null, null, DiskNumber: 3),
              new PhysicalDiskInfo("SATA", "HDD", "SATA", 1024UL * 1024 * 1024 * 1024, "Warning", 42, 12)],
             [new BatteryInfo("Bateria", null, "Desconhecido")],
             [new NetworkAdapterInfo("Ethernet", "Conectado", 1_000_000_000)], null, 4);
@@ -56,6 +58,8 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(restored.Batteries![0].ChargePercent);
         Assert.Equal(1_000_000_000UL, restored.NetworkAdapters![0].SpeedBitsPerSecond);
         Assert.Equal("Removível", restored.Disks[0].VolumeType);
+        Assert.Equal(new[] { 3, 4 }, restored.Disks[0].PhysicalDiskNumbers);
+        Assert.Equal(3, restored.PhysicalDisks![0].DiskNumber);
         Assert.Null(restored.Bios!.ReleaseDate);
         Assert.Equal(4, restored.MemoryArraySlotsReported);
     }
