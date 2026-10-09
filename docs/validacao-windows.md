@@ -422,3 +422,5 @@ No commit `cd358fd`, o resumo de comparação formata esse valor como quantidade
 ### Explicação das métricas de CPU por processo — 2026-10-09
 
 O Observador agora esclarece que a porcentagem é relativa à capacidade total da CPU e que 1,0 núcleo equivalente corresponde ao tempo de um núcleo ocupado durante toda a medição. O texto também alerta que a leitura descreve uso e não confirma gargalo. A aceitação WPF `ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme` passou depois de verificar presença, automação e conteúdo dessa explicação na janela real.
+
+O pacote portátil `win-x64` do commit `0c67cad` foi gerado de árvore limpa, abriu a janela principal, respondeu e fechou normalmente; ZIP SHA-256 `1E2305018D7EDA8021C7BE81940262CC3212532DC8700FAD1BEA8A46F0CBF6B9`. A suíte local anterior à cópia de explicação passou com 469 testes aprovados, zero falhas e nove ignorados. Evidência do pacote e do smoke: [observer-cpu-explanation-local-2026-10-09.json](evidencias/observer-cpu-explanation-local-2026-10-09.json).

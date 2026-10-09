@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "0c67cadfd87faa62cb9920f6f4275c7ea4c4d260",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "package": "artifacts/process-core-explainer/zeus-win-x64.zip",
+  "packageSha256": "1e2305018d7eda8021c7be81940262cc3212532dc8700fad1bea8a46f0cbf6b9",
+  "desktopExeSha256": "efbb4e0d709ff5952163d08bf5ac83aeb3913233a81293d115d4a000ff12927c",
+  "portableExeSmoke": {
+    "result": "passed",
+    "openedMainWindow": true,
+    "responded": true,
+    "closedCleanly": true
+  },
+  "tests": {
+    "fullSolutionBaseline": {
+      "sourceCommit": "0693b058d09835fdb92890ac2ff624c567703d86",
+      "passed": 469,
+      "failed": 0,
+      "skipped": 9
+    },
+    "updatedWpfAcceptance": "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme passed"
+  },
+  "notes": [
+    "Observer explains computer-wide CPU percent and equivalent logical cores in the live window.",
+    "The explanation states that usage alone does not confirm a bottleneck.",
+    "Package is a development build and is not Authenticode signed for production."
+  ]
+}
