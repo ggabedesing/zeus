@@ -13,7 +13,9 @@ public sealed record NetworkLatencyResult(
 {
     public int AttemptCount => Samples.Count;
     public int Replies => Samples.Count(sample => sample.Status == IPStatus.Success.ToString());
+    public int NoReplyCount => AttemptCount - Replies;
     public int NoReplies => Samples.Count(sample => sample.Status == IPStatus.TimedOut.ToString());
+    public double? NoReplyPercent => AttemptCount == 0 ? null : NoReplyCount / (double)AttemptCount * 100;
     public double? TimeoutPercent => AttemptCount == 0 ? null : NoReplies / (double)AttemptCount * 100;
     public long? MinimumMilliseconds => SuccessfulTimes() is { Length: > 0 } times ? times.Min() : null;
     public double? AverageMilliseconds => SuccessfulTimes() is { Length: > 0 } times ? times.Average() : null;

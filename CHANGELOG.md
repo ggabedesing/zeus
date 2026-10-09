@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O diagnóstico de rede agora mostra tentativas sem resposta ICMP e timeouts separadamente; a taxa não é apresentada como perda de pacotes da conexão inteira.
 - As heurísticas do Observador agora reconhecem processos de Genshin Impact, Warframe, Minecraft Bedrock e OBS 32-bit; continuam descrevendo presença de processo e não inferem partida ou transmissão ao vivo.
 - O smoke de instalação do MSI agora exige que a janela instalada responda antes de confirmar o ciclo de atualização.
 - O aceite explícito da licença de um driver agora acompanha o SHA-256 do texto exibido; antes de aceitar os termos, o auxiliar compara o texto atual do Windows Update e interrompe a transação se ele mudou.

@@ -218,11 +218,13 @@ public partial class MainWindow
                 .Select(sample => sample.Status).Distinct().ToArray();
             var attempts = result.AttemptCount;
             var timeoutRate = result.TimeoutPercent is { } percent ? $" ({percent:0.#}%)" : string.Empty;
-            NetworkProbeSummary = $"{result.Target} → {result.Address} · respostas: {result.Replies}/{attempts} · timeouts observados: {result.NoReplies}/{attempts}{timeoutRate} · latência ICMP mín/média/máx: {min}/{average}/{max}" +
+            var noReplyRate = result.NoReplyPercent is { } noReplyPercent ? $" ({noReplyPercent:0.#}%)" : string.Empty;
+            NetworkProbeSummary = $"{result.Target} → {result.Address} · respostas ICMP: {result.Replies}/{attempts} · tentativas sem resposta ICMP: {result.NoReplyCount}/{attempts}{noReplyRate} · timeouts: {result.NoReplies}/{attempts}{timeoutRate} · latência ICMP mín/média/máx: {min}/{average}/{max}" +
                 (statuses.Length == 0 ? string.Empty : $" · outros resultados: {string.Join(", ", statuses)}") +
+                " · taxa sem resposta não equivale à perda de pacotes da conexão inteira" +
                 $" · {result.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}";
             var correlation = Guid.NewGuid().ToString("N");
-            var details = JsonSerializer.Serialize(new { result.Target, result.Address, result.CheckedAt, result.Samples, result.AttemptCount, result.Replies, result.NoReplies, result.TimeoutPercent, result.MinimumMilliseconds, result.AverageMilliseconds, result.MaximumMilliseconds });
+            var details = JsonSerializer.Serialize(new { result.Target, result.Address, result.CheckedAt, result.Samples, result.AttemptCount, result.Replies, result.NoReplyCount, result.NoReplyPercent, result.NoReplies, result.TimeoutPercent, result.MinimumMilliseconds, result.AverageMilliseconds, result.MaximumMilliseconds });
             QueueActivity(new ActivityEntry(result.CheckedAt, "network-diagnostic", "icmp-measurement-completed",
                 result.Replies == 0 ? "warning" : "info", NetworkProbeSummary, details, correlation));
             StatusTitle = "Medição ICMP concluída";

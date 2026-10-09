@@ -36,6 +36,8 @@ public sealed class NetworkLatencyProbeTests
         ]);
 
         Assert.Equal(2, result.Replies);
+        Assert.Equal(2, result.NoReplyCount);
+        Assert.Equal(50d, result.NoReplyPercent);
         Assert.Equal(1, result.NoReplies);
         Assert.Equal(4, result.AttemptCount);
         Assert.Equal(25d, result.TimeoutPercent);
@@ -61,6 +63,8 @@ public sealed class NetworkLatencyProbeTests
         var result = new NetworkLatencyResult("router.local", "192.0.2.1", DateTimeOffset.UtcNow, []);
 
         Assert.Equal(0, result.AttemptCount);
+        Assert.Equal(0, result.NoReplyCount);
+        Assert.Null(result.NoReplyPercent);
         Assert.Null(result.TimeoutPercent);
     }
 }
