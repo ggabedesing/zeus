@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "c6c01806d2be5ca92b7c0877de14228051ef3184",
+  "githubActionsRun": 37929740343,
+  "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37929740343",
+  "accepted": true,
+  "outcomes": {
+    "build": "success",
+    "windowsTests": "success",
+    "portableSmoke": "success",
+    "publish": "success",
+    "msiInstallUpgradeUninstall": "success"
+  },
+  "tests": {
+    "passed": 524,
+    "failed": 0,
+    "skipped": 0
+  },
+  "change": "WPF acceptance now waits for Windows Update history operation to reach idle before asserting that history backup and restore buttons are enabled.",
+  "previousFailure": "Two runner executions failed at the same assertion because the test checked the idle-only buttons while the history query still held the application busy. No product backup/restore failure was recorded.",
+  "limitations": [
+    "CI acceptance ran on a Windows virtual machine, not every physical configuration.",
+    "The workflow does not perform real repairs, restore-point creation, driver installation, offline scan, or reboot.",
+    "No production Authenticode certificate is configured."
+  ]
+}
