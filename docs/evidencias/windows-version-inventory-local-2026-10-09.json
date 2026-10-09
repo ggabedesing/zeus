@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "windows-edition-build-inventory",
+  "recordedAtUtc": "2026-10-09T08:55:20Z",
+  "sourceCommit": "e3e5a6d1288728ca7d45ab7da4a68c8845214967",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "outcome": "success",
+  "nativeWindowsAcceptance": {
+    "inventoryTestPassed": true,
+    "desktopExperienceTestPassed": true,
+    "smokeCheckPassed": true,
+    "reportedEdition": "Microsoft Windows 11 Pro",
+    "reportedVersion": "10.0.26300",
+    "reportedBuild": "26300",
+    "reportedArchitecture": "64 bits"
+  },
+  "fullLocalSuite": { "passed": 466, "failed": 0, "skipped": 9 },
+  "portablePackage": {
+    "file": "artifacts/windows-version/zeus-win-x64.zip",
+    "sha256": "e1866dbbcf0edd50b6ae448c972aaa50347649e2c6c9a864101bacdf42b10136",
+    "applicationSmoke": { "opened": true, "responded": true, "closedCleanly": true }
+  },
+  "limitations": [
+    "Edition, version, build, and architecture come from Win32_OperatingSystem; unavailable fields remain explicitly unknown.",
+    "The Windows version/build describe the operating system, not its support status or activation state.",
+    "Nine local suite tests were skipped because of privilege or environment requirements.",
+    "The development package is unsigned for production Authenticode distribution."
+  ]
+}
