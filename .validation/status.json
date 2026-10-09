@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "778915b2ffdce3435e5349167c604ce36a8ddbb2",
+  "sourceBranch": "feat/zeus-windows-mvp",
+  "runId": "37879297562",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37879297562",
+  "recordedAtUtc": "2026-10-09T03:31:13.6204282+00:00",
+  "runner": "windows-latest",
+  "accepted": true,
+  "outcomes": {
+    "build": "success",
+    "windowsTests": "success",
+    "smoke": "success",
+    "publish": "success",
+    "installerTest": "success"
+  },
+  "testCounts": {
+    "failed": 0,
+    "total": 431,
+    "passed": 431,
+    "skipped": 0
+  },
+  "testProjects": [
+    {
+      "project": "Zeus.Cleanup.Tests",
+      "total": 42,
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Core.Tests",
+      "total": 89,
+      "passed": 89,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Hardware.Tests",
+      "total": 122,
+      "passed": 122,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Maintenance.Protocol.Tests",
+      "total": 72,
+      "passed": 72,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Storage.Tests",
+      "total": 17,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.UserOptimization.Tests",
+      "total": 38,
+      "passed": 38,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "Zeus.Windows.Acceptance.Tests",
+      "total": 51,
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "localRunner": {
+    "accepted": true,
+    "sourceCommit": "778915b2ffdce3435e5349167c604ce36a8ddbb2",
+    "stages": [
+      {
+        "name": "sdk",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-09T03:27:30.4300099+00:00",
+        "durationSeconds": 0.349,
+        "message": "SDK 10.0.401 confirmado."
+      },
+      {
+        "name": "build",
+        "outcome": "skipped",
+        "startedAtUtc": "2026-10-09T03:27:30.7870306+00:00",
+        "durationSeconds": 0.004,
+        "message": "Build prévio será utilizado por solicitação explícita."
+      },
+      {
+        "name": "test:Zeus.Cleanup.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-09T03:27:30.8390467+00:00",
+        "durationSeconds": 6.741,
+        "message": "42 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Core.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-09T03:27:37.5803248+00:00",
+        "durationSeconds": 2.634,
+        "message": "89 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Hardware.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-09T03:27:40.2140298+00:00",
+        "durationSeconds": 2.632,
+        "message": "122 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Maintenance.Protocol.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-09T03:27:42.8462719+00:00",
+        "durationSeconds": 2.382,
+        "message": "72 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Storage.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-09T03:27:45.2287638+00:00",
+        "durationSeconds": 5.394,
+        "message": "17 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.UserOptimization.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-09T03:27:50.6231066+00:00",
+        "durationSeconds": 3.614,
+        "message": "38 testes aprovados."
+      },
+      {
+        "name": "test:Zeus.Windows.Acceptance.Tests",
+        "outcome": "success",
+        "startedAtUtc": "2026-10-09T03:27:54.2366222+00:00",
+        "durationSeconds": 55.064,
+        "message": "51 testes aprovados."
+      }
+    ],
+    "failures": []
+  },
+  "failures": [],
+  "screenshots": [
+    "zeus-compact-viewport.png",
+    "zeus-complete-overview.png",
+    "zeus-desktop-organization-review.png",
+    "zeus-general-plan-review.png",
+    "zeus-light-overview.png",
+    "zeus-mac-inspired-overview.png",
+    "zeus-minimal-overview.png",
+    "zeus-theme-Complete.png",
+    "zeus-theme-Cyberpunk.png",
+    "zeus-theme-GamingNeon.png",
+    "zeus-theme-Light.png",
+    "zeus-theme-MacInspired.png",
+    "zeus-theme-Minimal.png",
+    "zeus-workspace-CleanupTab.png",
+    "zeus-workspace-DriverTab.png",
+    "zeus-workspace-HardwareTab.png",
+    "zeus-workspace-HistoryTab.png",
+    "zeus-workspace-MaintenanceTab.png",
+    "zeus-workspace-OverviewTab.png",
+    "zeus-workspace-ProfileTab.png",
+    "zeus-workspace-StartupTab.png"
+  ],
+  "limitations": [
+    "Acceptance runs on a Windows CI virtual machine, not on every physical hardware configuration.",
+    "Repair, restore-point creation, driver installation, offline scan and reboot are not executed by CI.",
+    "CI does not establish measured performance gains or production code-signing status."
+  ]
+}
