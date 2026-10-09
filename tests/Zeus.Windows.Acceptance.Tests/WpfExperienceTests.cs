@@ -9,9 +9,11 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Input;
 using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using Zeus.Core;
 using Zeus.Desktop;
 using Zeus.Windows;
+using Zeus.Storage;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
@@ -234,6 +236,7 @@ public sealed class WpfExperienceTests
             App? app = null;
             MainWindow? window = null;
             var fixture = Path.Combine(Path.GetTempPath(), "Zeus.Acceptance." + Guid.NewGuid().ToString("N"));
+            var databaseRecovery = new DatabaseRecoveryTestState(Path.Combine(fixture, "user-selected-backup.db"));
             try
             {
                 app = new App(startMainWindow: false);
@@ -253,9 +256,9 @@ public sealed class WpfExperienceTests
                         {
                             openedUris.Add(uri);
                             if (uri == "ms-settings:personalization-colors") throw new InvalidOperationException("Falha de abertura simulada.");
-                        }) { Width = 1440, Height = 1024 };
+                        }, null, databaseRecovery.Callbacks) { Width = 1440, Height = 1024 };
                         window.Show();
-                        await VerifyExperienceAsync(window, fixture, openedUris);
+                        await VerifyExperienceAsync(window, fixture, openedUris, databaseRecovery);
                         var constrainedWindow = new MainWindow(fixture, _ => { }, new Size(800, 450));
                         Assert.Equal(800, constrainedWindow.MinWidth);
                         Assert.Equal(450, constrainedWindow.MinHeight);
@@ -292,6 +295,7 @@ public sealed class WpfExperienceTests
                     finally
                     {
                         window?.Close();
+                        SqliteConnection.ClearAllPools();
                         if (Directory.Exists(fixture)) Directory.Delete(fixture, recursive: true);
                         app.Shutdown();
                     }
@@ -307,7 +311,8 @@ public sealed class WpfExperienceTests
         Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "The WPF application must exit after acceptance.");
     }
 
-    private static async Task VerifyExperienceAsync(MainWindow window, string fixture, List<string> openedUris)
+    private static async Task VerifyExperienceAsync(MainWindow window, string fixture, List<string> openedUris,
+        DatabaseRecoveryTestState databaseRecovery)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(120);
         while (window.StatusTitle != "Diagnóstico concluído" && DateTimeOffset.UtcNow < deadline)
@@ -1137,12 +1142,79 @@ public sealed class WpfExperienceTests
         // scan, changes startup or reboots the machine is invoked by this test.
         window.DesktopClockEnabled = true;
         Assert.Single(Application.Current!.Windows.OfType<DesktopClockWindow>());
+        await VerifyDatabaseRecoveryButtonsAsync(window, fixture, databaseRecovery);
         window.Close();
         var closeDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
         while (window.IsVisible && DateTimeOffset.UtcNow < closeDeadline) await Task.Delay(25);
         Assert.False(window.IsVisible, "The main window must finish closing after its activity writes drain.");
         Assert.Empty(Application.Current.Windows.OfType<DesktopClockWindow>());
         Assert.Equal("aurora", (await new DesktopStorage(fixture).ReadPreferencesAsync()).VisualLayoutPresetId);
+    }
+
+    private static async Task VerifyDatabaseRecoveryButtonsAsync(MainWindow window, string fixture,
+        DatabaseRecoveryTestState state)
+    {
+        var storage = new DesktopStorage(fixture);
+        var originalPreferences = await storage.ReadPreferencesAsync();
+        window.WorkspaceTabs.SelectedItem = window.WorkspaceTabs.Items.Cast<TabItem>()
+            .Single(tab => AutomationProperties.GetAutomationId(tab) == "HistoryTab");
+        var readyDeadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (!window.CanRefresh && DateTimeOffset.UtcNow < readyDeadline) await Task.Delay(25);
+        Assert.True(window.CanRefresh, "The previous UI operation must finish before the history buttons are used.");
+        var backupButton = Assert.IsType<Button>(window.FindName("BackupDatabaseButton"));
+        var restoreButton = Assert.IsType<Button>(window.FindName("RestoreDatabaseButton"));
+        Assert.True(backupButton.IsEnabled);
+
+        backupButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, backupButton));
+        var backupDeadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (window.StatusTitle != "Cópia de segurança verificada" && DateTimeOffset.UtcNow < backupDeadline)
+            await Task.Delay(25);
+        Assert.Equal("Cópia de segurança verificada", window.StatusTitle);
+        Assert.True(File.Exists(state.BackupPath));
+        Assert.True((await new ZeusDatabase(state.BackupPath).CheckHealthAsync()).IsHealthy);
+        var backupReadyDeadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (!window.CanRefresh && DateTimeOffset.UtcNow < backupReadyDeadline) await Task.Delay(25);
+        Assert.True(window.CanRefresh, "The backup operation must release the interface before another action starts.");
+
+        var changedTheme = originalPreferences.Theme == DesktopTheme.Cyberpunk
+            ? DesktopTheme.Complete : DesktopTheme.Cyberpunk;
+        await storage.SavePreferencesAsync(originalPreferences with { Theme = changedTheme });
+        restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, restoreButton));
+        Assert.Equal(1, state.ConfirmationCount);
+        Assert.False(state.RestartRequested);
+        Assert.Equal(changedTheme, (await storage.ReadPreferencesAsync()).Theme);
+
+        state.ConfirmRestore = true;
+        restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, restoreButton));
+        var restoreDeadline = DateTimeOffset.UtcNow.AddSeconds(20);
+        while (!state.RestartRequested && DateTimeOffset.UtcNow < restoreDeadline)
+            await Task.Delay(25);
+        Assert.True(state.RestartRequested, "The verified restore must request a restart only after consent and successful recovery.");
+        Assert.Equal("Dados restaurados", window.StatusTitle);
+        Assert.Equal(originalPreferences, await storage.ReadPreferencesAsync());
+        var recoveryCopies = Directory.GetFiles(Path.Combine(fixture, "recovery"), "zeus-pre-restore-*.db");
+        var recoveryCopy = Assert.Single(recoveryCopies);
+        Assert.True((await new ZeusDatabase(recoveryCopy).CheckHealthAsync()).IsHealthy);
+        SqliteConnection.ClearAllPools();
+    }
+
+    private sealed class DatabaseRecoveryTestState
+    {
+        public DatabaseRecoveryTestState(string backupPath)
+        {
+            BackupPath = backupPath;
+            Callbacks = new(
+                () => BackupPath,
+                () => BackupPath,
+                _ => { ConfirmationCount++; return ConfirmRestore; },
+                () => RestartRequested = true);
+        }
+
+        public string BackupPath { get; }
+        public bool ConfirmRestore { get; set; }
+        public int ConfirmationCount { get; private set; }
+        public bool RestartRequested { get; private set; }
+        public DatabaseDialogCallbacks Callbacks { get; }
     }
 
     private static void AssertThemeTextContrast(string foregroundKey, string backgroundKey, double minimum)

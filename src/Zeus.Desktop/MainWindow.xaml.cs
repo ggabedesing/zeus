@@ -34,6 +34,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly DesktopFileOrganizer _desktopOrganizer;
     private readonly TemporaryFileCleanup _cleanup;
     private readonly Action<string> _openUri;
+    private readonly DatabaseDialogCallbacks? _databaseDialogCallbacks;
     private readonly bool _isFixture;
     private readonly OptimizationRuleEngine _ruleEngine = new();
     private readonly DesktopStorage _storage;
@@ -116,14 +117,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _networkProbeTarget = string.Empty;
     private string _networkProbeSummary = "A medição só começa quando você informa um IP ou host e solicita o teste.";
 
-    public MainWindow() : this(null, null, null) { }
+    public MainWindow() : this(null, null, null, null) { }
 
-    public MainWindow(string? storageRoot, Action<string>? openUri = null) : this(storageRoot, openUri, null) { }
+    public MainWindow(string? storageRoot, Action<string>? openUri = null) : this(storageRoot, openUri, null, null) { }
 
-    internal MainWindow(string? storageRoot, Action<string>? openUri, Size? workAreaOverride)
+    internal MainWindow(string? storageRoot, Action<string>? openUri, Size? workAreaOverride,
+        DatabaseDialogCallbacks? databaseDialogCallbacks = null)
     {
         _isFixture = storageRoot is not null;
         _openUri = openUri ?? OpenSystemUri;
+        _databaseDialogCallbacks = databaseDialogCallbacks;
         _storage = new(storageRoot);
         _userOptimization = new(storageRoot is null ? null : Path.Combine(storageRoot, "Changes"));
         _desktopOrganizer = new(storageRoot is null ? null : Path.Combine(storageRoot, "Desktop"), storageRoot is null ? null : Path.Combine(storageRoot, "DesktopOrganization"));
