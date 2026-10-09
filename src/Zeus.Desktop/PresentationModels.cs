@@ -15,10 +15,11 @@ public sealed record ProfileOption(UsageProfile Value, string Name)
 {
     public override string ToString() => Name;
 }
-public sealed record ThemeOption(DesktopTheme Value, string Name)
+public sealed record ThemeOption(DesktopTheme Value, string Name, string Description)
 {
     public override string ToString() => Name;
 }
+public sealed record AppearanceCapabilityRow(string Name, string Status, string Detail);
 public sealed record AccentColorOption(AppAccentColor Value, string Name)
 {
     public override string ToString() => Name;

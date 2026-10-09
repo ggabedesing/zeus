@@ -205,7 +205,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<WingetUpdateRow> WingetUpdates { get; } = [];
     public ObservableCollection<WindowsUpdateRow> PendingWindowsUpdates { get; } = [];
     public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
-    public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS"), new(DesktopTheme.Light, "Claro · leitura"), new(DesktopTheme.GamingNeon, "Gamer Neon · foco em jogos"), new(DesktopTheme.Cyberpunk, "Cyberpunk · criação")];
+    public IReadOnlyList<ThemeOption> ThemeOptions { get; } =
+    [
+        new(DesktopTheme.Complete, "Completo · ZEUS", "Interface escura completa, com navegação e detalhes do diagnóstico disponíveis."),
+        new(DesktopTheme.Minimal, "Mínimo · Foco", "Interface compacta que esconde detalhes avançados até você ativar o modo técnico."),
+        new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS", "Interface escura com acento violeta e cartões suaves, inspirada em uma estética Aurora."),
+        new(DesktopTheme.Light, "Claro · leitura", "Interface clara com contraste ajustado para leitura em superfícies claras."),
+        new(DesktopTheme.GamingNeon, "Gamer Neon · foco em jogos", "Interface escura com acento verde neon; não altera jogos, drivers ou configurações de desempenho."),
+        new(DesktopTheme.Cyberpunk, "Cyberpunk · criação", "Interface escura com acento rosa; não altera jogos, drivers ou configurações de desempenho.")
+    ];
+    public IReadOnlyList<AppearanceCapabilityRow> AppearanceCapabilities { get; } =
+    [
+        new("Tema e cor de destaque", "Neste aplicativo", "Aplica a paleta escolhida na interface ZEUS e salva a preferência localmente."),
+        new("Relógio do ZEUS", "Configuração separada", "As opções do relógio só mudam quando você as altera no cartão do relógio."),
+        new("Papel de parede", "Ação separada", "Não é incluído no tema. Escolha uma imagem, confira a prévia e revise a aplicação por monitor."),
+        new("Animações e transparência do Windows", "Ação separada", "Não são alteradas pelo tema; use a ação própria para revisar, aplicar e restaurar essas preferências."),
+        new("Iniciar, barra de tarefas, sons e tela de bloqueio", "Configurações do Windows", "O ZEUS apenas abre páginas oficiais quando solicitado; essa navegação não conta como alteração aplicada ou reversão pelo ZEUS.")
+    ];
     public IReadOnlyList<AccentColorOption> AccentColorOptions { get; } = [new(AppAccentColor.ThemeDefault, "Padrão do tema"), new(AppAccentColor.Blue, "Azul oceano"), new(AppAccentColor.Violet, "Violeta"), new(AppAccentColor.Green, "Verde"), new(AppAccentColor.Rose, "Rosa"), new(AppAccentColor.Amber, "Âmbar")];
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -283,6 +299,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string CleanupSelectedText => $"{CleanupFiles.Count(f => f.IsSelected)} arquivo(s) · {ByteFormatting.Format(CleanupFiles.Where(f => f.IsSelected).Aggregate(0UL, (sum, f) => sum + f.SizeBytes))} selecionados";
     public Visibility DetailedVisibility => IsMinimal && !IsTechnicalMode ? Visibility.Collapsed : Visibility.Visible;
     public string LayoutDescription => ThemeOptions.First(t => t.Value == SelectedTheme).Name;
+    public ThemeOption SelectedThemeOption => ThemeOptions.First(theme => theme.Value == SelectedTheme);
     public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
     public bool IsTechnicalMode { get => _isTechnicalMode; set { if (Set(ref _isTechnicalMode, value)) { Notify(nameof(DetailedVisibility)); QueuePreferencesSave(); } } }
     public DesktopTheme SelectedTheme
@@ -291,7 +308,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (!Enum.IsDefined(value) || !Set(ref _selectedTheme, value)) return;
-            ApplyTheme(); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); QueuePreferencesSave();
+            ApplyTheme(); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption)); QueuePreferencesSave();
         }
     }
     public AppAccentColor SelectedAccentColor

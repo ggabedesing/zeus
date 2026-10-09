@@ -116,6 +116,14 @@ public sealed class WpfExperienceTests
         Assert.Equal("Tema do aplicativo", themeSelectorPeer.GetName());
         var expandCollapse = Assert.IsAssignableFrom<IExpandCollapseProvider>(themeSelectorPeer.GetPattern(PatternInterface.ExpandCollapse));
         Assert.Equal(6, themeSelector.Items.Count);
+        var themeScope = Assert.IsType<ItemsControl>(window.FindName("AppearanceCapabilitiesList"));
+        Assert.Equal(5, themeScope.Items.Count);
+        Assert.Equal("Matriz do que o tema altera", AutomationProperties.GetName(themeScope));
+        Assert.Contains(window.AppearanceCapabilities, capability => capability.Name == "Papel de parede" && capability.Status == "Ação separada");
+        Assert.Contains(window.AppearanceCapabilities, capability => capability.Name == "Iniciar, barra de tarefas, sons e tela de bloqueio" && capability.Status == "Configurações do Windows");
+        var animationsBeforeThemeChange = window.ReduceAnimations;
+        var transparencyBeforeThemeChange = window.ReduceTransparency;
+        var wallpaperBeforeThemeChange = window.SelectedWallpaperPath;
         var accentSelector = Assert.IsType<ComboBox>(window.FindName("AccentColorSelector"));
         Assert.Equal("accent-color-selector", AutomationProperties.GetAutomationId(accentSelector));
         Assert.Equal("Cor de destaque do aplicativo", AutomationProperties.GetName(accentSelector));
@@ -131,6 +139,11 @@ public sealed class WpfExperienceTests
         foreach (var theme in Enum.GetValues<DesktopTheme>())
         {
             window.SelectedTheme = theme;
+            Assert.Equal(theme, window.SelectedThemeOption.Value);
+            Assert.False(string.IsNullOrWhiteSpace(window.SelectedThemeOption.Description));
+            Assert.Equal(animationsBeforeThemeChange, window.ReduceAnimations);
+            Assert.Equal(transparencyBeforeThemeChange, window.ReduceTransparency);
+            Assert.Equal(wallpaperBeforeThemeChange, window.SelectedWallpaperPath);
             Assert.Same(Application.Current.Resources["PanelBrush"], themeSelector.Background);
             Assert.Same(Application.Current.Resources["TextBrush"], themeSelector.Foreground);
             await RenderAsync(window, $"zeus-theme-{theme}.png");
