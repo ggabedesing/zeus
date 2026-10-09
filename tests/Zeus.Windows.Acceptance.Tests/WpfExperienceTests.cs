@@ -366,9 +366,12 @@ public sealed class WpfExperienceTests
         Assert.Contains(window.AppearanceCapabilities, capability => capability.Name == "Papel de parede" && capability.Status == "Ação separada");
         Assert.Contains(window.AppearanceCapabilities, capability => capability.Name == "Iniciar, barra de tarefas, sons e tela de bloqueio" && capability.Status == "Configurações do Windows");
         var customizationResources = Assert.IsType<ItemsControl>(window.FindName("CustomizationResourcesList"));
-        Assert.Equal(3, customizationResources.Items.Count);
+        Assert.Equal(7, customizationResources.Items.Count);
         Assert.All(window.CustomizationResources, resource => Assert.Contains("https://", resource.OfficialUri, StringComparison.Ordinal));
         Assert.Contains(window.CustomizationResources, resource => resource.Id == "rainmeter" && resource.Caution.Contains("scripts", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(window.CustomizationResources, resource => resource.Id == "aero-dock" && resource.License == "MIT" && resource.Availability.Contains("sem assinatura", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(window.CustomizationResources, resource => resource.Id == "taskbar-widgets" && resource.Compatibility.Contains("Windows 11 x64", StringComparison.Ordinal) && resource.Availability.Contains("beta", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(window.CustomizationResources, resource => resource.Id == "translucenttb" && resource.License == "GPL-3.0" && resource.Caution.Contains("shell", StringComparison.OrdinalIgnoreCase));
         var animationsBeforeThemeChange = window.ReduceAnimations;
         var transparencyBeforeThemeChange = window.ReduceTransparency;
         var wallpaperBeforeThemeChange = window.SelectedWallpaperPath;
