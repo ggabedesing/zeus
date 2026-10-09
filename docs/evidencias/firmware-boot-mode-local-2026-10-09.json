@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "firmware-boot-mode-inventory",
+  "recordedAtUtc": "2026-10-09T08:48:16Z",
+  "sourceCommit": "b436bd02e3d58c2c6418338ab37e78c933136923",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "outcome": "success",
+  "nativeWindowsAcceptance": {
+    "inventoryTestPassed": true,
+    "desktopExperienceTestPassed": true,
+    "reportedMode": "UEFI",
+    "smokeCheckPassed": true,
+    "repairOrSystemChangeExecuted": false
+  },
+  "hardwareTests": { "passed": 141, "failed": 0, "skipped": 0 },
+  "portablePackage": {
+    "file": "artifacts/firmware-mode/zeus-win-x64.zip",
+    "sha256": "1f8f7822f4fd83f97359eab96eb5f698a392b72dbcfbfd42209aba2522ac9ee2",
+    "desktopExecutableSha256": "7c437f24b4cade5c52ab1185a8e6663ab9b87e9a0f877b8768983118c5a98b47",
+    "applicationSmoke": { "opened": true, "responded": true, "closedCleanly": true }
+  },
+  "limitations": [
+    "The reported mode is the firmware mode used to start this Windows session; it does not measure Secure Boot or attest to firmware security.",
+    "The development package is unsigned for production Authenticode distribution."
+  ]
+}

@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O inventário reporta se o Windows iniciou em UEFI ou BIOS legado, usando a API nativa `GetFirmwareType`; estado desconhecido e indisponível permanecem explícitos.
 - A aba de drivers agora mostra também um atalho oficial para o fabricante reportado da placa-mãe, quando reconhecido, explica quando não há fabricante/portal disponível e identifica o nome do fornecedor nos links por dispositivo. O link só abre uma busca manual e não confirma driver compatível.
 - A janela principal agora reduz seus limites mínimos para caber na área útil do monitor em resoluções menores, sem definir um tamanho máximo abaixo do mínimo.
 - O relógio flutuante ajusta a frequência do timer ao conteúdo: atualiza a cada segundo quando exibe segundos e na próxima virada do minuto quando não exibe, reduzindo despertares sem atrasar a mudança visível do horário.
