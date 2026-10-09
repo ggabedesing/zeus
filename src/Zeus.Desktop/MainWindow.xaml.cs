@@ -530,6 +530,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             foreach (var network in inventory.NetworkConfiguration)
                 ExtendedHardwareRows.Add(new($"Rede · {Available(network.Adapter)}", $"Estado: {Available(network.Status)} · IP: {FormatNetworkValues(network.Addresses)} · DNS: {FormatNetworkValues(network.DnsServers)} · Gateway: {FormatNetworkValues(network.Gateways)} · Rotas: {FormatNetworkValues(network.Routes)}"));
+            if (inventory.NetworkConfiguration.Count == 0)
+                ExtendedHardwareRows.Add(new("Rede · configuração IP/DNS/rotas", "O provedor de configuração não retornou interfaces nesta coleta. IP, DNS, gateway e rotas estão indisponíveis; isso não confirma ausência de adaptadores."));
             ExtendedHardwareRows.Add(new("Proxy do usuário (HKCU)", FormatProxyConfiguration(inventory.ProxyConfiguration)));
             ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
             ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
@@ -542,6 +544,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 : inventory.WindowsImageHealth));
             foreach (var device in inventory.PnpDevices.Where(device => !string.IsNullOrWhiteSpace(device.ProblemCode)).Take(20))
                 ExtendedHardwareRows.Add(new($"Dispositivo com código {device.ProblemCode}", $"{Available(device.Name)} · {Available(device.Status)}"));
+        }
+        else
+        {
+            ExtendedHardwareRows.Add(new("Rede · configuração IP/DNS/rotas", "Inventário do Windows indisponível nesta coleta; IP, DNS, gateway e rotas não foram verificados."));
         }
         Warnings.Clear(); foreach (var warning in _startupWarnings.Concat(snapshot.Warnings)) Warnings.Add(warning);
         BuildPersonalPlan();

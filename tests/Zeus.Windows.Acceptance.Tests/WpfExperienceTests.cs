@@ -223,6 +223,12 @@ public sealed class WpfExperienceTests
         if (window.Snapshot.WindowsInventory?.WindowsImageHealth is null)
             Assert.Contains("Não verificada nesta coleta", imageHealthRow.Detail, StringComparison.Ordinal);
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title.StartsWith("Rede · ", StringComparison.Ordinal));
+        if (window.Snapshot.WindowsInventory?.NetworkConfiguration.Count is null or 0)
+        {
+            var networkUnavailable = Assert.Single(window.ExtendedHardwareRows, row => row.Title == "Rede · configuração IP/DNS/rotas");
+            Assert.Contains("IP, DNS, gateway e rotas", networkUnavailable.Detail, StringComparison.Ordinal);
+            Assert.Contains("não confirma ausência de adaptadores", networkUnavailable.Detail, StringComparison.Ordinal);
+        }
         Assert.Contains("Win32_PnPSignedDriver", window.DriverInventorySummary, StringComparison.Ordinal);
         Assert.Equal(Math.Min(window.Snapshot.WindowsInventory!.Drivers.Count, 100), window.InstalledDriverRows.Count);
         Assert.All(window.InstalledDriverRows, row => Assert.Contains("Assinatura reportada:", row.Detail, StringComparison.Ordinal));
