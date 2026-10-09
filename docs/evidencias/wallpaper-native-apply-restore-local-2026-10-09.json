@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "collectedAtLocal": "2026-10-09T12:19:47-03:00",
+  "sourceCommit": "5b27302d22e4b831feb6c14c5aa086d9ef09c30e",
+  "sourceDirty": false,
+  "wallpaperAcceptance": {
+    "testProject": "tests/Zeus.UserOptimization.Tests/Zeus.UserOptimization.Tests.csproj",
+    "testName": "RealWindowsWallpaperCanBeAppliedVerifiedAndRestoredFromHistory",
+    "passed": true,
+    "sessionStatusAfterRestore": "Restored",
+    "appliedImageVerifiedOnAllConnectedMonitors": true,
+    "originalImageHashesVerifiedOnAllConnectedMonitors": true,
+    "originalPositionVerified": true,
+    "slideshowConfigured": false,
+    "personalWallpaperPathsRecorded": false
+  },
+  "suite": {
+    "passed": 46,
+    "failed": 0,
+    "skipped": 0,
+    "trx": "artifacts/TestResults/zeus-user-optimization-wallpaper-final-20261009/zeus-user-optimization-wallpaper-final.trx"
+  },
+  "portablePackage": {
+    "runtime": "win-x64",
+    "selfContained": true,
+    "windowOpenedAndResponded": true,
+    "closedNormally": true,
+    "buildInfoSourceDirty": false,
+    "packageZip": "artifacts/zeus-wallpaper-acceptance-local-20261009/zeus-win-x64.zip",
+    "packageSha256": "1601881000ec369d236a4dbd2ef10b2e28519cf7bee4af57d37ccc1d6bbc935e",
+    "executable": "artifacts/zeus-wallpaper-acceptance-local-20261009/zeus-win-x64-5b27302d22e4-20261009T151947482Z-a0a69a9c/Zeus.Desktop.exe",
+    "executableSha256": "4F98CAD3100E22B409BDBA95EBBABBDE3A428C51FC9459E24BA2695F7F44BFF7",
+    "productionAuthenticodeSignature": false
+  },
+  "windowsChangesLeftBehind": false
+}
