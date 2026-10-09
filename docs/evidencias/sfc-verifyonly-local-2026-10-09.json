@@ -1,0 +1,30 @@
+{
+  "evidenceType": "real-sfc-verifyonly-scan",
+  "date": "2026-10-09",
+  "operation": "sfc /verifyonly",
+  "startedUtc": "2026-10-09T10:27:12.9756511+00:00",
+  "completedUtc": "2026-10-09T10:29:43.2556998+00:00",
+  "durationSeconds": 151,
+  "exitCode": 0,
+  "elevationRequested": true,
+  "repairExecuted": false,
+  "cbsCapture": {
+    "newBytes": 62797,
+    "srEntries": 624,
+    "verifyCompleteMarkers": 208,
+    "repairingOrRepairedMarkers": 0,
+    "cannotRepairMarkers": 0,
+    "captureWasTruncatedOrRotated": false,
+    "rawAppendedLogStoredLocallyOnly": true
+  },
+  "zeusParser": {
+    "name": "SfcVerificationParser",
+    "state": "NoIntegrityViolationsDetected"
+  },
+  "scope": "Only the protected system files represented by this SFC verification; not a claim about overall Windows health.",
+  "limitations": [
+    "The SFC console output was not captured; the exit code and newly appended CBS.log segment were captured.",
+    "CBS.log is shared with Windows servicing; unrelated entries are not independently attributed to SFC.",
+    "This scan validates the real read-only SFC/parser path, not the complete ZEUS repair transaction or the full test suite."
+  ]
+}
