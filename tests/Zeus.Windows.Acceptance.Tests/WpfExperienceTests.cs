@@ -620,11 +620,17 @@ public sealed class WpfExperienceTests
         }
         tabs.SelectedIndex = 0;
         await RenderAsync(window, "zeus-complete-overview.png");
+        var hardwareCardsList = Assert.IsType<ItemsControl>(window.FindName("HardwareCardsList"));
+        var wideHardwareCardColumns = window.HardwareCardColumns;
+        Assert.Equal(MainWindow.ResolveHardwareCardColumns(hardwareCardsList.ActualWidth), wideHardwareCardColumns);
         window.Width = 900;
         window.Height = 650;
         await Task.Delay(50);
         window.UpdateLayout();
-        Assert.Equal(2, window.HardwareCardColumns);
+        var compactHardwareCardColumns = window.HardwareCardColumns;
+        Assert.Equal(MainWindow.ResolveHardwareCardColumns(hardwareCardsList.ActualWidth), compactHardwareCardColumns);
+        Assert.True(compactHardwareCardColumns <= wideHardwareCardColumns,
+            "A narrower available area must not increase the number of overview columns.");
         Assert.True(window.WorkspaceTabs.ActualWidth > 0 && window.WorkspaceTabs.ActualHeight > 0,
             "The workspaces must remain available at the minimum supported viewport.");
         AssertControlFitsWindow(window, technicalModeToggle);
@@ -648,7 +654,10 @@ public sealed class WpfExperienceTests
         window.Height = 1024;
         await Task.Delay(50);
         window.UpdateLayout();
-        Assert.Equal(3, window.HardwareCardColumns);
+        var restoredHardwareCardColumns = window.HardwareCardColumns;
+        Assert.Equal(MainWindow.ResolveHardwareCardColumns(hardwareCardsList.ActualWidth), restoredHardwareCardColumns);
+        Assert.True(restoredHardwareCardColumns >= compactHardwareCardColumns,
+            "A wider available area must not reduce the number of overview columns.");
         window.SelectedTheme = DesktopTheme.Minimal;
         window.IsMinimal = true;
         Assert.Equal(Visibility.Collapsed, window.DetailedVisibility);

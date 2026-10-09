@@ -1,0 +1,32 @@
+{
+  "evidenceType": "graphics-overview-adapter-completeness",
+  "date": "2026-10-09",
+  "sourceCommit": "0d1b75141372a8649ff4516bc6b7bf338cc8ce18",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+  "tests": {
+    "actualWpfApplication": "WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+    "focusedGraphicsCases": 2,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "durationSeconds": 35
+  },
+  "verifiedBehavior": [
+    "The overview summarizes multiple adapters without presenting the first returned adapter as the primary GPU.",
+    "The overview explicitly handles an empty adapter list and notes additional adapters beyond the first three.",
+    "The actual WPF application rendered local GPU inventory in the overview and generated 21 screenshots."
+  ],
+  "portablePackage": {
+    "path": "artifacts/gpu-overview-package/zeus-win-x64.zip",
+    "sha256": "293276b03e4bfec1461ecb6c057ab9895755f69ae27299780bf77acced6b6f62",
+    "desktopExeSha256": "b88b2b7f1bac417b379ef19b5ed0da2f790223cca440162dbccc59aa926db8b7",
+    "smoke": "main window opened, responded, and closed cleanly"
+  },
+  "limitations": [
+    "This focused acceptance does not replace the full Windows regression workflow.",
+    "The overview lists reported adapters but does not classify one as physical, primary, or active.",
+    "The screenshots contain live inventory and remain local; the development package is unsigned for production."
+  ]
+}
