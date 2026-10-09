@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "collectedAtUtc": "2026-10-09T13:39:00Z",
+  "sourceCommit": "8251a0e6c07e35f94fc9147d83da784225f3f6f3",
+  "sourceDirty": false,
+  "change": "Expanded the external Windows customization catalog with support status, compatibility, license and cautions. No external software is installed or configured by ZEUS.",
+  "catalog": {
+    "resourceCount": 7,
+    "added": ["TranslucentTB", "Aero Dock", "Taskbar Widgets", "Mica For Everyone"],
+    "fieldsShown": ["summary", "availability", "compatibility", "license", "caution", "officialUri"]
+  },
+  "verification": {
+    "focusedWpfAcceptance": {
+      "test": "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "durationSeconds": 41
+    },
+    "releaseBuild": {
+      "command": "dotnet build Zeus.slnx -c Release --no-restore",
+      "succeeded": true,
+      "warnings": 0,
+      "errors": 0
+    },
+    "portablePackageSmoke": {
+      "runtime": "win-x64",
+      "opened": true,
+      "responsive": true,
+      "closedCleanly": true,
+      "developmentBuild": true,
+      "sourceCommit": "8251a0e6c07e35f94fc9147d83da784225f3f6f3",
+      "sourceDirty": false,
+      "zipSha256": "57893F331BCB04EFBD0E403988D7516C8CE5852787C623436A20BAF391608AEA",
+      "exeSha256": "72BED58A79E961816CBD8725BF1A9FEDDCE491E92CC9FF799457ECFB5C88F5A6"
+    }
+  },
+  "systemChanges": {
+    "windowsPreferencesChanged": false,
+    "externalToolsInstalled": false,
+    "externalToolsConfigured": false,
+    "productionAuthenticodeSigned": false
+  }
+}
