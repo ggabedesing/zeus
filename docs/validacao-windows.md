@@ -226,6 +226,10 @@ Use Windows 11 suportado, snapshots quando disponíveis e backups independentes.
 
 Em 2026-10-09, a recuperação de um recibo de inicialização sem relatório foi exercitada em pasta temporária isolada. O estado permaneceu incompleto, e `MaintenancePolicy.FindUnresolvedAttempts` identificou a ação exata como `ManualReviewRequired`; a interface mostra essa pendência antes de uma nova confirmação explícita. O teste passou (1/1); não iniciou o auxiliar nem executou manutenção. Interrupção real durante operação elevada e recuperação após reinicialização continuam pendentes na matriz acima.
 
+### Parcela da capacidade dedicada por processo GPU — 2026-10-09
+
+No commit `5598c63`, a tela do Observador calcula quanto a alocação dedicada de cada processo representa da capacidade dedicada reportada pelo adaptador, somente quando a instância/LUID tem uma correspondência única. A amostra não corresponde a um orçamento de VRAM por processo, residência garantida nem diagnóstico de pressão; linhas sem correspondência mantêm o percentual indisponível. O teste de cálculo e casos ausentes/ambíguos passou (1/1). O build Release passou sem avisos/erros. O smoke somente de leitura neste PC encontrou dois adaptadores, uso dedicado em ambos, capacidade em um, e correspondência de capacidade para 32/40 linhas por processo. Uma amostra de RAM não foi suficiente para avaliar pressão; nenhum reparo foi executado. Resumo sanitizado: [gpu-process-capacity-share-local-2026-10-09.json](evidencias/gpu-process-capacity-share-local-2026-10-09.json).
+
 ## Recuperação disponível ao usuário
 
 Na área Limpeza, selecione a sessão guardada e restaure os arquivos. Se o destino já tiver um arquivo novo, ele é preservado. Arquivos excluídos definitivamente não podem ser recuperados pelo ZEUS.

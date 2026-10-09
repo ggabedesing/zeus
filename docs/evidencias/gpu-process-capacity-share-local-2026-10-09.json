@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "gpu-process-dedicated-capacity-share-read-only",
+  "recordedAtUtc": "2026-10-09T06:55:27Z",
+  "sourceCommit": "5598c631b49c99a3e267b93cf168a19a9e6a0fe0",
+  "outcome": "success",
+  "tests": {
+    "perProcessCapacityShareUnitTest": "passed",
+    "passed": 1,
+    "failed": 0,
+    "releaseBuild": "passed",
+    "releaseBuildWarnings": 0,
+    "releaseBuildErrors": 0,
+    "nativeReadOnlySmokeExitCode": 0
+  },
+  "gpuMemory": {
+    "adaptersObserved": 2,
+    "adaptersWithDedicatedUsage": 2,
+    "adaptersWithDedicatedCapacity": 1,
+    "adaptersWithOccupancy": 1,
+    "perProcessInstances": 40,
+    "perProcessDedicatedUsageAvailable": 40,
+    "perProcessCapacityShareAvailable": 32,
+    "processNamesOmitted": true,
+    "adapterIdentifiersOmitted": true,
+    "perProcessBudgetAvailable": false,
+    "pressureDiagnosed": false
+  },
+  "ram": {
+    "validPressureSamples": 1,
+    "pressureState": "InsufficientEvidence"
+  },
+  "maintenancePerformed": false,
+  "limitations": [
+    "The displayed process percentage compares the reported dedicated allocation with the matched adapter capacity; it is not a per-process budget, residency guarantee, or pressure diagnosis.",
+    "Eight process-memory rows had no unique adapter capacity match and remain unavailable.",
+    "This is one local Windows system and does not validate other GPU vendors or driver versions."
+  ]
+}
