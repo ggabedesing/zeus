@@ -48,7 +48,8 @@ internal static class VisualLayoutCatalog
                 string.IsNullOrWhiteSpace(preset.Name) || preset.Name.Length > 48 || !names.Add(preset.Name) ||
                 string.IsNullOrWhiteSpace(preset.Description) || preset.Description.Length > 240 ||
                 !string.Equals(preset.Scope, "zeus-ui", StringComparison.Ordinal) ||
-                !Enum.IsDefined(preset.Theme) || !Enum.IsDefined(preset.Accent))
+                !Enum.IsDefined(preset.Theme) || !Enum.IsDefined(preset.Accent) ||
+                preset.Density is { } density && !Enum.IsDefined(density))
                 throw new JsonException("O catálogo contém perfil inválido, duplicado ou fora do escopo da interface ZEUS.");
         }
 
@@ -79,7 +80,7 @@ internal static class VisualLayoutCatalog
 
     internal static string CreateTemplate() => SerializeCustom([
         new VisualLayoutPreset("custom-meu-tema", "Meu tema", DesktopTheme.Complete,
-            AppAccentColor.ThemeDefault, "Meu perfil de cores do ZEUS.", "zeus-ui")
+            AppAccentColor.ThemeDefault, "Meu perfil visual do ZEUS.", "zeus-ui", DesktopDensity.Comfortable)
     ]);
 
     private sealed record VisualLayoutManifest(int SchemaVersion, List<VisualLayoutPreset>? Presets);

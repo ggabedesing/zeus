@@ -212,6 +212,9 @@ public sealed class WpfExperienceTests
         Assert.Contains(presets, preset => preset.Name == "Produtividade");
         Assert.Contains(presets, preset => preset.Name == "Aurora");
         Assert.Contains(presets, preset => preset.Id == "terminal" && preset.Theme == DesktopTheme.Minimal && preset.Accent == AppAccentColor.Green);
+        Assert.Contains(presets, preset => preset.Id == "minimalista" && preset.Density == DesktopDensity.Compact);
+        Assert.Contains(presets, preset => preset.Id == "gamer-neon" && preset.Density == DesktopDensity.Compact);
+        Assert.Contains(presets, preset => preset.Id == "windows-moderno" && preset.Density is null);
         Assert.Contains(presets, preset => preset.Id == "retro-amber" && preset.Theme == DesktopTheme.RetroAmber);
         Assert.Contains(presets, preset => preset.Id == "monocromatico" && preset.Theme == DesktopTheme.Monochrome);
 
@@ -227,6 +230,7 @@ public sealed class WpfExperienceTests
         Assert.Throws<JsonException>(() => VisualLayoutCatalog.ParseCustom(duplicateName, presets));
         Assert.Throws<JsonException>(() => VisualLayoutCatalog.Parse(new string(' ', 65 * 1024)));
         Assert.DoesNotContain("command", VisualLayoutCatalog.CreateTemplate(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Comfortable", VisualLayoutCatalog.CreateTemplate(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -424,6 +428,7 @@ public sealed class WpfExperienceTests
         Assert.Equal("cancel-visual-layout-preview", AutomationProperties.GetAutomationId(cancelVisualLayoutPreviewButton));
         var originalTheme = window.SelectedTheme;
         var originalAccent = window.SelectedAccentColor;
+        var originalDensity = window.SelectedDensity;
         var originalBackground = Assert.IsType<SolidColorBrush>(Application.Current.Resources["BackgroundBrush"]).Color;
         var storedAppearanceBeforePreview = await new DesktopStorage(fixture).ReadPreferencesAsync();
         var cancelCandidate = window.VisualLayoutPresets.Last(preset => preset.Theme != originalTheme || preset.Accent != originalAccent);
@@ -432,6 +437,7 @@ public sealed class WpfExperienceTests
         Assert.True(cancelVisualLayoutPreviewButton.IsEnabled);
         Assert.Equal(originalTheme, window.SelectedTheme);
         Assert.Equal(originalAccent, window.SelectedAccentColor);
+        Assert.Equal(originalDensity, window.SelectedDensity);
         Assert.Equal(Assert.IsType<SolidColorBrush>(window.SelectedVisualLayoutPreview.BackgroundBrush).Color,
             Assert.IsType<SolidColorBrush>(Application.Current.Resources["BackgroundBrush"]).Color);
         var storedAppearanceDuringPreview = await new DesktopStorage(fixture).ReadPreferencesAsync();
@@ -441,13 +447,16 @@ public sealed class WpfExperienceTests
         cancelVisualLayoutPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, cancelVisualLayoutPreviewButton));
         Assert.False(window.IsVisualLayoutPreviewing);
         Assert.Equal(originalBackground, Assert.IsType<SolidColorBrush>(Application.Current.Resources["BackgroundBrush"]).Color);
+        Assert.Equal(originalDensity, window.SelectedDensity);
         foreach (var visualPreset in window.VisualLayoutPresets)
         {
             var themeBeforePreview = window.SelectedTheme;
             window.SelectedVisualLayoutPreset = visualPreset;
             Assert.Equal(themeBeforePreview, window.SelectedTheme);
-            Assert.Equal(visualPreset.Theme != window.SelectedTheme || visualPreset.Accent != window.SelectedAccentColor,
+            Assert.Equal(visualPreset.Theme != window.SelectedTheme || visualPreset.Accent != window.SelectedAccentColor || visualPreset.Density is { } density && density != window.SelectedDensity,
                 window.IsVisualLayoutPreviewing);
+            var densitySelectorDuringPreview = Assert.IsType<ComboBox>(window.FindName("DensitySelector"));
+            Assert.Equal(!window.IsVisualLayoutPreviewing, densitySelectorDuringPreview.IsEnabled);
             Assert.Equal(Assert.IsType<SolidColorBrush>(window.SelectedVisualLayoutPreview.BackgroundBrush).Color,
                 Assert.IsType<SolidColorBrush>(Application.Current.Resources["BackgroundBrush"]).Color);
             Assert.Equal(visualPreset.Name, window.SelectedVisualLayoutPreview.Name);
@@ -458,12 +467,13 @@ public sealed class WpfExperienceTests
             applyVisualLayoutButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(visualPreset.Theme, window.SelectedTheme);
             Assert.Equal(visualPreset.Accent, window.SelectedAccentColor);
+            if (visualPreset.Density is { } expectedDensity) Assert.Equal(expectedDensity, window.SelectedDensity);
             Assert.Contains("somente à interface do ZEUS", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(animationsBeforeThemeChange, window.ReduceAnimations);
             Assert.Equal(transparencyBeforeThemeChange, window.ReduceTransparency);
             Assert.Equal(wallpaperBeforeThemeChange, window.SelectedWallpaperPath);
         }
-        const string importedVisualLayout = """{"schemaVersion":1,"presets":[{"id":"custom-criacao","name":"Criação pessoal","theme":"GamingNeon","accent":"Green","description":"Paleta criada localmente para o ZEUS.","scope":"zeus-ui"}]}""";
+        const string importedVisualLayout = """{"schemaVersion":1,"presets":[{"id":"custom-criacao","name":"Criação pessoal","theme":"GamingNeon","accent":"Green","density":"Comfortable","description":"Paleta criada localmente para o ZEUS.","scope":"zeus-ui"}]}""";
         Assert.Null(await window.TryImportVisualLayoutManifestAsync(importedVisualLayout));
         Assert.Equal(10, window.VisualLayoutPresets.Count);
         Assert.Equal("custom-criacao", window.SelectedVisualLayoutPreset.Id);
@@ -476,6 +486,7 @@ public sealed class WpfExperienceTests
         var storedAfterCustomConfirm = await new DesktopStorage(fixture).ReadPreferencesAsync();
         Assert.Equal("custom-criacao", storedAfterCustomConfirm.VisualLayoutPresetId);
         Assert.Equal(DesktopTheme.GamingNeon, storedAfterCustomConfirm.Theme);
+        Assert.Equal(DesktopDensity.Comfortable, storedAfterCustomConfirm.Density);
         window.SelectedVisualLayoutPreset = window.VisualLayoutPresets.Single(preset => preset.Id == "aurora");
         applyVisualLayoutButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var customAccentInput = Assert.IsType<TextBox>(window.FindName("CustomAccentHexTextBox"));

@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "presets": [
     {"id":"windows-moderno","name":"Windows Moderno","theme":"Complete","accent":"ThemeDefault","description":"Interface ZEUS completa com a cor padrão do tema.","scope":"zeus-ui"},
-    {"id":"minimalista","name":"Minimalista","theme":"Minimal","accent":"ThemeDefault","description":"Interface ZEUS compacta; detalhes avançados continuam acessíveis no modo técnico.","scope":"zeus-ui"},
+    {"id":"minimalista","name":"Minimalista","theme":"Minimal","accent":"ThemeDefault","description":"Interface ZEUS compacta; detalhes avançados continuam acessíveis no modo técnico.","scope":"zeus-ui","density":"Compact"},
     {"id":"produtividade","name":"Produtividade","theme":"Light","accent":"Blue","description":"Interface clara para leitura e trabalho, com destaque azul.","scope":"zeus-ui"},
     {"id":"aurora","name":"Aurora","theme":"MacInspired","accent":"Violet","description":"Interface escura com cartões suaves e destaque violeta.","scope":"zeus-ui"},
-    {"id":"gamer-neon","name":"Gamer Neon","theme":"GamingNeon","accent":"ThemeDefault","description":"Interface gamer escura com destaque verde neon; não altera jogos ou desempenho.","scope":"zeus-ui"},
+    {"id":"gamer-neon","name":"Gamer Neon","theme":"GamingNeon","accent":"ThemeDefault","description":"Interface gamer escura com destaque verde neon; não altera jogos ou desempenho.","scope":"zeus-ui","density":"Compact"},
     {"id":"cyberpunk","name":"Cyberpunk","theme":"Cyberpunk","accent":"ThemeDefault","description":"Interface escura com contraste rosa e violeta para criação e jogos.","scope":"zeus-ui"},
-    {"id":"terminal","name":"Terminal verde","theme":"Minimal","accent":"Green","description":"Interface compacta com destaque verde; não executa comandos nem muda o Windows Terminal.","scope":"zeus-ui"},
+    {"id":"terminal","name":"Terminal verde","theme":"Minimal","accent":"Green","description":"Interface compacta com destaque verde; não executa comandos nem muda o Windows Terminal.","scope":"zeus-ui","density":"Compact"},
     {"id":"retro-amber","name":"Retrô âmbar","theme":"RetroAmber","accent":"ThemeDefault","description":"Paleta escura em âmbar, inspirada em monitores clássicos.","scope":"zeus-ui"},
     {"id":"monocromatico","name":"Monocromático","theme":"Monochrome","accent":"ThemeDefault","description":"Tons neutros no ZEUS; os estados continuam identificados por texto e ícones.","scope":"zeus-ui"}
   ]

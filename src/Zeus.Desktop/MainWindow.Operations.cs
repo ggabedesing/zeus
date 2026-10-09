@@ -783,6 +783,7 @@ public partial class MainWindow
         ClearCustomAccentForThemeChange();
         _visualLayoutPreviewActive = false;
         _savedVisualLayoutPresetId = preset.Id;
+        if (preset.Density is { } density) SelectedDensity = density;
         SelectedTheme = preset.Theme;
         SelectedAccentColor = preset.Accent;
         ApplyTheme();
@@ -790,6 +791,7 @@ public partial class MainWindow
         Notify(nameof(IsVisualLayoutPreviewing));
         Notify(nameof(VisualLayoutPreviewState));
         Notify(nameof(CanConfirmVisualLayout));
+        Notify(nameof(CanEditDensity));
         StatusTitle = "Perfil visual aplicado";
         StatusDetail = $"{preset.Name} foi aplicado somente à interface do ZEUS. Papel de parede, relógio, animações e configurações do Windows permanecem independentes.";
     }
@@ -835,6 +837,7 @@ public partial class MainWindow
         Notify(nameof(IsVisualLayoutPreviewing));
         Notify(nameof(VisualLayoutPreviewState));
         Notify(nameof(CanConfirmVisualLayout));
+        Notify(nameof(CanEditDensity));
         StatusTitle = "Prévia cancelada";
         StatusDetail = "O tema salvo e o relógio da Área de Trabalho foram mantidos.";
     }
@@ -883,7 +886,7 @@ public partial class MainWindow
         try
         {
             File.WriteAllText(dialog.FileName, VisualLayoutCatalog.CreateTemplate());
-            SetVisualLayoutCatalogStatus("Modelo salvo. Edite apenas ID, nome, descrição, tema e cor de destaque antes de importar.");
+            SetVisualLayoutCatalogStatus("Modelo salvo. Edite apenas ID, nome, descrição, tema, cor e espaçamento antes de importar.");
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {

@@ -459,17 +459,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Notify(nameof(SelectedVisualLayoutPreview));
             if (_loaded)
             {
-                _visualLayoutPreviewActive = value.Theme != SelectedTheme || value.Accent != SelectedAccentColor;
+                _visualLayoutPreviewActive = value.Theme != SelectedTheme || value.Accent != SelectedAccentColor ||
+                    value.Density is { } density && density != SelectedDensity;
                 ApplyTheme(value.Theme, value.Accent);
                 Notify(nameof(IsVisualLayoutPreviewing));
                 Notify(nameof(VisualLayoutPreviewState));
+                Notify(nameof(CanEditDensity));
             }
             Notify(nameof(CanConfirmVisualLayout));
         }
     }
     public VisualLayoutPreview SelectedVisualLayoutPreview => CreateVisualLayoutPreview(SelectedVisualLayoutPreset);
+    public string SelectedVisualLayoutDensitySummary => SelectedVisualLayoutPreset.Density switch
+    {
+        DesktopDensity.Compact => "Prévia: espaçamento compacto, sem reduzir o tamanho do texto.",
+        DesktopDensity.Comfortable => "Prévia: espaçamento confortável.",
+        _ => "Este perfil mantém a densidade selecionada atualmente."
+    };
     public string VisualLayoutCatalogStatus => _visualLayoutCatalogStatus;
     public bool IsVisualLayoutPreviewing => _visualLayoutPreviewActive;
+    public bool CanEditDensity => CanChooseActions && !_visualLayoutPreviewActive;
     public string CustomAccentDraftHex
     {
         get => _customAccentDraftHex;
@@ -491,11 +500,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanConfirmVisualLayout => CanChooseActions &&
         (_visualLayoutPreviewActive ||
          (SelectedVisualLayoutPreset.Theme == SelectedTheme && SelectedVisualLayoutPreset.Accent == SelectedAccentColor &&
+          (SelectedVisualLayoutPreset.Density is null || SelectedVisualLayoutPreset.Density == SelectedDensity) &&
           !string.Equals(SelectedVisualLayoutPreset.Id, _savedVisualLayoutPresetId, StringComparison.Ordinal)));
     public string VisualLayoutPreviewState => SystemParameters.HighContrast
         ? "O alto contraste do Windows prevalece; confirme o perfil para salvar ou cancele a prévia."
         : _visualLayoutPreviewActive
-            ? "Prévia temporária ativa nesta interface. O tema salvo e o relógio da Área de Trabalho não foram alterados."
+            ? "Prévia temporária ativa nesta interface. Tema, densidade salva, relógio e Windows permanecem sem alteração até confirmar."
             : CanConfirmVisualLayout
                 ? "Este perfil já corresponde às cores atuais; confirmar salva o perfil sem mudar as cores."
             : "Escolha um perfil para pré-visualizar nesta interface; confirme para salvar ou cancele a prévia.";
@@ -519,7 +529,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (!Enum.IsDefined(value) || !Set(ref _selectedTheme, value)) return;
             ClearCustomAccentForThemeChange();
             _visualLayoutPreviewActive = false;
-            ApplyTheme(); Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout)); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption));
+            ApplyTheme(); Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout)); Notify(nameof(CanEditDensity)); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption));
             UpdateAppearanceStatus();
             QueuePreferencesSave();
         }
@@ -530,8 +540,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (!Enum.IsDefined(value) || !Set(ref _selectedDensity, value)) return;
-            ApplyDensity();
+            ApplyDensity(_visualLayoutPreviewActive ? SelectedVisualLayoutPreset.Density : null);
             QueuePreferencesSave();
+            Notify(nameof(CanConfirmVisualLayout));
         }
     }
     public DesktopDensityOption[] DensityOptions { get; } =
@@ -545,7 +556,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ClearCustomAccentForThemeChange();
             _visualLayoutPreviewActive = false;
             ApplyTheme();
-            Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout));
+            Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout)); Notify(nameof(CanEditDensity));
             UpdateAppearanceStatus();
             QueuePreferencesSave();
         }
@@ -1114,7 +1125,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ApplyTheme(DesktopTheme? previewTheme = null, AppAccentColor? previewAccent = null, string? customAccentOverride = null)
     {
-        ApplyDensity();
+        ApplyDensity(_visualLayoutPreviewActive ? SelectedVisualLayoutPreset.Density : null);
         if (SystemParameters.HighContrast) return;
         var theme = previewTheme ?? SelectedTheme;
         var colors = GetThemePalette(theme, previewAccent ?? SelectedAccentColor);
@@ -1146,10 +1157,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (previewTheme is null && _loaded && DesktopClockEnabled) SyncDesktopClock();
     }
 
-    private void ApplyDensity()
+    private void ApplyDensity(DesktopDensity? overrideDensity = null)
     {
         if (Application.Current is null) return;
-        var compact = SelectedDensity == DesktopDensity.Compact;
+        var compact = (overrideDensity ?? SelectedDensity) == DesktopDensity.Compact;
         Application.Current.Resources["CardContentPadding"] = compact ? new Thickness(14) : new Thickness(20);
         Application.Current.Resources["ButtonContentPadding"] = compact ? new Thickness(12, 7, 12, 7) : new Thickness(17, 10, 17, 10);
         Application.Current.Resources["NavigationItemPadding"] = compact ? new Thickness(11, 9, 11, 9) : new Thickness(15, 13, 15, 13);
