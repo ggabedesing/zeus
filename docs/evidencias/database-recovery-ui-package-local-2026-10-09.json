@@ -1,6 +1,6 @@
 {
   "date": "2026-10-09",
-  "sourceCommit": "a011cf9b5ca97413c5b6d3ae514461f2dc6ebe00",
+  "sourceCommit": "017a986d8fa8287eea35a9871fd3286039241f47",
   "sourceDirty": false,
   "releaseBuild": {
     "configuration": "Release",
@@ -61,7 +61,11 @@
     "confirmedRestoreRecoveredBackup": true,
     "preRestoreSafetyCopyVerified": true,
     "restartRequestedAfterSuccess": true,
-    "restartActuallyPerformed": false
+    "restartActuallyPerformed": false,
+    "corruptBackupRejected": true,
+    "corruptRestoreLeftCurrentStateUntouched": true,
+    "corruptRestoreCreatedNoRecoveryCopy": true,
+    "corruptRestoreRequestedNoRestart": true
   },
   "portablePackage": {
     "runtime": "win-x64",
