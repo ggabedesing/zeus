@@ -333,6 +333,10 @@ public sealed class WpfExperienceTests
         AssertControlFitsWindow(window, technicalModeToggle);
         AssertControlFitsWindow(window, FindVisualDescendants<Button>(window).Single(button => AutomationProperties.GetAutomationId(button) == "refresh-diagnostics"));
         AssertControlFitsWindow(window, FindVisualDescendants<Button>(window).Single(button => AutomationProperties.GetAutomationId(button) == "export-report"));
+        var diagnosticPackageButton = FindVisualDescendants<Button>(window).Single(button => AutomationProperties.GetAutomationId(button) == "export-diagnostic-package");
+        Assert.Equal("Salvar pacote de diagnóstico ZIP", AutomationProperties.GetName(diagnosticPackageButton));
+        Assert.True(diagnosticPackageButton.IsEnabled);
+        AssertControlFitsWindow(window, diagnosticPackageButton);
         var navigationScroll = Assert.IsType<ScrollViewer>(tabs.Template.FindName("WorkspaceTabNavigationScrollViewer", tabs));
         Assert.True(navigationScroll.ScrollableHeight > 0, "The vertical navigation must offer scrolling when all workspaces do not fit.");
         navigationScroll.ScrollToEnd();

@@ -1,4 +1,7 @@
 using System.IO;
+using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Zeus.Core;
@@ -126,6 +129,65 @@ internal sealed class DesktopStorage
         _database.ReadPerformanceSessionsAsync();
 
     public static Task ExportAsync(string path, ExportDocument document) => WriteAsync(path, document);
+
+    public static async Task ExportDiagnosticPackageAsync(string path, ExportDocument document, string applicationVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationVersion);
+
+        var generatedAt = DateTimeOffset.UtcNow;
+        var reportBytes = JsonSerializer.SerializeToUtf8Bytes(document, JsonOptions);
+        var reportHash = Convert.ToHexString(SHA256.HashData(reportBytes)).ToLowerInvariant();
+        var manifestBytes = JsonSerializer.SerializeToUtf8Bytes(
+            new DiagnosticPackageManifest(1, generatedAt, applicationVersion, document.SchemaVersion, reportHash), JsonOptions);
+        var readme = string.Join(Environment.NewLine,
+        [
+            "Pacote de diagnóstico ZEUS",
+            $"Versão do aplicativo: {applicationVersion}",
+            $"Criado em UTC: {generatedAt:O}",
+            "Conteúdo: relatorio.json, LEIA-ANTES.txt e manifesto.json.",
+            "Privacidade: o relatório pode incluir nomes do computador, dispositivos, programas, processos, serviços, eventos, rede local, manutenção, limpeza e desempenho.",
+            "Revise o relatorio.json e remova dados pessoais antes de compartilhar.",
+            "Este pacote é salvo somente no destino escolhido; o ZEUS não o envia.",
+            "O hash SHA-256 do manifesto confere a integridade dos bytes do relatório, mas não autentica sua origem.",
+            "O pacote não inclui o banco SQLite nem arquivos brutos de log."
+        ]) + Environment.NewLine;
+        var readmeBytes = Encoding.UTF8.GetBytes(readme);
+
+        var fullPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(fullPath) ?? throw new IOException("Diretório de destino inválido.");
+        Directory.CreateDirectory(directory);
+        var temporary = Path.Combine(directory, $".zeus-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true))
+            {
+                using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true))
+                {
+                    await WriteZipEntryAsync(archive, "relatorio.json", reportBytes, cancellationToken);
+                    await WriteZipEntryAsync(archive, "LEIA-ANTES.txt", readmeBytes, cancellationToken);
+                    await WriteZipEntryAsync(archive, "manifesto.json", manifestBytes, cancellationToken);
+                }
+                await file.FlushAsync(cancellationToken);
+                file.Flush(flushToDisk: true);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(temporary, fullPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
+    }
+
+    private static async Task WriteZipEntryAsync(ZipArchive archive, string name, byte[] contents, CancellationToken cancellationToken)
+    {
+        var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
+        await using var stream = entry.Open();
+        await stream.WriteAsync(contents, cancellationToken);
+    }
 
     private static DesktopPreferences DeserializePreferences(string json) =>
         JsonSerializer.Deserialize<DesktopPreferences>(json, JsonOptions)

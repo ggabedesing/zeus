@@ -797,10 +797,40 @@ public partial class MainWindow
         if (dialog.ShowDialog(this) != true) return;
         await RunOperationAsync("Exportando relatório", "Guardando inventário, observações e resultados reais.", async _ =>
         {
-            await DesktopStorage.ExportAsync(dialog.FileName, new(7, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(), new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(), _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan));
+            await DesktopStorage.ExportAsync(dialog.FileName, CreateExportDocument());
             StatusTitle = "Relatório exportado"; StatusDetail = "O JSON contém nomes de computador, usuários e processos. Revise essas informações antes de compartilhar.";
         });
     }
+
+    private async void ExportDiagnosticPackage_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanExport) return;
+        var dialog = new SaveFileDialog
+        {
+            Title = "Salvar pacote de diagnóstico do ZEUS",
+            Filter = "Pacote de diagnóstico ZIP (*.zip)|*.zip",
+            FileName = $"zeus-diagnostico-{DateTime.Now:yyyyMMdd-HHmmss}.zip",
+            DefaultExt = ".zip",
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        if (!Confirm(
+            "O pacote contém o relatório local de diagnóstico, manutenção, limpeza e desempenho, quando disponíveis. Ele pode incluir nomes de computador, dispositivos, programas, processos, serviços, eventos, endereços e configurações de rede.\n\nO ZEUS não inclui o banco SQLite nem arquivos brutos de log e não envia o pacote. Confira o relatorio.json antes de compartilhar. O manifesto contém um hash de integridade, não uma assinatura de origem.\n\nSalvar no caminho escolhido?",
+            "Revisar privacidade do pacote")) return;
+
+        await RunOperationAsync("Preparando pacote de diagnóstico", "Montando o ZIP local com relatório, instruções de privacidade e hash de integridade.", async token =>
+        {
+            await DesktopStorage.ExportDiagnosticPackageAsync(dialog.FileName, CreateExportDocument(), BuildVersion, token);
+            StatusTitle = "Pacote de diagnóstico salvo";
+            StatusDetail = $"Arquivo salvo em {dialog.FileName}. Revise o conteúdo antes de compartilhar; nenhum dado foi enviado.";
+        }, cancellable: true);
+    }
+
+    private ExportDocument CreateExportDocument() =>
+        new(7, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
+            new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(),
+            _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan);
 
     private async void BackupDatabase_Click(object sender, RoutedEventArgs e)
     {

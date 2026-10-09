@@ -224,3 +224,6 @@ internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset Exported
     IReadOnlyList<PerformanceObservation>? PerformanceBaseline = null,
     PerformanceComparison? PerformanceComparison = null,
     OptimizationPlan? FormalOptimizationPlan = null);
+
+internal sealed record DiagnosticPackageManifest(int FormatVersion, DateTimeOffset CreatedAt, string ApplicationVersion,
+    int ReportSchemaVersion, string ReportSha256);

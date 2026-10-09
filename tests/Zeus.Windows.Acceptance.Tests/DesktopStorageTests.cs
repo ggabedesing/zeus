@@ -165,6 +165,49 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.True(diagnostics.GetProperty("PnpDevices")[0].GetProperty("IsPresent").GetBoolean());
     }
 
+    [Fact]
+    public async Task DiagnosticPackageContainsReviewInstructionsAndVerifiableReportHash()
+    {
+        Directory.CreateDirectory(_root);
+        var report = new ExportDocument(7, DateTimeOffset.UtcNow, null, []);
+        var path = Path.Combine(_root, "zeus-diagnostic.zip");
+
+        await DesktopStorage.ExportDiagnosticPackageAsync(path, report, "1.2.3+fixture");
+
+        using var archive = System.IO.Compression.ZipFile.OpenRead(path);
+        Assert.Equal(new[] { "LEIA-ANTES.txt", "manifesto.json", "relatorio.json" }, archive.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal));
+        var reportEntry = Assert.Single(archive.Entries, entry => entry.FullName == "relatorio.json");
+        byte[] reportBytes;
+        await using (var reportStream = reportEntry.Open())
+        await using (var copy = new MemoryStream())
+        {
+            await reportStream.CopyToAsync(copy);
+            reportBytes = copy.ToArray();
+        }
+        using var manifestStream = Assert.Single(archive.Entries, entry => entry.FullName == "manifesto.json").Open();
+        using var manifest = await JsonDocument.ParseAsync(manifestStream);
+        Assert.Equal(1, manifest.RootElement.GetProperty("FormatVersion").GetInt32());
+        Assert.Equal("1.2.3+fixture", manifest.RootElement.GetProperty("ApplicationVersion").GetString());
+        Assert.Equal(7, manifest.RootElement.GetProperty("ReportSchemaVersion").GetInt32());
+        Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(reportBytes)).ToLowerInvariant(),
+            manifest.RootElement.GetProperty("ReportSha256").GetString());
+        using var readmeStream = Assert.Single(archive.Entries, entry => entry.FullName == "LEIA-ANTES.txt").Open();
+        using var reader = new StreamReader(readmeStream);
+        var readme = await reader.ReadToEndAsync();
+        Assert.Contains("o ZEUS não o envia", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("não autentica", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(Directory.EnumerateFiles(_root, ".zeus-*.tmp"));
+
+        var existingPath = Path.Combine(_root, "existing.zip");
+        await File.WriteAllTextAsync(existingPath, "arquivo anterior preservado");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            DesktopStorage.ExportDiagnosticPackageAsync(existingPath, report, "1.2.3+fixture", cancellation.Token));
+        Assert.Equal("arquivo anterior preservado", await File.ReadAllTextAsync(existingPath));
+        Assert.Empty(Directory.EnumerateFiles(_root, ".zeus-*.tmp"));
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
