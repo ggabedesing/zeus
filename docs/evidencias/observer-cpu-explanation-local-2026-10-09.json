@@ -13,8 +13,8 @@
     "closedCleanly": true
   },
   "tests": {
-    "fullSolutionBaseline": {
-      "sourceCommit": "0693b058d09835fdb92890ac2ff624c567703d86",
+    "fullSolution": {
+      "sourceCommit": "0c67cadfd87faa62cb9920f6f4275c7ea4c4d260",
       "passed": 469,
       "failed": 0,
       "skipped": 9
