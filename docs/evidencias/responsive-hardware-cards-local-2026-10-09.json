@@ -1,0 +1,32 @@
+{
+  "evidenceType": "responsive-hardware-overview-cards-and-portable-executable",
+  "date": "2026-10-09",
+  "sourceCommit": "cf8391c47a9b9615e9f19c7289127d94a0c79aa9",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "tests": {
+    "project": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+    "applicationAcceptance": "WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+    "responsiveColumnsCases": 6,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0,
+    "durationSeconds": 34
+  },
+  "verifiedBehavior": [
+    "The actual application uses two hardware summary columns at a 900-DIP window width and returns to three at a wide window width.",
+    "The responsive column policy covers one, two, and three columns, plus invalid measurements.",
+    "The WPF acceptance generated 21 local screenshots, including the compact viewport."
+  ],
+  "portablePackage": {
+    "path": "artifacts/responsive-grid-package/zeus-win-x64.zip",
+    "sha256": "7605d3162230ab1c4be8632f84b3ef6e28cc78b9482a74b6c678ab18969b3ea7",
+    "desktopExeSha256": "fa3a095f652d1b37ca458f8501f9a511db0321f2433e6348f5764cc6a8279e9f",
+    "smoke": "main window opened, responded, and closed cleanly"
+  },
+  "limitations": [
+    "The screenshot files remain local because they show live system inventory; only the sanitized evidence summary is committed.",
+    "This validates responsive layout and startup, not every workflow or a performance improvement.",
+    "The package is an unsigned development build."
+  ]
+}
