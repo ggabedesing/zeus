@@ -20,6 +20,7 @@ public sealed class EventPatternAnalyzerTests
         Assert.Contains("ExampleProvider", finding.Title);
         Assert.Contains("2 ocorrências", finding.Detail);
         Assert.Contains("Error, Warning", finding.Detail);
+        Assert.Contains("período:", finding.Detail);
         Assert.Contains("não prova causa", report.Summary);
     }
 

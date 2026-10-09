@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O Centro de Reparos esclarece que a consulta de eventos inclui níveis crítico, erro e aviso, limita-se a até 20 por log e pode ser incompleta; padrões repetidos mostram o intervalo observado sem inferir causa.
 - A tela Meu PC agora lista até 30 serviços e tarefas agendadas com seus estados reportados; o relatório continua contendo a coleção completa e nenhuma entrada é executada ou alterada.
 - A assinatura de release usa o certificado fixado no repositório `CurrentUser\My`, sem passar a senha PFX na linha de comando do SignTool; variáveis secretas e entradas de certificado temporárias são removidas, inclusive em caso de falha.
 - O CI Windows agora gera um certificado descartável de assinatura, testa a importação/limpeza do PFX e assina uma cópia temporária de um executável pelo thumbprint sem usar credenciais de produção.

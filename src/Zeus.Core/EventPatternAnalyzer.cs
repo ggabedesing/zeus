@@ -20,6 +20,7 @@ public static class EventPatternAnalyzer
                 group.Key.Provider,
                 group.Key.Id,
                 Count = group.Count(),
+                First = group.Min(item => item.Time),
                 Levels = group.Select(item => item.Level).Where(level => !string.IsNullOrWhiteSpace(level))
                     .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(level => level, StringComparer.OrdinalIgnoreCase).ToArray(),
                 Latest = group.Max(item => item.Time)
@@ -34,13 +35,13 @@ public static class EventPatternAnalyzer
             : " Uma ou mais fontes não puderam ser consultadas; a amostra está incompleta.";
         var summary = events.Count == 0
             ? sourcesComplete
-                ? "Nenhum evento de aviso/erro foi retornado pelas fontes consultadas; isso não comprova ausência de problemas no Windows."
+                ? "Nenhum evento crítico, de erro ou aviso foi retornado pelas fontes consultadas; isso não comprova ausência de problemas no Windows."
                 : "Nenhum evento foi retornado e uma ou mais fontes estão indisponíveis; estado desconhecido."
-            : $"{events.Count} evento(s) de aviso/erro na amostra atual · {repeated.Length} assinatura(s) repetida(s). Repetição não prova causa nem impacto." + sourceNote;
+            : $"{events.Count} evento(s) crítico(s), de erro ou aviso na amostra atual · {repeated.Length} assinatura(s) repetida(s). Repetição não prova causa nem impacto." + sourceNote;
 
         var findings = repeated.Select(group => new EventPatternFinding(
             $"{group.Log} · {group.Provider} · ID {group.Id}",
-            $"{group.Count} ocorrências na amostra · nível: {(group.Levels.Length == 0 ? "indisponível" : string.Join(", ", group.Levels))} · mais recente: {group.Latest.ToLocalTime():dd/MM/yyyy HH:mm:ss}. Consulte o Visualizador de Eventos para os detalhes e o contexto."))
+            $"{group.Count} ocorrências na amostra · nível: {(group.Levels.Length == 0 ? "indisponível" : string.Join(", ", group.Levels))} · período: {group.First.ToLocalTime():dd/MM/yyyy HH:mm:ss} a {group.Latest.ToLocalTime():dd/MM/yyyy HH:mm:ss}. Consulte o Visualizador de Eventos para os detalhes e o contexto."))
             .ToArray();
         return new(summary, findings);
     }

@@ -320,3 +320,7 @@ No commit `55ad76d`, o inventário local passou a combinar entradas Win32 do Reg
 ### Listas visíveis de serviços e tarefas agendadas — 2026-10-09
 
 A tela Meu PC agora exibe até 30 serviços (nome, estado e tipo de inicialização) e até 30 tarefas agendadas (pasta e estado), em ordem alfabética. Quando há mais itens, a tela informa quantos permanecem no relatório completo. Isso é inventário declarativo: nenhuma tarefa é executada e nenhum serviço é iniciado ou parado. A aceitação WPF `ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme` passou (1/1) com inventário local; ela confirmou que as linhas exibidas correspondem ao limite aplicado sobre as coleções realmente coletadas. Nenhuma configuração do Windows foi alterada.
+
+### Limites e período dos padrões de eventos — 2026-10-09
+
+O Centro de Reparos agora identifica explicitamente que os logs System, Application e Windows Update são consultados por até 20 eventos críticos, de erro ou aviso por log nos últimos 14 dias; uma coleta limitada pode não incluir todos os eventos desse período. Cada assinatura repetida também mostra a primeira e a última ocorrência da amostra. A análise continua usando somente log, provedor, ID, nível e horário; mensagens brutas permanecem omitidas, e repetição/período não estabelecem causa nem impacto. `EventPatternAnalyzerTests` cobre agrupamento e período; nenhuma ação de reparo é iniciada por esta análise.
