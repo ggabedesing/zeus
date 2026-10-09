@@ -101,13 +101,26 @@ public sealed class WpfExperienceTests
                         Assert.Equal(450, constrainedWindow.MaxHeight);
                         constrainedWindow.Close();
                         Assert.Empty(bindingErrors.Errors);
-                        var restoredWindow = new MainWindow(fixture, _ => { }) { Width = 1200, Height = 850 };
+                        var restoredWindow = new MainWindow(fixture, _ => { }, new Size(800, 450)) { Width = 800, Height = 450 };
                         restoredWindow.Show();
                         var restoreDeadline = DateTimeOffset.UtcNow.AddSeconds(30);
                         while (restoredWindow.StatusTitle != "Diagnóstico concluído" && DateTimeOffset.UtcNow < restoreDeadline)
                             await Task.Delay(50);
                         Assert.Equal("Diagnóstico concluído", restoredWindow.StatusTitle);
                         Assert.Equal("aurora", restoredWindow.SelectedVisualLayoutPreset.Id);
+                        Assert.Equal(800, restoredWindow.MinWidth);
+                        Assert.Equal(450, restoredWindow.MinHeight);
+                        Assert.InRange(restoredWindow.ActualWidth, 1, 800);
+                        Assert.InRange(restoredWindow.ActualHeight, 1, 450);
+                        Assert.True(restoredWindow.WorkspaceTabs.ActualWidth > 0 && restoredWindow.WorkspaceTabs.ActualHeight > 0);
+                        AssertControlFitsWindow(restoredWindow, FindVisualDescendants<Button>(restoredWindow).Single(button => AutomationProperties.GetAutomationId(button) == "refresh-diagnostics"));
+                        var compactNavigation = Assert.IsType<ScrollViewer>(restoredWindow.WorkspaceTabs.Template.FindName("WorkspaceTabNavigationScrollViewer", restoredWindow.WorkspaceTabs));
+                        Assert.True(compactNavigation.ScrollableHeight > 0);
+                        compactNavigation.ScrollToEnd();
+                        restoredWindow.UpdateLayout();
+                        var compactViewport = compactNavigation.TransformToAncestor(restoredWindow).TransformBounds(new Rect(compactNavigation.RenderSize));
+                        var lastWorkspace = restoredWindow.WorkspaceTabs.Items.Cast<TabItem>().Single(tab => AutomationProperties.GetAutomationId(tab) == "HistoryTab");
+                        Assert.True(compactViewport.Contains(lastWorkspace.TransformToAncestor(restoredWindow).TransformBounds(new Rect(lastWorkspace.RenderSize))));
                         restoredWindow.Close();
                         Assert.Empty(bindingErrors.Errors);
                         completion.TrySetResult();
