@@ -101,6 +101,9 @@ public sealed class WindowsInventoryTests
             Assert.False(string.IsNullOrWhiteSpace(service.Name));
             if (service.DependenciesAvailable == true) Assert.NotNull(service.Dependencies);
         });
+        Assert.InRange(snapshot.WindowsInventory.ScheduledTasks.Count, 0, 500);
+        if (snapshot.WindowsInventory.Warnings.Any(warning => warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase)))
+            Assert.Equal(500, snapshot.WindowsInventory.ScheduledTasks.Count);
         Assert.Contains(snapshot.WindowsInventory.Warnings, warning => warning.Contains("WinHTTP", StringComparison.OrdinalIgnoreCase));
         Assert.All(snapshot.WindowsInventory.NetworkConfiguration, network => Assert.NotNull(network.Addresses));
         // Defender, physical sensors, OEM inventory, Secure Boot and TPM are optional on CI VMs.

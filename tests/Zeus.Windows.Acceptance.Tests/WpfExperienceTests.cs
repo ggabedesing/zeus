@@ -276,7 +276,10 @@ public sealed class WpfExperienceTests
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Programas instalados" && row.Detail.Contains("Win32/Appx-MSIX", StringComparison.Ordinal));
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Reinicialização pendente");
         var inventory = window.Snapshot.WindowsInventory!;
-        Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Tarefas agendadas" && row.Detail.Contains("até 30", StringComparison.Ordinal));
+        var scheduledTasksRow = Assert.Single(window.ExtendedHardwareRows, row => row.Title == "Tarefas agendadas");
+        Assert.Contains("até 30", scheduledTasksRow.Detail, StringComparison.Ordinal);
+        var taskInventoryLimited = inventory.Warnings.Any(warning => warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(taskInventoryLimited, scheduledTasksRow.Detail.Contains("amostra está incompleta", StringComparison.Ordinal));
         Assert.Equal(Math.Min(inventory.ScheduledTasks.Count, 30), window.ExtendedHardwareRows.Count(row => row.Title.StartsWith("Tarefa · ", StringComparison.Ordinal)));
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Serviços" && row.Detail.Contains("nenhum foi iniciado ou parado", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(Math.Min(inventory.Services.Count, 30), window.ExtendedHardwareRows.Count(row => row.Title.StartsWith("Serviço · ", StringComparison.Ordinal)));

@@ -40,6 +40,9 @@ try
     Console.WriteLine($"Optional inventory: board={snapshot.Board is not null}; BIOS={snapshot.Bios is not null}; physicalDisks={physicalDisks.Count}.");
     var software = snapshot.WindowsInventory?.InstalledSoftware ?? [];
     Console.WriteLine($"Installed software inventory: total={software.Count}; uninstall registry={software.Count(item => item.Source == "Registro de desinstalação")}; current-user Appx/MSIX={software.Count(item => item.Source == "Pacote Appx/MSIX do usuário")}; names and publishers omitted.");
+    var scheduledTasks = snapshot.WindowsInventory?.ScheduledTasks ?? [];
+    var scheduledTasksTruncated = snapshot.WindowsInventory?.Warnings.Any(warning => warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase)) == true;
+    Console.WriteLine($"Scheduled task inventory: collected={scheduledTasks.Count}; maximum=500; truncated={scheduledTasksTruncated}; names omitted.");
     Console.WriteLine($"Storage provider counters: temperature={physicalDisks.Count(disk => disk.TemperatureCelsius.HasValue)}/{physicalDisks.Count}; wear={physicalDisks.Count(disk => disk.Wear.HasValue)}/{physicalDisks.Count}; power-on hours={physicalDisks.Count(disk => disk.PowerOnHours.HasValue)}/{physicalDisks.Count}; read/write error counters={physicalDisks.Count(disk => disk.ReadErrorsTotal.HasValue || disk.WriteErrorsTotal.HasValue)}/{physicalDisks.Count}. Missing values are unavailable, not zero.");
     Console.WriteLine($"Memory inventory: modules={snapshot.MemoryModules?.Count.ToString() ?? "unavailable"}; firmware-declared slots={snapshot.MemoryArraySlotsReported?.ToString() ?? "unavailable"}; channels=not inferred.");
     Console.WriteLine($"Optional warnings: {snapshot.Warnings.Count}. No repair or restore operation executed.");

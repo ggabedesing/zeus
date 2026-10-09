@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-09",
+  "collector": "Get-ScheduledTask",
+  "limit": 500,
+  "collectedCount": 189,
+  "truncated": false,
+  "taskNamesIncluded": false,
+  "smokeCheckExitCode": 0,
+  "maintenanceExecuted": false,
+  "notes": "The collector probes up to 501 entries to detect truncation and retains at most 500."
+}

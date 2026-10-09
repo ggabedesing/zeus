@@ -573,7 +573,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 .OrderBy(task => task.Path, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(task => task.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
-            ExtendedHardwareRows.Add(new("Tarefas agendadas", $"{scheduledTasks.Length} entradas inventariadas; até 30 são exibidas abaixo. Nenhuma foi alterada."));
+            var scheduledTasksTruncated = inventory.Warnings.Any(warning =>
+                warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase));
+            var scheduledTasksSummary = scheduledTasksTruncated
+                ? $"A coleta atingiu o limite de 500 entradas; há pelo menos {scheduledTasks.Length} tarefas e a amostra está incompleta. Até 30 são exibidas abaixo."
+                : $"{scheduledTasks.Length} entradas inventariadas; até 30 são exibidas abaixo.";
+            ExtendedHardwareRows.Add(new("Tarefas agendadas", scheduledTasksSummary + " Nenhuma foi alterada."));
             foreach (var task in scheduledTasks.Take(30))
                 ExtendedHardwareRows.Add(new($"Tarefa · {Available(task.Name)}", $"Pasta: {Available(task.Path)} · Estado reportado: {Available(task.State)}"));
             if (scheduledTasks.Length > 30)
