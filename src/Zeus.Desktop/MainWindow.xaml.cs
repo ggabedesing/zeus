@@ -55,6 +55,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _firstRunSetupComplete = true;
     private bool _isTechnicalMode;
     private DesktopTheme _selectedTheme = DesktopTheme.Complete;
+    private AppAccentColor _selectedAccentColor = AppAccentColor.ThemeDefault;
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop;
@@ -197,6 +198,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<WindowsUpdateRow> PendingWindowsUpdates { get; } = [];
     public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
     public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS"), new(DesktopTheme.Light, "Claro · leitura")];
+    public IReadOnlyList<AccentColorOption> AccentColorOptions { get; } = [new(AppAccentColor.ThemeDefault, "Padrão do tema"), new(AppAccentColor.Blue, "Azul oceano"), new(AppAccentColor.Violet, "Violeta"), new(AppAccentColor.Green, "Verde"), new(AppAccentColor.Rose, "Rosa"), new(AppAccentColor.Amber, "Âmbar")];
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public bool CanRefresh => !_isBusy;
@@ -281,6 +283,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ApplyTheme(); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); QueuePreferencesSave();
         }
     }
+    public AppAccentColor SelectedAccentColor
+    {
+        get => _selectedAccentColor;
+        set
+        {
+            if (!Enum.IsDefined(value) || !Set(ref _selectedAccentColor, value)) return;
+            ApplyTheme(); QueuePreferencesSave();
+        }
+    }
     public UsageProfile SelectedProfile { get => _selectedProfile; set { if (Enum.IsDefined(value) && Set(ref _selectedProfile, value)) ProfileChanged(); } }
     public bool ReduceAnimations { get => _reduceAnimations; set { if (Set(ref _reduceAnimations, value)) ProfileChanged(); } }
     public bool ReduceTransparency { get => _reduceTransparency; set { if (Set(ref _reduceTransparency, value)) ProfileChanged(); } }
@@ -311,6 +322,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             {
                 var p = await _storage.ReadPreferencesAsync();
                 SelectedTheme = p.IsMinimal ? DesktopTheme.Minimal : p.Theme;
+                SelectedAccentColor = Enum.IsDefined(p.AccentColor) ? p.AccentColor : AppAccentColor.ThemeDefault;
                 SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency;
                 IsTechnicalMode = p.IsTechnicalMode;
                 FirstRunSetupComplete = p.FirstRunSetupComplete;
@@ -612,7 +624,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
-        new(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop));
+        new(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop), SelectedAccentColor);
     private void ClockChanged() { if (_loaded) { SyncDesktopClock(); QueuePreferencesSave(); } }
     private void SyncDesktopClock()
     {
@@ -659,6 +671,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 : SelectedTheme == DesktopTheme.Light
                     ? new[] { "#F3F6FA", "#FFFFFF", "#D8E0EA", "#17212E", "#4B5A6B", "#176B87", "#EFF4F8", "#E7F1F5", "#F6F8FB" }
                     : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
+        colors[5] = GetAccentHex(SelectedAccentColor, SelectedTheme == DesktopTheme.Light);
         var keys = new[] { "BackgroundBrush", "PanelBrush", "BorderBrush", "TextBrush", "MutedBrush", "AccentBrush", "ButtonBrush", "SelectedTabBrush", "LogBackgroundBrush" };
         for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[i]));
         Application.Current.Resources["PrimaryButtonBrush"] = Application.Current.Resources["AccentBrush"];
@@ -683,6 +696,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     internal void RefreshSelectedThemeAfterContrastChange() => ApplyTheme();
+
+    private static string GetAccentHex(AppAccentColor accent, bool isLightTheme) => (accent, isLightTheme) switch
+    {
+        (AppAccentColor.Blue, true) => "#1D4ED8",
+        (AppAccentColor.Blue, false) => "#60A5FA",
+        (AppAccentColor.Violet, true) => "#6D28D9",
+        (AppAccentColor.Violet, false) => "#C4B5FD",
+        (AppAccentColor.Green, true) => "#226B45",
+        (AppAccentColor.Green, false) => "#86EFAC",
+        (AppAccentColor.Rose, true) => "#A02F55",
+        (AppAccentColor.Rose, false) => "#FDA4AF",
+        (AppAccentColor.Amber, true) => "#8A4B00",
+        (AppAccentColor.Amber, false) => "#FCD34D",
+        _ => isLightTheme ? "#176B87"
+            : "#65E3E0"
+    };
 
     private async Task RunOperationAsync(string title, string detail, Func<CancellationToken, Task> operation, bool cancellable = false, bool mutation = false)
     {

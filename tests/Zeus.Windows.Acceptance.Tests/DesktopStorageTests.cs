@@ -14,11 +14,12 @@ public sealed class DesktopStorageTests : IDisposable
     public async Task LightThemePreferencePersistsInSqlite()
     {
         var storage = new DesktopStorage(_root);
-        await storage.SavePreferencesAsync(new DesktopPreferences(false, DesktopTheme.Light));
+        await storage.SavePreferencesAsync(new DesktopPreferences(false, DesktopTheme.Light, AccentColor: AppAccentColor.Green));
 
         var restored = await storage.ReadPreferencesAsync();
 
         Assert.Equal(DesktopTheme.Light, restored.Theme);
+        Assert.Equal(AppAccentColor.Green, restored.AccentColor);
     }
 
     [Fact]

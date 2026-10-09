@@ -2,6 +2,7 @@ namespace Zeus.Windows;
 
 public enum UsageProfile { Balanced = 0, Work = 1, Gaming = 2, Creative = 3, Battery = 4, GamingStreaming = 5, Development = 6 }
 public enum DesktopTheme { Minimal, Complete, MacInspired, Light }
+public enum AppAccentColor { ThemeDefault, Blue, Violet, Green, Rose, Amber }
 
 /// <summary>The usage profile records a preference; it never selects a power plan automatically.</summary>
 public sealed record UserOptimizationPreferences(UsageProfile Profile, bool ReduceAnimations, bool ReduceTransparency);

@@ -106,6 +106,10 @@ public sealed class WpfExperienceTests
         Assert.Equal("Tema do aplicativo", themeSelectorPeer.GetName());
         var expandCollapse = Assert.IsAssignableFrom<IExpandCollapseProvider>(themeSelectorPeer.GetPattern(PatternInterface.ExpandCollapse));
         Assert.Equal(4, themeSelector.Items.Count);
+        var accentSelector = Assert.IsType<ComboBox>(window.FindName("AccentColorSelector"));
+        Assert.Equal("accent-color-selector", AutomationProperties.GetAutomationId(accentSelector));
+        Assert.Equal("Cor de destaque do aplicativo", AutomationProperties.GetName(accentSelector));
+        Assert.Equal(6, accentSelector.Items.Count);
         var technicalModeToggle = Assert.IsType<CheckBox>(window.FindName("TechnicalModeToggle"));
         Assert.Equal("technical-mode-toggle", AutomationProperties.GetAutomationId(technicalModeToggle));
         Assert.Equal("Modo técnico: mostrar detalhes adicionais", AutomationProperties.GetName(technicalModeToggle));
@@ -119,6 +123,11 @@ public sealed class WpfExperienceTests
             window.SelectedTheme = theme;
             Assert.Same(Application.Current.Resources["PanelBrush"], themeSelector.Background);
             Assert.Same(Application.Current.Resources["TextBrush"], themeSelector.Foreground);
+        }
+        foreach (var accent in Enum.GetValues<AppAccentColor>())
+        {
+            window.SelectedAccentColor = accent;
+            Assert.IsType<SolidColorBrush>(Application.Current.Resources["AccentBrush"]);
         }
         Assert.NotEmpty(window.HardwareCards);
         Assert.NotNull(window.Snapshot);
@@ -393,6 +402,8 @@ public sealed class WpfExperienceTests
         Assert.Equal(DesktopTheme.Complete, window.SelectedTheme);
         Assert.Same(app.Resources["PanelBrush"], themeSelector.Background);
         Assert.Same(app.Resources["TextBrush"], themeSelector.Foreground);
+        Assert.Equal(Color.FromRgb(0xFC, 0xD3, 0x4D), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
+        window.SelectedAccentColor = AppAccentColor.ThemeDefault;
         Assert.Equal(Color.FromRgb(0x65, 0xE3, 0xE0), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
         Assert.Equal(Color.FromRgb(0xFF, 0xD1, 0x8B), Assert.IsType<SolidColorBrush>(app.Resources["WarningBrush"]).Color);
         window.SelectedTheme = DesktopTheme.MacInspired;
@@ -400,6 +411,8 @@ public sealed class WpfExperienceTests
         window.SelectedTheme = DesktopTheme.Light;
         Assert.Equal(Color.FromRgb(0x17, 0x6B, 0x87), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
         Assert.Equal(Color.FromRgb(0x80, 0x54, 0x00), Assert.IsType<SolidColorBrush>(app.Resources["WarningBrush"]).Color);
+        window.SelectedAccentColor = AppAccentColor.Green;
+        Assert.Equal(Color.FromRgb(0x22, 0x6B, 0x45), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
         await RenderAsync(window, "zeus-light-overview.png");
 
         foreach (var tab in actualTabs)
