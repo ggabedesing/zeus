@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "f07547d1e4a28851afbfe7811178b8a724a6ef31",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "productionSigned": false,
+  "validation": {
+    "releaseBuildWarnings": 0,
+    "releaseBuildErrors": 0,
+    "coreTestsPassed": 127,
+    "targetedWpfAndStorageTestsPassed": 46,
+    "testsFailed": 0,
+    "testsSkipped": 0,
+    "fullSolutionTestsRun": false,
+    "portableExeOpenedRespondedClosed": true
+  },
+  "realReadOnlyCollection": {
+    "events": 40,
+    "findings": 6,
+    "documentedGuidanceMatches": 0,
+    "rawMessagesRecorded": false,
+    "repairsPerformed": false
+  },
+  "guidanceVerification": "Known signatures, wrong provider/log/ID, singleton inclusion, ordering, DCOM uncertainty, unavailable sources and JSON schema 9 verified with controlled fixtures; known signatures were not present in the real sample.",
+  "package": {
+    "directory": "artifacts/event-investigation-exe/zeus-win-x64-f07547d1e4a2-20261009T164159616Z-9c699c16",
+    "exeSha256": "d2d90fa6c14873115ed1e3f88b015500729979ae2140d7cf24e8fec4e9d32b76",
+    "zipSha256": "1DE0F89F25329E0639A369BB6FBFF9D43CF1A9A1D95A6066511133C64AEC5952"
+  },
+  "limitations": [
+    "Events are limited samples, not a diagnosis of cause or current Windows health.",
+    "Guides do not execute repairs or change security permissions.",
+    "Disk guidance source addresses Windows Server; no controller adjustments are inferred for this PC.",
+    "Administrative repairs, driver installation, restarts and production signing remain outside this validation."
+  ]
+}
