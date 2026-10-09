@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-09",
+  "smokeCheckExitCode": 0,
+  "processes": {
+    "maximum": 200,
+    "collected": 200,
+    "truncated": true,
+    "orderedBy": "largest working set first",
+    "namesIncluded": false
+  },
+  "routes": {
+    "maximum": 300,
+    "associatedWithReturnedInterfaces": 14,
+    "truncated": false,
+    "addressesIncluded": false
+  },
+  "scheduledTasks": {
+    "maximum": 500,
+    "collected": 189,
+    "truncated": false,
+    "namesIncluded": false
+  },
+  "maintenanceExecuted": false
+}

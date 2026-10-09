@@ -43,6 +43,12 @@ try
     var scheduledTasks = snapshot.WindowsInventory?.ScheduledTasks ?? [];
     var scheduledTasksTruncated = snapshot.WindowsInventory?.Warnings.Any(warning => warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase)) == true;
     Console.WriteLine($"Scheduled task inventory: collected={scheduledTasks.Count}; maximum=500; truncated={scheduledTasksTruncated}; names omitted.");
+    var inventoriedProcesses = snapshot.WindowsInventory?.Processes ?? [];
+    var processesTruncated = snapshot.WindowsInventory?.Warnings.Any(warning => warning.StartsWith("Processos: amostra limitada aos 200", StringComparison.OrdinalIgnoreCase)) == true;
+    var inventoriedRoutes = snapshot.WindowsInventory?.NetworkConfiguration.Sum(network => network.Routes?.Length ?? 0) ?? 0;
+    var routesTruncated = snapshot.WindowsInventory?.Warnings.Any(warning => warning.StartsWith("Rotas de rede: amostra limitada a 300", StringComparison.OrdinalIgnoreCase)) == true;
+    Console.WriteLine($"Process inventory: collected={inventoriedProcesses.Count}; maximum=200; truncated={processesTruncated}; names omitted.");
+    Console.WriteLine($"Route inventory: associated={inventoriedRoutes}; maximum=300; truncated={routesTruncated}; addresses omitted.");
     Console.WriteLine($"Storage provider counters: temperature={physicalDisks.Count(disk => disk.TemperatureCelsius.HasValue)}/{physicalDisks.Count}; wear={physicalDisks.Count(disk => disk.Wear.HasValue)}/{physicalDisks.Count}; power-on hours={physicalDisks.Count(disk => disk.PowerOnHours.HasValue)}/{physicalDisks.Count}; read/write error counters={physicalDisks.Count(disk => disk.ReadErrorsTotal.HasValue || disk.WriteErrorsTotal.HasValue)}/{physicalDisks.Count}. Missing values are unavailable, not zero.");
     Console.WriteLine($"Memory inventory: modules={snapshot.MemoryModules?.Count.ToString() ?? "unavailable"}; firmware-declared slots={snapshot.MemoryArraySlotsReported?.ToString() ?? "unavailable"}; channels=not inferred.");
     Console.WriteLine($"Optional warnings: {snapshot.Warnings.Count}. No repair or restore operation executed.");

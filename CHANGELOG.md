@@ -5,6 +5,7 @@
 - O Centro de Reparos esclarece que a consulta de eventos inclui níveis crítico, erro e aviso, limita-se a até 20 por log e pode ser incompleta; padrões repetidos mostram o intervalo observado sem inferir causa.
 - A tela Meu PC agora lista até 30 serviços e tarefas agendadas com seus estados reportados; a coleta de tarefas detecta quando excede 500 e sinaliza que a amostra está incompleta. Nenhuma entrada é executada ou alterada.
 - A coleta de tarefas agendadas consulta um item além do limite de 500 para identificar truncamento; a tela e os avisos deixam explícito quando o inventário não é completo.
+- Os inventários de processos (200) e rotas (300) agora consultam um item além de cada limite e sinalizam truncamento; a tela mostra quando a amostra está incompleta.
 - A assinatura de release usa o certificado fixado no repositório `CurrentUser\My`, sem passar a senha PFX na linha de comando do SignTool; variáveis secretas e entradas de certificado temporárias são removidas, inclusive em caso de falha.
 - O CI Windows agora gera um certificado descartável de assinatura, testa a importação/limpeza do PFX e assina uma cópia temporária de um executável pelo thumbprint sem usar credenciais de produção.
 - A personalização de papel de parede agora aplica uma imagem estática aos monitores conectados com cópia e restauração independentes por monitor; slideshows são preservados e conflitos externos/topologia alterada bloqueiam a reversão automática.

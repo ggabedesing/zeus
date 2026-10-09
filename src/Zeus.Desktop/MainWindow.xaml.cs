@@ -569,6 +569,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
             ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
             ExtendedHardwareRows.Add(new("Reinicialização pendente", FormatRestartState(WindowsRestartStateParser.Evaluate(inventory.RestartIndicators))));
+            var processInventoryLimited = inventory.Warnings.Any(warning =>
+                warning.StartsWith("Processos: amostra limitada aos 200", StringComparison.OrdinalIgnoreCase));
+            var processInventoryUnavailable = inventory.Warnings.Any(warning =>
+                warning.StartsWith("Processos: fonte indisponível", StringComparison.OrdinalIgnoreCase));
+            var processSummary = processInventoryUnavailable
+                ? "Fonte indisponível nesta coleta; inventário de processos desconhecido."
+                : processInventoryLimited
+                    ? "Amostra incompleta: até 200 processos com maior memória de trabalho; outros podem estar fora."
+                    : $"{inventory.Processes.Count} processos retornados pela fonte consultada.";
+            ExtendedHardwareRows.Add(new("Processos do Windows", processSummary));
+            var routeCount = inventory.NetworkConfiguration.Sum(network => network.Routes?.Length ?? 0);
+            var routesLimited = inventory.Warnings.Any(warning =>
+                warning.StartsWith("Rotas de rede: amostra limitada a 300", StringComparison.OrdinalIgnoreCase));
+            var routesUnavailable = inventory.Warnings.Any(warning =>
+                warning.StartsWith("Rotas de rede: fonte indisponível", StringComparison.OrdinalIgnoreCase));
+            var routeSummary = routesUnavailable
+                ? "Fonte de rotas indisponível nesta coleta; cobertura desconhecida."
+                : routesLimited
+                    ? $"Amostra incompleta: limite de 300 rotas; {routeCount} rotas foram associadas às interfaces retornadas."
+                    : $"{routeCount} rotas associadas às interfaces retornadas pela fonte consultada.";
+            ExtendedHardwareRows.Add(new("Rotas de rede", routeSummary));
             var scheduledTasks = inventory.ScheduledTasks
                 .OrderBy(task => task.Path, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(task => task.Name, StringComparer.CurrentCultureIgnoreCase)

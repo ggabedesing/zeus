@@ -281,6 +281,10 @@ public sealed class WpfExperienceTests
         var taskInventoryLimited = inventory.Warnings.Any(warning => warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(taskInventoryLimited, scheduledTasksRow.Detail.Contains("amostra está incompleta", StringComparison.Ordinal));
         Assert.Equal(Math.Min(inventory.ScheduledTasks.Count, 30), window.ExtendedHardwareRows.Count(row => row.Title.StartsWith("Tarefa · ", StringComparison.Ordinal)));
+        var processInventoryRow = Assert.Single(window.ExtendedHardwareRows, row => row.Title == "Processos do Windows");
+        Assert.Equal(inventory.Warnings.Any(warning => warning.StartsWith("Processos: amostra limitada aos 200", StringComparison.OrdinalIgnoreCase)),
+            processInventoryRow.Detail.Contains("Amostra incompleta", StringComparison.Ordinal));
+        Assert.Single(window.ExtendedHardwareRows, row => row.Title == "Rotas de rede");
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Serviços" && row.Detail.Contains("nenhum foi iniciado ou parado", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(Math.Min(inventory.Services.Count, 30), window.ExtendedHardwareRows.Count(row => row.Title.StartsWith("Serviço · ", StringComparison.Ordinal)));
         var imageHealthRow = Assert.Single(window.ExtendedHardwareRows, row => row.Title == "Integridade da imagem do Windows");

@@ -103,7 +103,7 @@ $warnings = [System.Collections.Generic.List[string]]::new()
 function Read-Part([string]$label, [scriptblock]$body) {
   try { return @(& $body) } catch { $warnings.Add($label + ': fonte indisponível.'); return @() }
 }
-$routes = Read-Part 'Rotas de rede' { Get-NetRoute -ErrorAction Stop | Select-Object -First 300 @{n='AdapterIndex';e={[int]$_.InterfaceIndex}},@{n='Route';e={([string]$_.DestinationPrefix + ' -> ' + [string]$_.NextHop)} } }
+$routes = Read-Part 'Rotas de rede' { $sample = @(Get-NetRoute -ErrorAction Stop | Select-Object -First 301); if ($sample.Count -gt 300) { $warnings.Add('Rotas de rede: amostra limitada a 300 entradas; inventário incompleto.') }; $sample | Select-Object -First 300 @{n='AdapterIndex';e={[int]$_.InterfaceIndex}},@{n='Route';e={([string]$_.DestinationPrefix + ' -> ' + [string]$_.NextHop)} } }
 $network = Read-Part 'Rede' { Get-NetIPConfiguration -ErrorAction Stop | Select-Object @{n='Adapter';e={$_.InterfaceAlias}},@{n='InterfaceIndex';e={$_.InterfaceIndex}},@{n='Addresses';e={@($_.IPv4Address.IPAddress + $_.IPv6Address.IPAddress)}},@{n='DnsServers';e={@($_.DNSServer.ServerAddresses)}},@{n='Gateways';e={@($_.IPv4DefaultGateway.NextHop + $_.IPv6DefaultGateway.NextHop)}},@{n='Status';e={[string]$_.NetProfile.NetworkCategory}} }
 $proxy = $null; $proxyEnabled = $null; $proxyPac = $null; $proxyAutoDetect = $null; $proxyBypass = $null; $proxyAvailable = $false
 try {
@@ -122,7 +122,7 @@ $drivers = Read-Part 'Drivers' { Get-CimInstance Win32_PnPSignedDriver -ErrorAct
 $pnp = Read-Part 'Dispositivos PnP' { Get-CimInstance Win32_PnPEntity -ErrorAction Stop | Select-Object Name,PNPClass,Status,PNPDeviceID,@{n='ProblemCode';e={if($_.ConfigManagerErrorCode -ne 0){[string]$_.ConfigManagerErrorCode}else{$null}}} }
 $presentPnp = $null
 try { $presentPnp = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase); Get-PnpDevice -PresentOnly -ErrorAction Stop | ForEach-Object { if (![string]::IsNullOrWhiteSpace([string]$_.InstanceId)) { [void]$presentPnp.Add([string]$_.InstanceId) } } } catch { $warnings.Add('Presença de dispositivos PnP: fonte Get-PnpDevice indisponível; reversão de driver desativada.') }
-$processes = Read-Part 'Processos' { Get-Process -ErrorAction Stop | Where-Object { $_.Id -gt 0 } | Sort-Object WorkingSet64 -Descending | Select-Object -First 200 @{n='Name';e={$_.ProcessName}},Id,@{n='CpuSeconds';e={if($_.CPU -ne $null){[double]$_.CPU}else{$null}}},@{n='WorkingSetBytes';e={[uint64]$_.WorkingSet64}} }
+$processes = Read-Part 'Processos' { $sample = @(Get-Process -ErrorAction Stop | Where-Object { $_.Id -gt 0 } | Sort-Object WorkingSet64 -Descending | Select-Object -First 201); if ($sample.Count -gt 200) { $warnings.Add('Processos: amostra limitada aos 200 maiores working sets; inventário incompleto.') }; $sample | Select-Object -First 200 @{n='Name';e={$_.ProcessName}},Id,@{n='CpuSeconds';e={if($_.CPU -ne $null){[double]$_.CPU}else{$null}}},@{n='WorkingSetBytes';e={[uint64]$_.WorkingSet64}} }
  $services = Read-Part 'Serviços' { Get-CimInstance Win32_Service -ErrorAction Stop | Select-Object Name,DisplayName,State,StartMode }
  $serviceDependencies = Read-Part 'Dependências dos serviços' { Get-Service -ErrorAction Stop | ForEach-Object { [pscustomobject]@{Name=[string]$_.Name;Dependencies=@($_.ServicesDependedOn | ForEach-Object {[string]$_.Name})} } }
  $dependencyMap = $null

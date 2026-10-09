@@ -75,6 +75,8 @@ public sealed class WindowsInventoryTests
         Assert.True(snapshot.WindowsInventory is not null, string.Join(" | ", snapshot.Warnings));
         Assert.NotEmpty(snapshot.WindowsInventory.Processes);
         Assert.InRange(snapshot.WindowsInventory.Processes.Count, 1, 200);
+        if (snapshot.WindowsInventory.Warnings.Any(warning => warning.StartsWith("Processos: amostra limitada aos 200", StringComparison.OrdinalIgnoreCase)))
+            Assert.Equal(200, snapshot.WindowsInventory.Processes.Count);
         Assert.All(snapshot.WindowsInventory.Processes, process =>
         {
             Assert.True(process.Id > 0);
@@ -106,6 +108,8 @@ public sealed class WindowsInventoryTests
             Assert.Equal(500, snapshot.WindowsInventory.ScheduledTasks.Count);
         Assert.Contains(snapshot.WindowsInventory.Warnings, warning => warning.Contains("WinHTTP", StringComparison.OrdinalIgnoreCase));
         Assert.All(snapshot.WindowsInventory.NetworkConfiguration, network => Assert.NotNull(network.Addresses));
+        var routeCount = snapshot.WindowsInventory.NetworkConfiguration.Sum(network => network.Routes?.Length ?? 0);
+        Assert.InRange(routeCount, 0, 300);
         // Defender, physical sensors, OEM inventory, Secure Boot and TPM are optional on CI VMs.
         // The collector must preserve warnings when providers are absent and never invent results.
         Assert.NotNull(snapshot.Warnings);
