@@ -1,8 +1,8 @@
 {
   "evidenceType": "small-work-area-window-sizing-acceptance",
   "date": "2026-10-09",
-  "sourceBaseCommit": "37cb5b53c02c5c36c1fad8fde42ec86d63cb3c50",
-  "sourceIncludesWorkingTreeChanges": true,
+  "sourceCommit": "734f85c4d135798f34691e49ec4d6410e4f5a0de",
+  "sourceDirty": false,
   "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
   "tests": [
     "WindowMinimumSizeFitsSmallWorkAreasWithoutContradictingMaximumSize",
@@ -13,9 +13,11 @@
     "result": "passed",
     "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
     "runtime": "win-x64",
-    "sourceCommit": "37cb5b53c02c5c36c1fad8fde42ec86d63cb3c50",
-    "sourceDirty": true,
-    "zipSha256": "52f1af605e989db90dbdc063a2d194aebf09582b6f146c9d943c47f9f85e2b4f"
+    "packageDirectory": "artifacts/small-work-area-clean-package/zeus-win-x64-734f85c4d135-20261009T075604257Z-705dc917",
+    "zipPath": "artifacts/small-work-area-clean-package/zeus-win-x64.zip",
+    "sourceCommit": "734f85c4d135798f34691e49ec4d6410e4f5a0de",
+    "sourceDirty": false,
+    "zipSha256": "c308bda4b38058089a38f9aedd54a0a6eefe09b1599cad152a27a68e3feb3fee"
   },
   "limitations": [
     "The test checks the minimum-size calculation for an 800x450 work area and the default 900x600 size.",
