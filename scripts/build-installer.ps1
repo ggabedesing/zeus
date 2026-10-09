@@ -22,6 +22,16 @@ dotnet build (Join-Path $PSScriptRoot '../installer/Zeus.Installer.wixproj') -c 
 if ($LASTEXITCODE -ne 0) { throw 'Windows installer build failed.' }
 $installer = Join-Path $OutputDirectory 'Zeus.Installer.msi'
 if (!(Test-Path -LiteralPath $installer -PathType Leaf)) { throw 'WiX build succeeded but installer output was not found.' }
+$msi = New-Object -ComObject WindowsInstaller.Installer
+$database = $msi.OpenDatabase($installer, 0)
+$view = $database.OpenView('SELECT `File`, `FileName`, `Language`, `Version` FROM `File` WHERE `File`=''SQLiteNativeLibraryFile''')
+$view.Execute()
+$sqliteFile = $view.Fetch()
+$view.Close()
+if ($null -eq $sqliteFile -or $sqliteFile.StringData(2) -notmatch 'e_sqlite3\.dll$' -or
+    $sqliteFile.StringData(3) -ne '0' -or [string]::IsNullOrWhiteSpace($sqliteFile.StringData(4))) {
+    throw 'The MSI must contain the language-neutral SQLite native library with LANGID 0 and its file version.'
+}
 $installerHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 "$installerHash  Zeus.Installer.msi" | Set-Content "$installer.sha256" -Encoding ascii
 Write-Output "Windows MSI installer: $installer"

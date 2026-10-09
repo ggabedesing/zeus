@@ -13,7 +13,12 @@
     </StandardDirectory>
 
     <Feature Id="Main" Title="ZEUS" Level="1">
-      <Files Directory="INSTALLFOLDER" Include="$(var.PayloadDirectory)\**" />
+      <Files Directory="INSTALLFOLDER" Include="$(var.PayloadDirectory)\**">
+        <Exclude Files="$(var.PayloadDirectory)\e_sqlite3.dll" />
+      </Files>
+      <Component Directory="INSTALLFOLDER" Id="SQLiteNativeLibrary">
+        <File Id="SQLiteNativeLibraryFile" Source="$(var.PayloadDirectory)\e_sqlite3.dll" DefaultLanguage="0" KeyPath="yes" />
+      </Component>
       <Component Directory="ApplicationProgramsFolder" Id="StartMenuShortcut">
         <Shortcut Id="ZEUSShortcut" Name="ZEUS" Target="[INSTALLFOLDER]Zeus.Desktop.exe" WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue Root="HKLM" Key="Software\ZEUS" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
