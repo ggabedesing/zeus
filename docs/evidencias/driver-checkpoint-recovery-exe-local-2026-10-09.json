@@ -1,0 +1,45 @@
+{
+  "milestone": "driver-checkpoint-recovery",
+  "recordedAtUtc": "2026-10-09T22:26:41.6282944+00:00",
+  "sourceCommit": "8d2c28259cae13d5fc51ad709975c92a51d38a6f",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "signedRelease": false,
+  "build": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "tests": {
+    "total": 680,
+    "failed": 0,
+    "passed": 668,
+    "skipped": 12
+  },
+  "administrativeFocusedTests": {
+    "total": 3,
+    "failed": 0,
+    "passed": 3,
+    "skipped": 0,
+    "scope": "ProtectedSessionStoreTests: unique temporary sessions, ACL, checkpoint create/read/recovery, oversized and user-writable rejection, own fixture cleanup"
+  },
+  "verification": {
+    "actualWindowsPowerShellWriter": "two atomic replacements of isolated fixture with original Before preserved; strict parser read",
+    "unicode": "raw checkpoint preserved; canonical summary bound with explicit unavailable capture",
+    "independentReview": "findings fixed; final read-only review found no new issues",
+    "portableMainWindow": "opened, responded, closed cleanly",
+    "recovery": "missing report and pending report remain unresolved; no automatic retry; existing evidence preserved"
+  },
+  "package": {
+    "zipSha256": "828b7a218bdd12043526045be5eab41f812afa8235fa5396451578d839d20cde",
+    "exeSha256": "e2aaa943497324602bfd9149f2dd5e1b53160bd6fe91651cdcb81fc78f615712",
+    "zip": "artifacts/driver-checkpoint-exe/zeus-win-x64.zip",
+    "folder": "artifacts/driver-checkpoint-exe/zeus-win-x64-8d2c28259cae-20261009T222610901Z-d761905c"
+  },
+  "limitations": [
+    "No driver installation, rollback, actual repair or restart performed",
+    "Administrative fixture tests do not validate actual elevated driver installation",
+    "Observed device bindings do not prove exact WUA package activation, functionality or gain",
+    "Production signed release remains pending"
+  ]
+}
