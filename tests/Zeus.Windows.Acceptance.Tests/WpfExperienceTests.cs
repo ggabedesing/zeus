@@ -140,6 +140,23 @@ public sealed class WpfExperienceTests
         var animationsBeforeThemeChange = window.ReduceAnimations;
         var transparencyBeforeThemeChange = window.ReduceTransparency;
         var wallpaperBeforeThemeChange = window.SelectedWallpaperPath;
+        var visualLayoutSelector = Assert.IsType<ComboBox>(window.FindName("VisualLayoutPresetSelector"));
+        Assert.Equal("visual-layout-preset-selector", AutomationProperties.GetAutomationId(visualLayoutSelector));
+        Assert.Equal("Perfil visual do ZEUS", AutomationProperties.GetName(visualLayoutSelector));
+        Assert.Equal(4, visualLayoutSelector.Items.Count);
+        var applyVisualLayoutButton = Assert.IsType<Button>(window.FindName("ApplyVisualLayoutButton"));
+        Assert.Equal("apply-visual-layout", AutomationProperties.GetAutomationId(applyVisualLayoutButton));
+        foreach (var visualPreset in window.VisualLayoutPresets)
+        {
+            window.SelectedVisualLayoutPreset = visualPreset;
+            applyVisualLayoutButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(visualPreset.Theme, window.SelectedTheme);
+            Assert.Equal(visualPreset.Accent, window.SelectedAccentColor);
+            Assert.Contains("somente à interface do ZEUS", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(animationsBeforeThemeChange, window.ReduceAnimations);
+            Assert.Equal(transparencyBeforeThemeChange, window.ReduceTransparency);
+            Assert.Equal(wallpaperBeforeThemeChange, window.SelectedWallpaperPath);
+        }
         var accentSelector = Assert.IsType<ComboBox>(window.FindName("AccentColorSelector"));
         Assert.Equal("accent-color-selector", AutomationProperties.GetAutomationId(accentSelector));
         Assert.Equal("Cor de destaque do aplicativo", AutomationProperties.GetName(accentSelector));

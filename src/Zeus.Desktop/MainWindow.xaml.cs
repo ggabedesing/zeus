@@ -59,6 +59,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _isTechnicalMode;
     private DesktopTheme _selectedTheme = DesktopTheme.Complete;
     private AppAccentColor _selectedAccentColor = AppAccentColor.ThemeDefault;
+    private VisualLayoutPreset? _selectedVisualLayoutPreset;
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop, _desktopClockUse24HourFormat = true;
@@ -216,6 +217,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         new(DesktopTheme.GamingNeon, "Gamer Neon · foco em jogos", "Interface escura com acento verde neon; não altera jogos, drivers ou configurações de desempenho."),
         new(DesktopTheme.Cyberpunk, "Cyberpunk · criação", "Interface escura com acento rosa; não altera jogos, drivers ou configurações de desempenho.")
     ];
+    public IReadOnlyList<VisualLayoutPreset> VisualLayoutPresets { get; } =
+    [
+        new("windows-moderno", "Windows Moderno", DesktopTheme.Complete, AppAccentColor.ThemeDefault, "Interface ZEUS completa com a cor padrão do tema."),
+        new("minimalista", "Minimalista", DesktopTheme.Minimal, AppAccentColor.ThemeDefault, "Interface ZEUS compacta; detalhes avançados continuam acessíveis no modo técnico."),
+        new("produtividade", "Produtividade", DesktopTheme.Light, AppAccentColor.Blue, "Interface clara para leitura e trabalho, com destaque azul."),
+        new("aurora", "Aurora", DesktopTheme.MacInspired, AppAccentColor.Violet, "Interface escura com cartões suaves e destaque violeta.")
+    ];
     public IReadOnlyList<AppearanceCapabilityRow> AppearanceCapabilities { get; } =
     [
         new("Tema e cor de destaque", "Neste aplicativo", "Aplica a paleta escolhida na interface ZEUS e salva a preferência localmente."),
@@ -308,6 +316,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public Visibility DetailedVisibility => IsMinimal && !IsTechnicalMode ? Visibility.Collapsed : Visibility.Visible;
     public string LayoutDescription => ThemeOptions.First(t => t.Value == SelectedTheme).Name;
     public ThemeOption SelectedThemeOption => ThemeOptions.First(theme => theme.Value == SelectedTheme);
+    public VisualLayoutPreset SelectedVisualLayoutPreset
+    {
+        get => _selectedVisualLayoutPreset ?? VisualLayoutPresets[0];
+        set
+        {
+            if (value is null || !VisualLayoutPresets.Contains(value) || !Set(ref _selectedVisualLayoutPreset, value)) return;
+        }
+    }
     public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
     public bool IsTechnicalMode { get => _isTechnicalMode; set { if (Set(ref _isTechnicalMode, value)) { Notify(nameof(DetailedVisibility)); QueuePreferencesSave(); } } }
     public DesktopTheme SelectedTheme

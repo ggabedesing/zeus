@@ -709,6 +709,16 @@ public partial class MainWindow
         if (!completed) DesktopOrganizationSummary = "Restauração interrompida ou não confirmada. Confira Estados guardados antes de repetir; arquivos modificados foram preservados.";
     }
 
+    private void ApplyVisualLayout_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanChooseActions) return;
+        var preset = SelectedVisualLayoutPreset;
+        SelectedTheme = preset.Theme;
+        SelectedAccentColor = preset.Accent;
+        StatusTitle = "Perfil visual aplicado";
+        StatusDetail = $"{preset.Name} foi aplicado somente à interface do ZEUS. Papel de parede, relógio, animações e configurações do Windows permanecem independentes.";
+    }
+
     private void ChooseWallpaper_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
