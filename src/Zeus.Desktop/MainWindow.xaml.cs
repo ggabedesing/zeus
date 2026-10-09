@@ -87,6 +87,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _performanceSummary = "Meça por cinco segundos durante a tarefa lenta para observar a carga real.";
     private string _performanceActivityLabel = string.Empty;
     private string _performanceSessionHistorySummary = "As sessões salvas aparecem aqui depois da primeira medição.";
+    private PerformanceSessionExport[] _performanceSessionExports = [];
     private string _networkProbeTarget = string.Empty;
     private string _networkProbeSummary = "A medição só começa quando você informa um IP ou host e solicita o teste.";
 

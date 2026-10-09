@@ -190,28 +190,35 @@ public sealed class DesktopStorageTests : IDisposable
     }
 
     [Fact]
-    public async Task ReportSchemaSevenExportsManufacturerSignatureAndPnpPresence()
+    public async Task ReportSchemaEightExportsInventoryAndPerformanceSessionMetadata()
     {
         var inventory = new WindowsInventoryInfo([], [new("Display", "Fixture", "1.2.3", "2025-01-02", "Fixture Signer", false, "Dell Inc.")],
             [new("Display", "Display", "OK", null, "USB\\VID_1234&PID_5678\\A1", true)], [], [], [], [], [], null, null, null, []);
         var snapshot = new HardwareSnapshot(DateTimeOffset.UtcNow, "Windows fixture", "fixture", null, null, [], [], [], null, [],
             WindowsInventory: inventory);
         var path = Path.Combine(_root, "export.json");
-        await DesktopStorage.ExportAsync(path, new ExportDocument(7, DateTimeOffset.UtcNow, snapshot, []));
+        var started = DateTimeOffset.UtcNow.AddMinutes(-2);
+        await DesktopStorage.ExportAsync(path, new ExportDocument(8, DateTimeOffset.UtcNow, snapshot, [],
+            PerformanceSessions: [new("Jogo teste + OBS", started, started.AddMinutes(1), true, 6)]));
 
         using var export = JsonDocument.Parse(await File.ReadAllTextAsync(path));
         var diagnostics = export.RootElement.GetProperty("Diagnostics").GetProperty("WindowsInventory");
-        Assert.Equal(7, export.RootElement.GetProperty("SchemaVersion").GetInt32());
+        Assert.Equal(8, export.RootElement.GetProperty("SchemaVersion").GetInt32());
         Assert.False(diagnostics.GetProperty("Drivers")[0].GetProperty("IsSigned").GetBoolean());
         Assert.Equal("Dell Inc.", diagnostics.GetProperty("Drivers")[0].GetProperty("Manufacturer").GetString());
         Assert.True(diagnostics.GetProperty("PnpDevices")[0].GetProperty("IsPresent").GetBoolean());
+        var session = Assert.Single(export.RootElement.GetProperty("PerformanceSessions").EnumerateArray());
+        Assert.Equal("Jogo teste + OBS", session.GetProperty("Label").GetString());
+        Assert.Equal(started, session.GetProperty("StartedAt").GetDateTimeOffset());
+        Assert.True(session.GetProperty("IsReference").GetBoolean());
+        Assert.Equal(6, session.GetProperty("SampleCount").GetInt32());
     }
 
     [Fact]
     public async Task DiagnosticPackageContainsReviewInstructionsAndVerifiableReportHash()
     {
         Directory.CreateDirectory(_root);
-        var report = new ExportDocument(7, DateTimeOffset.UtcNow, null, []);
+        var report = new ExportDocument(8, DateTimeOffset.UtcNow, null, []);
         var path = Path.Combine(_root, "zeus-diagnostic.zip");
 
         await DesktopStorage.ExportDiagnosticPackageAsync(path, report, "1.2.3+fixture");
@@ -230,7 +237,7 @@ public sealed class DesktopStorageTests : IDisposable
         using var manifest = await JsonDocument.ParseAsync(manifestStream);
         Assert.Equal(1, manifest.RootElement.GetProperty("FormatVersion").GetInt32());
         Assert.Equal("1.2.3+fixture", manifest.RootElement.GetProperty("ApplicationVersion").GetString());
-        Assert.Equal(7, manifest.RootElement.GetProperty("ReportSchemaVersion").GetInt32());
+        Assert.Equal(8, manifest.RootElement.GetProperty("ReportSchemaVersion").GetInt32());
         Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(reportBytes)).ToLowerInvariant(),
             manifest.RootElement.GetProperty("ReportSha256").GetString());
         using var readmeStream = Assert.Single(archive.Entries, entry => entry.FullName == "LEIA-ANTES.txt").Open();

@@ -542,6 +542,12 @@ public sealed class WpfExperienceTests
             session => session.Label == "Medição manual · Jogo teste + OBS");
         Assert.Single(savedPerformanceSession.Samples);
         Assert.Contains("Medição manual · Jogo teste + OBS", window.PerformanceSessionHistorySummary, StringComparison.Ordinal);
+        var exportedSession = Assert.Single(window.CreateExportDocument().PerformanceSessions!,
+            session => session.Label == savedPerformanceSession.Label);
+        Assert.Equal(savedPerformanceSession.StartedAt, exportedSession.StartedAt);
+        Assert.Equal(savedPerformanceSession.FinishedAt, exportedSession.FinishedAt);
+        Assert.Equal(savedPerformanceSession.IsReference, exportedSession.IsReference);
+        Assert.Equal(savedPerformanceSession.Samples.Count, exportedSession.SampleCount);
         Assert.All(window.MaintenanceChoices, choice => Assert.False(choice.IsSelected));
         Assert.False(window.CanExecute);
         // No button that repairs, installs a driver, deletes files, schedules a

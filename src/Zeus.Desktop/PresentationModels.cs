@@ -234,7 +234,11 @@ internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset Exported
     IReadOnlyList<PerformanceHistoryEntry>? PerformanceHistory = null,
     IReadOnlyList<PerformanceObservation>? PerformanceBaseline = null,
     PerformanceComparison? PerformanceComparison = null,
-    OptimizationPlan? FormalOptimizationPlan = null);
+    OptimizationPlan? FormalOptimizationPlan = null,
+    IReadOnlyList<PerformanceSessionExport>? PerformanceSessions = null);
+
+internal sealed record PerformanceSessionExport(string Label, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt,
+    bool IsReference, int SampleCount);
 
 internal sealed record DiagnosticPackageManifest(int FormatVersion, DateTimeOffset CreatedAt, string ApplicationVersion,
     int ReportSchemaVersion, string ReportSha256);

@@ -290,6 +290,9 @@ public partial class MainWindow
         try
         {
             var sessions = await _storage.ReadPerformanceSessionsAsync();
+            _performanceSessionExports = sessions.OrderByDescending(session => session.StartedAt)
+                .Select(session => new PerformanceSessionExport(session.Label, session.StartedAt, session.FinishedAt,
+                    session.IsReference, session.Samples.Count)).ToArray();
             var recent = sessions.OrderByDescending(session => session.StartedAt).Take(5).ToArray();
             PerformanceSessionHistorySummary = recent.Length == 0
                 ? "Nenhuma sessão de desempenho foi salva ainda."
@@ -313,6 +316,9 @@ public partial class MainWindow
     private async Task LoadPerformanceSessionsAsync()
     {
         var sessions = await _storage.ReadPerformanceSessionsAsync();
+        _performanceSessionExports = sessions.OrderByDescending(session => session.StartedAt)
+            .Select(session => new PerformanceSessionExport(session.Label, session.StartedAt, session.FinishedAt,
+                session.IsReference, session.Samples.Count)).ToArray();
         var recentSessions = sessions.OrderByDescending(session => session.StartedAt).Take(5).ToArray();
         PerformanceSessionHistorySummary = recentSessions.Length == 0
             ? "Nenhuma sessão de desempenho foi salva ainda."
@@ -968,10 +974,11 @@ public partial class MainWindow
         }, cancellable: true);
     }
 
-    private ExportDocument CreateExportDocument() =>
-        new(7, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
+    internal ExportDocument CreateExportDocument() =>
+        new(8, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
             new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(),
-            _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan);
+            _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan,
+            _performanceSessionExports);
 
     private async void BackupDatabase_Click(object sender, RoutedEventArgs e)
     {
