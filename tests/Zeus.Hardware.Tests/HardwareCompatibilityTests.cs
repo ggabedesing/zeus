@@ -27,6 +27,7 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(snapshot.NetworkAdapters);
         Assert.Null(snapshot.MemoryArraySlotsReported);
         Assert.Null(snapshot.WindowsInventory);
+        Assert.Null(snapshot.WindowsVersion);
     }
 
     [Fact]
@@ -117,5 +118,16 @@ public sealed class HardwareCompatibilityTests
 
         Assert.Equal(expected, result.Mode);
         Assert.Equal(available, result.IsAvailable);
+    }
+
+    [Fact]
+    public void WindowsVersionJsonKeepsUnavailableDetailsExplicit()
+    {
+        var source = new WindowsVersionInfo(null, null, null, null, false);
+        var restored = JsonSerializer.Deserialize<WindowsVersionInfo>(JsonSerializer.Serialize(source))!;
+
+        Assert.False(restored.IsAvailable);
+        Assert.Null(restored.Caption);
+        Assert.Null(restored.BuildNumber);
     }
 }

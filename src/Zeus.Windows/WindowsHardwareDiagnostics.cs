@@ -61,6 +61,7 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         var memorySlotsTask = Read<int?>("Slots de memória", ReadMemoryArraySlots, null);
         var batteriesTask = Read<IReadOnlyList<BatteryInfo>>("Baterias", ReadBatteries, []);
         var networkTask = Read<IReadOnlyList<NetworkAdapterInfo>>("Adaptadores de rede", ReadNetworkAdapters, []);
+        var windowsVersionTask = Read<WindowsVersionInfo?>("Versão e edição do Windows", ReadWindowsVersion, null);
         var securityTask = ReadAsync<SecurityInfo?>("Defender (outro antivírus pode estar ativo)", ReadSecurityAsync, null);
         var physicalTask = ReadAsync<IReadOnlyList<PhysicalDiskInfo>>("Armazenamento físico", async token =>
         {
@@ -73,8 +74,10 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
             }
         }, []);
         await Task.WhenAll(cpuTask, memoryTask, graphicsTask, disksTask, startupTask, boardTask,
-            biosTask, modulesTask, memorySlotsTask, batteriesTask, networkTask, securityTask, physicalTask);
+            biosTask, modulesTask, memorySlotsTask, batteriesTask, networkTask, windowsVersionTask, securityTask, physicalTask);
         cancellationToken.ThrowIfCancellationRequested();
+        if (await windowsVersionTask is not { IsAvailable: true })
+            warnings.Enqueue("Versão/edição do Windows: Win32_OperatingSystem não forneceu os detalhes nesta coleta.");
         var physical = await physicalTask;
         // Run the broad, optional inventory after the focused hardware providers. Starting
         // another large PowerShell query alongside every WMI/PowerShell probe can starve it
@@ -89,7 +92,7 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         return new HardwareSnapshot(DateTimeOffset.UtcNow, Environment.OSVersion.VersionString,
             Environment.MachineName, await cpuTask, await memoryTask, await graphicsTask, await disksTask,
             await startupTask, await securityTask, warnings.ToArray(), await boardTask, await biosTask,
-            await modulesTask, physical, await batteriesTask, await networkTask, inventory, await memorySlotsTask);
+            await modulesTask, physical, await batteriesTask, await networkTask, inventory, await memorySlotsTask, await windowsVersionTask);
     }
 
     private sealed record WindowsInventoryPayload(WindowsInventoryInfo? Inventory, string[]? Warnings);
@@ -184,6 +187,25 @@ $inventory = [pscustomobject]@{
     {
         var text = Convert.ToString(value[field], CultureInfo.InvariantCulture)?.Trim();
         return string.IsNullOrWhiteSpace(text) ? "Desconhecido" : text;
+    }
+
+    private static string? OptionalStringValue(ManagementBaseObject value, string field)
+    {
+        var text = Convert.ToString(value[field], CultureInfo.InvariantCulture)?.Trim();
+        return string.IsNullOrWhiteSpace(text) ? null : text;
+    }
+
+    private static WindowsVersionInfo ReadWindowsVersion(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        using var rows = Query("SELECT Caption,Version,BuildNumber,OSArchitecture FROM Win32_OperatingSystem");
+        foreach (ManagementObject row in rows)
+        {
+            using (row)
+                return new(OptionalStringValue(row, "Caption"), OptionalStringValue(row, "Version"),
+                    OptionalStringValue(row, "BuildNumber"), OptionalStringValue(row, "OSArchitecture"), true);
+        }
+        return new(null, null, null, null, false);
     }
 
     private static ulong? UnsignedValue(ManagementBaseObject row, string field) =>

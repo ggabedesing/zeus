@@ -379,6 +379,8 @@ public sealed class WpfExperienceTests
             row.Detail.Contains(window.Snapshot.WindowsInventory?.WinHttpProxyConfiguration is { IsAvailable: true } ? "Fonte: configuração WinHTTP padrão" : "Estado indisponível", StringComparison.Ordinal));
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Modo de inicialização firmware" &&
             row.Detail.Contains(window.Snapshot.WindowsInventory?.FirmwareBoot is { IsAvailable: true } ? "reportada pelo Windows" : "Indisponível", StringComparison.Ordinal));
+        Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Sistema operacional" &&
+            row.Detail.Contains(window.Snapshot.WindowsVersion is { IsAvailable: true } ? "build" : "Detalhes da edição/build indisponíveis", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Programas instalados" && row.Detail.Contains("Win32/Appx-MSIX", StringComparison.Ordinal));
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Reinicialização pendente");
         var inventory = window.Snapshot.WindowsInventory!;

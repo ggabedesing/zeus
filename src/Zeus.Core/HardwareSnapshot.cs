@@ -43,7 +43,11 @@ public sealed record HardwareSnapshot(
     IReadOnlyList<BatteryInfo>? Batteries = null,
     IReadOnlyList<NetworkAdapterInfo>? NetworkAdapters = null,
     WindowsInventoryInfo? WindowsInventory = null,
-    int? MemoryArraySlotsReported = null);
+    int? MemoryArraySlotsReported = null,
+    WindowsVersionInfo? WindowsVersion = null);
+
+public sealed record WindowsVersionInfo(string? Caption, string? Version, string? BuildNumber,
+    string? Architecture, bool IsAvailable);
 
 public interface IHardwareDiagnostics
 {

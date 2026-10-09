@@ -301,7 +301,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string NetworkProbeTarget { get => _networkProbeTarget; set => Set(ref _networkProbeTarget, value); }
     public string NetworkProbeSummary { get => _networkProbeSummary; private set => Set(ref _networkProbeSummary, value); }
     public string CollectionDate => _snapshot is null ? "Leitura pendente" : _snapshot.CollectedAt.ToLocalTime().ToString("dd/MM HH:mm:ss");
-    public string SystemDescription => _snapshot is null ? "Inventário local do Windows" : $"{_snapshot.ComputerName} · {_snapshot.OperatingSystem}";
+    public string SystemDescription => _snapshot is null ? "Inventário local do Windows" : FormatSystemDescription(_snapshot);
     public string RecommendationEmptyText => _snapshot is null ? "As recomendações aparecem depois do diagnóstico." : Recommendations.Count == 0 ? "Nenhum alerta pelos critérios desta leitura. Meça a tarefa lenta para investigar." : string.Empty;
     public string FormalPlanSummary => _optimizationPlan?.Status switch
     {
@@ -618,6 +618,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ExtendedHardwareRows.Add(new("Proxy do usuário (HKCU)", FormatProxyConfiguration(inventory.ProxyConfiguration)));
             ExtendedHardwareRows.Add(new("Proxy WinHTTP padrão", FormatWinHttpProxyConfiguration(inventory.WinHttpProxyConfiguration)));
             ExtendedHardwareRows.Add(new("Modo de inicialização firmware", FormatFirmwareBoot(inventory.FirmwareBoot)));
+            ExtendedHardwareRows.Add(new("Sistema operacional", FormatWindowsVersion(snapshot.WindowsVersion, snapshot.OperatingSystem)));
             ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
             ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
             ExtendedHardwareRows.Add(new("Reinicialização pendente", FormatRestartState(WindowsRestartStateParser.Evaluate(inventory.RestartIndicators))));
@@ -1064,6 +1065,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             WindowsFirmwareBootMode.LegacyBios => "Inicialização em BIOS legado, reportada pelo Windows.",
             _ => "Tipo de firmware desconhecido segundo o Windows."
         };
+
+    private static string FormatSystemDescription(HardwareSnapshot snapshot) =>
+        $"{snapshot.ComputerName} · {FormatWindowsVersion(snapshot.WindowsVersion, snapshot.OperatingSystem)}";
+
+    private static string FormatWindowsVersion(WindowsVersionInfo? version, string fallback)
+    {
+        if (version is not { IsAvailable: true }) return $"Detalhes da edição/build indisponíveis · {fallback}";
+        var caption = version.Caption ?? "Edição desconhecida";
+        var versionText = version.Version ?? "versão desconhecida";
+        var build = version.BuildNumber ?? "build desconhecido";
+        var architecture = version.Architecture ?? "arquitetura desconhecida";
+        return $"{caption} · versão {versionText} · build {build} · {architecture}";
+    }
 
     private static string FormatRestartState(WindowsRestartState state) => state.IsPending switch
     {

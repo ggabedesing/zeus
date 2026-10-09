@@ -59,6 +59,12 @@ public sealed class WindowsInventoryTests
         Assert.True(snapshot.Cpu.LogicalProcessors >= snapshot.Cpu.PhysicalCores);
         Assert.NotNull(snapshot.Memory);
         Assert.NotNull(snapshot.WindowsInventory);
+        Assert.NotNull(snapshot.WindowsVersion);
+        if (snapshot.WindowsVersion is { IsAvailable: false })
+            Assert.Contains(snapshot.Warnings, warning => warning.StartsWith("Versão/edição do Windows:", StringComparison.Ordinal));
+        else
+            Assert.Contains(new[] { snapshot.WindowsVersion!.Caption, snapshot.WindowsVersion.Version,
+                snapshot.WindowsVersion.BuildNumber, snapshot.WindowsVersion.Architecture }, value => !string.IsNullOrWhiteSpace(value));
         Assert.NotNull(snapshot.WindowsInventory.RestartIndicators);
         var restartState = Zeus.Core.WindowsRestartStateParser.Evaluate(snapshot.WindowsInventory.RestartIndicators);
         Assert.InRange(restartState.CheckedSourceCount, 0, restartState.TotalSourceCount);
