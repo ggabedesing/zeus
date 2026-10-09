@@ -29,6 +29,21 @@
     "sourceDirty": false,
     "zipSha256": "1c5e5f71a7705f5cc983eed6f1805206566cc47185798bb7af4d8bb3082a89ff"
   },
+  "msiPackageInspection": {
+    "result": "passed",
+    "installerPath": "artifacts/clock-adaptive-clean-package/msi/Zeus.Installer.msi",
+    "sourcePayloadCommit": "420bc6d7e7a0d8d5bece03d0f504140c1ecfeeb1",
+    "sourcePayloadDirty": false,
+    "sha256": "bba848e53038994af69fe3dfb436093abe050d99e79f5fcedf8516dbb7aca76b",
+    "verifiedFileTableEntries": [
+      "THIRD-PARTY-NOTICES.md",
+      "THIRD-PARTY-NOTICES.NET.txt",
+      "licenses/MIT.txt",
+      "licenses/Apache-2.0.txt"
+    ],
+    "installedOnThisComputer": false,
+    "note": "The MSI was built and its embedded file table inspected; install, upgrade, launch and uninstall remain covered by the Windows CI workflow."
+  },
   "limitations": [
     "This is automated acceptance on one Windows machine, not a power or CPU benchmark across hardware.",
     "It does not validate physical multi-monitor layouts or mixed-DPI behavior."
