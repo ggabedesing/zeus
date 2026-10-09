@@ -1,0 +1,38 @@
+{
+  "evidenceType": "wallpaper-position-safety-and-portable-package",
+  "date": "2026-10-09",
+  "implementationCommit": "9aa0cb225889b324aa2961b74d0279c900dde266",
+  "sourceTreeCleanAtPackageBuild": true,
+  "changes": [
+    "Added Center, Tile, Stretch, Fit, Fill, and Span wallpaper positions with explicit global-scope messaging.",
+    "Recorded previous and applied positions in the change journal and verified apply and restore behavior.",
+    "Required all monitors for Span and guarded rollback against external changes."
+  ],
+  "tests": {
+    "wallpaperChangeTests": {
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    "wpfExperienceTests": {
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "portablePackage": {
+    "path": "artifacts/wallpaper-position-final-package/zeus-win-x64.zip",
+    "sha256": "1843bf70406778aa9fb9c7a93dfbf4e832a6b35322bb30d8f620d111f5831d7e",
+    "desktopExePath": "artifacts/wallpaper-position-final-package/zeus-win-x64-9aa0cb225889-20261009T101741890Z-1a27a667/Zeus.Desktop.exe",
+    "desktopExeSha256": "0c163e2bea899254d106f16f00f2b02bd093d24d563d299c11a7e04a9dd89443",
+    "runtime": "win-x64",
+    "developmentBuild": true,
+    "sourceDirty": false,
+    "smoke": "main window opened, responded, and closed cleanly"
+  },
+  "limitations": [
+    "Wallpaper modes were not applied to the user's real desktop during validation.",
+    "This focused change does not establish full-suite regression status or administrative repair validation.",
+    "The development package is not signed with a production Authenticode certificate."
+  ]
+}
