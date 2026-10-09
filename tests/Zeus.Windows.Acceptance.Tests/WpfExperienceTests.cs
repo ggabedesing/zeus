@@ -49,6 +49,25 @@ public sealed class WpfExperienceTests
             MainWindow.FormatMemoryInterleave(new MemoryModuleInfo("DIMM 1", 8UL * 1024 * 1024 * 1024, null, "Fabricante")));
     }
 
+    [Fact]
+    public void DriverSearchSummaryDistinguishesCompleteEmptyResultsFromPartialResultsAndUnknownSource()
+    {
+        var checkedAt = new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero);
+        var completeEmpty = new DriverUpdateSearch(checkedAt, true, 0, null, [], ["avisos informativos"]);
+        var incomplete = new DriverUpdateSearch(checkedAt, false, 0, null,
+            [new("9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2", "Driver fixture", "Vendor", "Device", null, false)], ["fonte parcial"]);
+
+        var emptySummary = MainWindow.FormatDriverSearchSummary(completeEmpty);
+        var partialSummary = MainWindow.FormatDriverSearchSummary(incomplete);
+
+        Assert.Contains("Busca concluída", emptySummary, StringComparison.Ordinal);
+        Assert.Contains("0 candidato(s)", emptySummary, StringComparison.Ordinal);
+        Assert.Contains("origem efetiva desconhecida", emptySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Resultado incompleto", partialSummary, StringComparison.Ordinal);
+        Assert.Contains("1 candidato(s)", partialSummary, StringComparison.Ordinal);
+        Assert.Contains("fonte parcial", partialSummary, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(WallpaperPosition.Fill, Stretch.UniformToFill, TileMode.None)]
     [InlineData(WallpaperPosition.Fit, Stretch.Uniform, TileMode.None)]
