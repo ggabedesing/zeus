@@ -1118,6 +1118,24 @@ public partial class MainWindow
         try { _openUri(uri); }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException) { StatusDetail = $"O Windows não conseguiu abrir este destino: {error.Message}"; }
     }
+    private void OpenCustomizationResource_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy || sender is not FrameworkElement { DataContext: CustomizationResourceOption option }) return;
+        var approved = CustomizationResources.FirstOrDefault(item => item.Id == option.Id && item == option);
+        if (approved is null || !Uri.TryCreate(approved.OfficialUri, UriKind.Absolute, out var uri) ||
+            uri.Scheme != Uri.UriSchemeHttps || uri.Host is not ("learn.microsoft.com" or "github.com")) return;
+        try
+        {
+            _openUri(uri.AbsoluteUri);
+            StatusTitle = "Página oficial aberta";
+            StatusDetail = $"O ZEUS abriu a referência oficial de {approved.Name}. Não instalou nem configurou esse programa; a presença dele neste PC não foi verificada.";
+        }
+        catch (Exception error) when (error is Win32Exception or InvalidOperationException)
+        {
+            StatusTitle = "Página oficial não foi aberta";
+            StatusDetail = $"Não foi possível abrir a referência de {approved.Name}: {error.Message}";
+        }
+    }
     private void OpenWindowsPersonalizationSettings(string uri, string settingName)
     {
         if (_isBusy) return;

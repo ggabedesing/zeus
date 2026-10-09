@@ -222,6 +222,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         new("Animações e transparência do Windows", "Ação separada", "Não são alteradas pelo tema; use a ação própria para revisar, aplicar e restaurar essas preferências."),
         new("Iniciar, barra de tarefas, sons e tela de bloqueio", "Configurações do Windows", "O ZEUS apenas abre páginas oficiais quando solicitado; essa navegação não conta como alteração aplicada ou reversão pelo ZEUS.")
     ];
+    public IReadOnlyList<CustomizationResourceOption> CustomizationResources { get; } =
+    [
+        new("powertoys", "Microsoft PowerToys · FancyZones", "Organiza janelas em áreas e layouts personalizados.", "Projeto MIT com avisos de privacidade e dados de diagnóstico configuráveis. Confira requisitos e privacidade na página oficial.", "https://learn.microsoft.com/windows/powertoys/fancyzones"),
+        new("lively", "Lively Wallpaper", "Papéis de parede animados e interativos para a área de trabalho.", "Projeto GPL-3.0. O consumo varia por conteúdo e configuração; confira distribuição e requisitos na página oficial.", "https://github.com/rocksdanister/lively"),
+        new("rainmeter", "Rainmeter · avançado", "Widgets e informações personalizáveis na área de trabalho.", "Projeto GPL-2.0. Skins podem executar scripts ou acessar a rede; revise cada skin antes de usar.", "https://github.com/rainmeter/rainmeter")
+    ];
     public IReadOnlyList<AccentColorOption> AccentColorOptions { get; } = [new(AppAccentColor.ThemeDefault, "Padrão do tema"), new(AppAccentColor.Blue, "Azul oceano"), new(AppAccentColor.Violet, "Violeta"), new(AppAccentColor.Green, "Verde"), new(AppAccentColor.Rose, "Rosa"), new(AppAccentColor.Amber, "Âmbar")];
     public event PropertyChangedEventHandler? PropertyChanged;
 

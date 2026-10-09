@@ -20,6 +20,7 @@ public sealed record ThemeOption(DesktopTheme Value, string Name, string Descrip
     public override string ToString() => Name;
 }
 public sealed record AppearanceCapabilityRow(string Name, string Status, string Detail);
+public sealed record CustomizationResourceOption(string Id, string Name, string Summary, string Caution, string OfficialUri);
 public sealed record AccentColorOption(AppAccentColor Value, string Name)
 {
     public override string ToString() => Name;

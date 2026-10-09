@@ -121,6 +121,10 @@ public sealed class WpfExperienceTests
         Assert.Equal("Matriz do que o tema altera", AutomationProperties.GetName(themeScope));
         Assert.Contains(window.AppearanceCapabilities, capability => capability.Name == "Papel de parede" && capability.Status == "Ação separada");
         Assert.Contains(window.AppearanceCapabilities, capability => capability.Name == "Iniciar, barra de tarefas, sons e tela de bloqueio" && capability.Status == "Configurações do Windows");
+        var customizationResources = Assert.IsType<ItemsControl>(window.FindName("CustomizationResourcesList"));
+        Assert.Equal(3, customizationResources.Items.Count);
+        Assert.All(window.CustomizationResources, resource => Assert.Contains("https://", resource.OfficialUri, StringComparison.Ordinal));
+        Assert.Contains(window.CustomizationResources, resource => resource.Id == "rainmeter" && resource.Caution.Contains("scripts", StringComparison.OrdinalIgnoreCase));
         var animationsBeforeThemeChange = window.ReduceAnimations;
         var transparencyBeforeThemeChange = window.ReduceTransparency;
         var wallpaperBeforeThemeChange = window.SelectedWallpaperPath;
@@ -246,6 +250,13 @@ public sealed class WpfExperienceTests
             }
             openedUris.Clear();
         }
+        var resourceButton = new Button { DataContext = window.CustomizationResources[0] };
+        typeof(MainWindow).GetMethod("OpenCustomizationResource_Click", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(window, [resourceButton, new RoutedEventArgs(Button.ClickEvent, resourceButton)]);
+        Assert.Equal(window.CustomizationResources[0].OfficialUri, Assert.Single(openedUris));
+        Assert.Equal("Página oficial aberta", window.StatusTitle);
+        Assert.Contains("Não instalou nem configurou", window.StatusDetail, StringComparison.Ordinal);
+        openedUris.Clear();
         Assert.NotNull(window.Snapshot.Cpu);
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
