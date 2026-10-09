@@ -109,4 +109,6 @@ O [esquema e a migração do armazenamento local](docs/persistencia-local.md) de
 
 Leia [SECURITY.md](SECURITY.md) e o [relatório de viabilidade com fontes](docs/relatorio-viabilidade-zeus.md).
 
-O Observador também apresenta até 30 processos por atividade de I/O, com leitura/escrita/outras transferências, intervalo próprio e comparação por identidade e cobertura. São contadores de arquivos/rede/dispositivos, sem atribuição a disco físico ou comprovação de gargalo. Exportação JSON: esquema 10.
+O Observador também apresenta até 30 processos por atividade de I/O, com leitura/escrita/outras transferências, intervalo próprio e comparação por identidade e cobertura. São contadores de arquivos/rede/dispositivos, sem atribuição a disco físico ou comprovação de gargalo. Exportação JSON: esquema 11.
+
+Após um reparo concluído elegível, o Histórico oferece **Verificar após reparo (SCAN)**: nova sessão independente com vínculo recuperável, SFC/DISM estruturados e resultado desconhecido quando a evidência falta. Não inicia outro reparo nem comprova causalidade ou saúde completa. Contrato: [verificacao-apos-reparo.md](docs/verificacao-apos-reparo.md). Banco SQLite esquema 6.

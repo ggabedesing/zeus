@@ -1367,7 +1367,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void Cancel_Click(object sender, RoutedEventArgs e) => _readCancellation?.Cancel();
     private void OpenMaintenance_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 1;
     private void OpenProfile_Click(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 4;
-    private void RebuildHistory() { HistoryRows.Clear(); foreach (var report in _reports) HistoryRows.Add(HistoryRow.From(report)); Notify(nameof(HistoryEmptyText)); Notify(nameof(CanExport)); Notify(nameof(CanVerifyPendingDriverUpdates)); }
+    private void RebuildHistory()
+    {
+        HistoryRows.Clear();
+        foreach (var report in _reports)
+        {
+            var row = HistoryRow.From(report);
+            if (report.VerificationOfSessionId is { } parentId)
+            {
+                var parent = _reports.SingleOrDefault(item => item.SessionId == parentId);
+                row = row with { PostRepairSummary = row.PostRepairSummary + " " + (parent is null
+                    ? "Sessão de origem indisponível; comparação não confirmada."
+                    : PostRepairVerification.Describe(parent, report)) };
+            }
+            HistoryRows.Add(row);
+        }
+        Notify(nameof(HistoryEmptyText)); Notify(nameof(CanExport)); Notify(nameof(CanVerifyPendingDriverUpdates));
+    }
     private void AppendLog(string message)
     {
         ExecutionLog += $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";

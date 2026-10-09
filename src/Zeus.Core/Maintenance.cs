@@ -44,7 +44,9 @@ public sealed record MaintenanceStepResult(
     string? TargetId = null,
     MaintenanceVerificationStatus Verification = MaintenanceVerificationStatus.NotRecorded,
     int? UpdateServerSelection = null,
-    string? UpdateServiceId = null);
+    string? UpdateServiceId = null,
+    WindowsImageHealthState ImageHealthState = WindowsImageHealthState.Unknown,
+    SfcVerificationState SystemFilesState = SfcVerificationState.Unknown);
 
 public sealed record MaintenanceReport(
     Guid SessionId,
@@ -54,7 +56,8 @@ public sealed record MaintenanceReport(
     IReadOnlyList<MaintenanceStepResult> Steps,
     string? Error = null,
     bool IsComplete = true,
-    int? RestorePointSequenceNumber = null);
+    int? RestorePointSequenceNumber = null,
+    Guid? VerificationOfSessionId = null);
 
 public interface IMaintenanceExecutor
 {
@@ -86,6 +89,9 @@ public sealed record MaintenanceRequest(
 
 public interface IAdvancedMaintenanceExecutor
 {
+    Task<MaintenanceReport> ExecutePostRepairVerificationAsync(MaintenanceReport repair,
+        IProgress<string>? progress = null, CancellationToken cancellationToken = default);
+
     Task<MaintenanceReport> ExecuteRequestsAsync(
         IReadOnlyCollection<MaintenanceRequest> requests,
         IProgress<string>? progress = null,

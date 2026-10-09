@@ -150,7 +150,8 @@ internal static class CommandRunner
             MaintenanceActionId.VerifySystemFiles => MaintenanceVerificationStatus.ManualReviewRequired,
             _ => MaintenanceVerificationStatus.CommandCompleted
         };
-        return new MaintenanceStepResult(action, StepOutcome.Succeeded, message, result.LogFile, Verification: verification);
+        return new MaintenanceStepResult(action, StepOutcome.Succeeded, message, result.LogFile, Verification: verification,
+            ImageHealthState: imageScanState, SystemFilesState: sfcVerificationState);
     }
 
     private static CbsLogCheckpoint? TryGetCbsLogCheckpoint(string path)

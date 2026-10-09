@@ -54,13 +54,18 @@ internal sealed class DesktopStorage
         foreach (var report in reports)
         {
             if (report is null || report.SessionId == Guid.Empty || !sessionIds.Add(report.SessionId) || report.Steps is null ||
-                report.RestorePointSequenceNumber is <= 0 || (report.RestorePointSequenceNumber is not null && !report.RestorePointConfirmed))
+                report.RestorePointSequenceNumber is <= 0 || (report.RestorePointSequenceNumber is not null && !report.RestorePointConfirmed) ||
+                report.VerificationOfSessionId == Guid.Empty || report.VerificationOfSessionId == report.SessionId ||
+                (report.VerificationOfSessionId is not null && (report.Steps.Count == 0 ||
+                    report.Steps.Any(step => step is null || step.Action is not (MaintenanceActionId.ScanWindowsImage or MaintenanceActionId.VerifySystemFiles)))))
                 throw new InvalidDataException("O histórico contém uma sessão inválida ou repetida.");
             var actions = new HashSet<(MaintenanceActionId Action, string? Target)>();
             foreach (var step in report.Steps)
             {
                 if (step is null || !Enum.IsDefined(step.Action) || !Enum.IsDefined(step.Outcome) ||
-                    !Enum.IsDefined(step.Verification) ||
+                    !Enum.IsDefined(step.Verification) || !Enum.IsDefined(step.ImageHealthState) || !Enum.IsDefined(step.SystemFilesState) ||
+                    (step.ImageHealthState != WindowsImageHealthState.Unknown && step.Action != MaintenanceActionId.ScanWindowsImage) ||
+                    (step.SystemFilesState != SfcVerificationState.Unknown && step.Action != MaintenanceActionId.VerifySystemFiles) ||
                     !actions.Add((step.Action, step.Action is MaintenanceActionId.InstallDriverUpdate or MaintenanceActionId.RollbackDriver ? step.TargetId : null)) || step.Message is null)
                     throw new InvalidDataException("O histórico contém uma ação inválida ou repetida.");
                 if (step.Action == MaintenanceActionId.InstallDriverUpdate && !MaintenanceRequestProtocol.TryParseDriverIdentity(step.TargetId, out _, out _))
@@ -246,18 +251,27 @@ internal sealed class DesktopStorage
     private static StoredMaintenanceSession ToStored(MaintenanceReport report) => new(
         report.SessionId.ToString("D"), report.StartedAt, report.FinishedAt, report.RestorePointConfirmed, report.IsComplete, report.Error,
         report.Steps.Select((step, index) => new StoredMaintenanceStep(index, step.Action.ToString(), step.Outcome.ToString(), step.Message,
-            step.LogFile, step.TargetId, step.Verification.ToString(), step.UpdateServerSelection, step.UpdateServiceId)).ToArray(),
-        report.RestorePointSequenceNumber);
+            step.LogFile, step.TargetId, step.Verification.ToString(), step.UpdateServerSelection, step.UpdateServiceId,
+            step.ImageHealthState.ToString(), step.SystemFilesState.ToString())).ToArray(),
+        report.RestorePointSequenceNumber, report.VerificationOfSessionId?.ToString("D"));
 
     private static MaintenanceReport FromStored(StoredMaintenanceSession session)
     {
         if (!Guid.TryParseExact(session.SessionId, "D", out var id) || id == Guid.Empty)
             throw new InvalidDataException("O banco contém um identificador de sessão inválido.");
+        Guid? verificationOf = null;
+        if (session.VerificationOfSessionId is not null)
+        {
+            if (!Guid.TryParseExact(session.VerificationOfSessionId, "D", out var parsed) || parsed == Guid.Empty)
+                throw new InvalidDataException("O banco contém um identificador de verificação inválido.");
+            verificationOf = parsed;
+        }
         var steps = session.Steps.OrderBy(step => step.Sequence).Select(step => new MaintenanceStepResult(
             ParseEnum<MaintenanceActionId>(step.Action), ParseEnum<StepOutcome>(step.Outcome), step.Message, step.LogFile, step.TargetId,
-            ParseEnum<MaintenanceVerificationStatus>(step.Verification), step.UpdateServerSelection, step.UpdateServiceId)).ToArray();
+            ParseEnum<MaintenanceVerificationStatus>(step.Verification), step.UpdateServerSelection, step.UpdateServiceId,
+            ParseEnum<WindowsImageHealthState>(step.ImageHealthState), ParseEnum<SfcVerificationState>(step.SystemFilesState))).ToArray();
         return new(id, session.StartedAt, session.FinishedAt, session.RestorePointConfirmed, steps, session.Error, session.IsComplete,
-            session.RestorePointSequenceNumber);
+            session.RestorePointSequenceNumber, verificationOf);
     }
 
     private static T ParseEnum<T>(string value) where T : struct, Enum =>

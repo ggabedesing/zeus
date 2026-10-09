@@ -137,14 +137,16 @@ public partial class MainWindow
             {
                 var existing = _reports.FindIndex(r => r.SessionId == report.SessionId);
                 if (existing < 0) _reports.Add(report);
-                else if (!_reports[existing].IsComplete || report.IsComplete) _reports[existing] = report;
+                else if (!_reports[existing].IsComplete || report.IsComplete)
+                    _reports[existing] = PostRepairVerification.ReconcileRecoveredReport(_reports[existing], report);
             }
             _reports.Sort((a, b) => b.StartedAt.CompareTo(a.StartedAt));
             RebuildHistory();
             if (_historyReadable && recovered.Length > 0)
             {
                 await _storage.SaveHistoryAsync(_reports);
-                foreach (var report in recovered.Where(r => r.IsComplete)) await _pendingSessions.ForgetAsync(report.SessionId);
+                foreach (var report in recovered.Where(r => r.IsComplete && _reports.Any(saved => saved.SessionId == r.SessionId && saved.IsComplete)))
+                    await _pendingSessions.ForgetAsync(report.SessionId);
             }
         }
         catch (Exception error) { _startupWarnings.Add($"A recuperação de sessões de manutenção não foi concluída: {error.Message}"); }
@@ -165,7 +167,7 @@ public partial class MainWindow
         await ReviewAndExecuteAsync(requests);
     }
 
-    private async Task ReviewAndExecuteAsync(IReadOnlyCollection<MaintenanceRequest> requests)
+    private async Task ReviewAndExecuteAsync(IReadOnlyCollection<MaintenanceRequest> requests, MaintenanceReport? repairToVerify = null)
     {
         if (_isBusy) return;
         IReadOnlyList<MaintenanceRequest> ordered;
@@ -177,6 +179,8 @@ public partial class MainWindow
         }
         var definitions = ordered.Select(r => MaintenanceCatalog.Get(r.Action)).ToArray();
         var text = new StringBuilder("Revise as ações selecionadas:\n\n");
+        if (repairToVerify is not null)
+            text.AppendLine($"Verificação posterior da sessão {repairToVerify.SessionId:D}. Apenas varreduras SCAN; nenhum novo reparo. Se o Windows solicitou reinício, faça-o manualmente antes da verificação definitiva. O resultado descreve esta nova leitura, sem comprovar causalidade ou saúde completa.\n");
         foreach (var definition in definitions) text.AppendLine($"• {definition.Title}");
         text.Append("\nO Windows solicitará autorização de administrador. A execução é sequencial e pode demorar; mantenha o computador conectado à energia.\n\n");
         if (definitions.Any(d => d.RequiresRestorePoint)) text.Append("Os reparos e a instalação de driver exigem proteção de recuperação confirmada. Se não for possível confirmar, essas ações serão bloqueadas. Restauração do sistema não recupera documentos apagados.\n\n");
@@ -207,19 +211,27 @@ public partial class MainWindow
         if (!Confirm(text.ToString(), "Revisar manutenção")) return;
         await RunOperationAsync("Manutenção em andamento", "Aguarde o auxiliar e o relatório real da execução.", async _ =>
         {
-            await ExecuteMaintenancePlanAsync(ordered);
+            await ExecuteMaintenancePlanAsync(ordered, repairToVerify: repairToVerify);
         }, mutation: true);
     }
 
-    private async Task<bool> ExecuteMaintenancePlanAsync(IReadOnlyList<MaintenanceRequest> ordered, bool resetLog = true)
+    private async Task<bool> ExecuteMaintenancePlanAsync(IReadOnlyList<MaintenanceRequest> ordered, bool resetLog = true, MaintenanceReport? repairToVerify = null)
     {
             if (resetLog) ExecutionLog = string.Empty;
             MaintenanceResultSummary = string.Empty;
-            var report = await _executor.ExecuteRequestsAsync(ordered, new Progress<string>(AppendLog));
+            var report = repairToVerify is null
+                ? await _executor.ExecuteRequestsAsync(ordered, new Progress<string>(AppendLog))
+                : await _executor.ExecutePostRepairVerificationAsync(repairToVerify, new Progress<string>(AppendLog));
+            if (repairToVerify is not null)
+            {
+                try { report = PostRepairVerification.Link(repairToVerify, report); }
+                catch (ArgumentException error) { AppendLog($"O vínculo posterior não foi confirmado: {error.Message}"); }
+            }
             foreach (var step in report.Steps) AppendLog($"{MaintenanceCatalog.Get(step.Action).Title}: {step.Message}");
             _reports.Insert(0, report); RebuildHistory();
             var presentation = MaintenanceResultPresentation.From(report, ordered);
             MaintenanceResultSummary = presentation.Detail;
+            if (repairToVerify is not null) MaintenanceResultSummary += " " + PostRepairVerification.Describe(repairToVerify, report);
             StatusTitle = presentation.Title;
             StatusDetail = MaintenanceResultSummary;
             try
@@ -240,6 +252,15 @@ public partial class MainWindow
     private async void OfflineScan_Click(object sender, RoutedEventArgs e)
     {
         if (CanOfflineScan) await ReviewAndExecuteAsync([new(MaintenanceActionId.DefenderOfflineScan)]);
+    }
+
+    private async void VerifyAfterRepair_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy || sender is not FrameworkElement { Tag: Guid sessionId }) return;
+        var repair = _reports.SingleOrDefault(report => report.SessionId == sessionId);
+        if (repair is null) return;
+        var plan = PostRepairVerification.CreatePlan(repair);
+        if (plan.Count > 0) await ReviewAndExecuteAsync(plan, repair);
     }
 
     private async void Performance_Click(object sender, RoutedEventArgs e)
@@ -1297,7 +1318,7 @@ public partial class MainWindow
     }
 
     internal ExportDocument CreateExportDocument() =>
-        new(10, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
+        new(11, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
             new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(),
             _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan,
             _performanceSessionExports, EventPatternAnalyzer.AnalyzeInventory(_snapshot?.WindowsInventory));

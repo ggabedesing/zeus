@@ -11,7 +11,21 @@ public sealed class ElevatedMaintenanceExecutor : IMaintenanceExecutor, IAdvance
         IProgress<string>? progress = null, CancellationToken cancellationToken = default) =>
         ExecuteRequestsAsync(actions.Select(action => new MaintenanceRequest(action)).ToArray(), progress, cancellationToken);
 
-    public async Task<MaintenanceReport> ExecuteRequestsAsync(IReadOnlyCollection<MaintenanceRequest> requests,
+    public Task<MaintenanceReport> ExecuteRequestsAsync(IReadOnlyCollection<MaintenanceRequest> requests,
+        IProgress<string>? progress = null, CancellationToken cancellationToken = default) =>
+        ExecuteRequestsCoreAsync(requests, null, progress, cancellationToken);
+
+    public async Task<MaintenanceReport> ExecutePostRepairVerificationAsync(MaintenanceReport repair,
+        IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var plan = PostRepairVerification.CreatePlan(repair);
+        if (plan.Count == 0) throw new ArgumentException("Nenhum reparo concluído elegível para verificação.", nameof(repair));
+        var report = await ExecuteRequestsCoreAsync(plan, repair.SessionId, progress, cancellationToken);
+        return report.Steps.Count == 0 ? report : PostRepairVerification.Link(repair, report);
+    }
+
+    private async Task<MaintenanceReport> ExecuteRequestsCoreAsync(IReadOnlyCollection<MaintenanceRequest> requests,
+        Guid? verificationOfSessionId,
         IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("A manutenção requer Windows.");
@@ -40,7 +54,7 @@ public sealed class ElevatedMaintenanceExecutor : IMaintenanceExecutor, IAdvance
         var helperStarted = false;
         try
         {
-            await new PendingMaintenanceSessions().RememberAsync(id, selected, started, cancellationToken);
+            await new PendingMaintenanceSessions().RememberAsync(id, selected, started, cancellationToken, verificationOfSessionId);
             using var process = Process.Start(start) ?? throw new InvalidOperationException("O auxiliar não iniciou.");
             helperStarted = true;
             progress?.Report("Manutenção em execução. Reparos podem levar bastante tempo; aguarde o relatório antes de fechar o aplicativo.");

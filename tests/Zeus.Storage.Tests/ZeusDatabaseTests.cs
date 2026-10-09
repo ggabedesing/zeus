@@ -341,6 +341,106 @@ public sealed class ZeusDatabaseTests : IDisposable
         Assert.True(File.Exists(path));
     }
 
+    [Fact]
+    public async Task SchemaV5AddsUnknownIntegrityStatesAndNullableVerificationLinkWithoutInventingResults()
+    {
+        var database = CreateDatabase();
+        var session = new StoredMaintenanceSession(Guid.NewGuid().ToString("D"), DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow, false, true, null, [new(0, "ScanWindowsImage", "Succeeded", "Scan completed", null, null)]);
+        await database.SaveMaintenanceHistoryAsync([session]);
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={database.PathName};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "ALTER TABLE maintenance_sessions DROP COLUMN verification_of_session_id; ALTER TABLE maintenance_steps DROP COLUMN image_health_state; ALTER TABLE maintenance_steps DROP COLUMN system_files_state; DELETE FROM schema_migrations WHERE version=6; PRAGMA user_version=5;";
+            await command.ExecuteNonQueryAsync();
+        }
+        var upgraded = new ZeusDatabase(database.PathName);
+        var restored = Assert.Single(await upgraded.ReadMaintenanceHistoryAsync());
+        Assert.Equal(session.SessionId, restored.SessionId);
+        Assert.Null(restored.VerificationOfSessionId);
+        var step = Assert.Single(restored.Steps);
+        Assert.Equal("Unknown", step.ImageHealthState);
+        Assert.Equal("Unknown", step.SystemFilesState);
+        Assert.Equal("Succeeded", step.Outcome);
+        Assert.Equal("Scan completed", step.Message);
+        Assert.Equal(6, (await upgraded.CheckHealthAsync()).SchemaVersion);
+        await upgraded.InitializeAsync();
+        Assert.Equal("Unknown", Assert.Single(Assert.Single(await upgraded.ReadMaintenanceHistoryAsync()).Steps).ImageHealthState);
+    }
+
+    [Fact]
+    public async Task IntegrityStatesAndVerificationLinkRoundTripBackupAndRestoreInSchemaSix()
+    {
+        var database = CreateDatabase();
+        var parentId = Guid.NewGuid().ToString("D");
+        var session = new StoredMaintenanceSession(Guid.NewGuid().ToString("D"), DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow, false, true, null,
+            [new(0, "ScanWindowsImage", "Succeeded", "Image scan", null, null, ImageHealthState: "NoCorruptionDetected"),
+             new(1, "VerifySystemFiles", "Succeeded", "File scan", null, null, SystemFilesState: "IntegrityViolationsDetected")],
+            VerificationOfSessionId: parentId);
+        await database.SaveMaintenanceHistoryAsync([session]);
+        var backup = Path.Combine(_root, "integrity-backup.db");
+        await database.BackupToAsync(backup);
+        await database.SaveMaintenanceHistoryAsync([]);
+        await database.RestoreFromAsync(backup);
+        var restored = Assert.Single(await database.ReadMaintenanceHistoryAsync());
+        Assert.Equal(parentId, restored.VerificationOfSessionId);
+        Assert.Equal(session.SessionId, restored.SessionId);
+        Assert.Equal("NoCorruptionDetected", restored.Steps[0].ImageHealthState);
+        Assert.Equal("Unknown", restored.Steps[0].SystemFilesState);
+        Assert.Equal("IntegrityViolationsDetected", restored.Steps[1].SystemFilesState);
+        Assert.Equal("Unknown", restored.Steps[1].ImageHealthState);
+        Assert.Equal(6, (await database.CheckHealthAsync()).SchemaVersion);
+    }
+
+    [Fact]
+    public async Task RestoreMigratesSchemaFiveInStagingAndPreservesSelectedBackup()
+    {
+        var database = CreateDatabase();
+        await database.WriteSettingAsync("preferences", "\"current\"");
+        var sourcePath = Path.Combine(_root, "schema-five-backup.db");
+        var source = new ZeusDatabase(sourcePath);
+        await source.SaveMaintenanceHistoryAsync([new(Guid.NewGuid().ToString("D"), DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow, false, true, null, [new(0, "VerifySystemFiles", "Succeeded", "Legacy scan", null, null)])]);
+        SqliteConnectionClear();
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={sourcePath};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "ALTER TABLE maintenance_sessions DROP COLUMN verification_of_session_id; ALTER TABLE maintenance_steps DROP COLUMN image_health_state; ALTER TABLE maintenance_steps DROP COLUMN system_files_state; DELETE FROM schema_migrations WHERE version=6; PRAGMA user_version=5;";
+            await command.ExecuteNonQueryAsync();
+        }
+        var original = await File.ReadAllBytesAsync(sourcePath);
+        var safetyPath = await database.RestoreFromAsync(sourcePath);
+        Assert.Equal(original, await File.ReadAllBytesAsync(sourcePath));
+        Assert.Equal("\"current\"", await new ZeusDatabase(safetyPath).ReadSettingAsync("preferences"));
+        var restored = Assert.Single(await database.ReadMaintenanceHistoryAsync());
+        Assert.Null(restored.VerificationOfSessionId);
+        Assert.Equal("Unknown", Assert.Single(restored.Steps).SystemFilesState);
+        Assert.Equal(6, (await database.CheckHealthAsync()).SchemaVersion);
+    }
+
+    [Fact]
+    public async Task ClaimedSchemaSixMissingIntegrityColumnIsRejectedWithoutChangingHistory()
+    {
+        var database = CreateDatabase();
+        await database.WriteSettingAsync("preferences", "\"keep\"");
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={database.PathName};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "ALTER TABLE maintenance_steps DROP COLUMN system_files_state;";
+            await command.ExecuteNonQueryAsync();
+        }
+        await Assert.ThrowsAsync<InvalidDataException>(() => new ZeusDatabase(database.PathName).InitializeAsync());
+        await using var readerConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={database.PathName};Pooling=False");
+        await readerConnection.OpenAsync();
+        await using var read = readerConnection.CreateCommand();
+        read.CommandText = "SELECT json_value FROM app_settings WHERE setting_key='preferences';";
+        Assert.Equal("\"keep\"", await read.ExecuteScalarAsync());
+    }
+
     public void Dispose()
     {
         SqliteConnectionClear();

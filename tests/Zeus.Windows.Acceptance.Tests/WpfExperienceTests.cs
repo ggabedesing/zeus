@@ -602,7 +602,7 @@ public sealed class WpfExperienceTests
             for (var index = 0; index < expectedEventRows.Length; index++)
                 Assert.Equal(expectedEventRows[index].Detail, window.EventDiagnosticRows[index].Detail);
             var exportedEventReport = window.CreateExportDocument();
-            Assert.Equal(10, exportedEventReport.SchemaVersion);
+            Assert.Equal(11, exportedEventReport.SchemaVersion);
             Assert.Equal(eventReport.Summary, exportedEventReport.EventDiagnostics!.Summary);
             Assert.Equal(eventReport.Findings, exportedEventReport.EventDiagnostics.Findings);
         }
@@ -999,6 +999,25 @@ public sealed class WpfExperienceTests
         window.Height = 1024;
         await Task.Delay(50);
         window.UpdateLayout();
+        var originalWorkspace = tabs.SelectedItem;
+        tabs.SelectedItem = historyTab;
+        var postRepairFixtureStart = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var repairFixture = new MaintenanceReport(Guid.NewGuid(), postRepairFixtureStart, postRepairFixtureStart.AddMinutes(1), true,
+            [new(MaintenanceActionId.RepairWindowsImage, StepOutcome.Succeeded, "Fixture: comando concluído, sem inferir correção.", Verification: MaintenanceVerificationStatus.ManualReviewRequired)]);
+        var repairHistoryRow = HistoryRow.From(repairFixture);
+        window.HistoryRows.Add(repairHistoryRow);
+        await Task.Delay(50);
+        window.UpdateLayout();
+        var verifyRepairButton = FindVisualDescendants<Button>(window).Single(button => Equals(button.Tag, repairFixture.SessionId) && Equals(button.Content, "Verificar após reparo (SCAN)"));
+        Assert.True(verifyRepairButton.IsEnabled);
+        verifyRepairButton.BringIntoView();
+        await Task.Delay(50);
+        window.UpdateLayout();
+        AssertControlFitsWindow(window, verifyRepairButton);
+        await RenderAsync(window, "zeus-post-repair-history.png");
+        window.HistoryRows.Remove(repairHistoryRow);
+        tabs.SelectedItem = originalWorkspace;
+        window.UpdateLayout();
         var restoredHardwareCardColumns = window.HardwareCardColumns;
         Assert.Equal(MainWindow.ResolveHardwareCardColumns(hardwareCardsList.ActualWidth), restoredHardwareCardColumns);
         Assert.True(restoredHardwareCardColumns >= compactHardwareCardColumns,
@@ -1292,7 +1311,7 @@ public sealed class WpfExperienceTests
             Assert.Contains("intervalo do processo:", row.Detail);
         });
         var processIoExport = window.CreateExportDocument();
-        Assert.Equal(10, processIoExport.SchemaVersion);
+        Assert.Equal(11, processIoExport.SchemaVersion);
         Assert.Equal(window.Performance.IoProcesses, processIoExport.Performance!.IoProcesses);
         var savedPerformanceSession = Assert.Single(await new DesktopStorage(fixture).ReadPerformanceSessionsAsync(),
             session => session.Label == "Medição manual · Jogo teste + OBS");
@@ -1448,7 +1467,7 @@ public sealed class WpfExperienceTests
         Assert.True(control.IsVisible, $"The {AutomationProperties.GetName(control)} control must remain visible in the compact viewport.");
         var bounds = control.TransformToAncestor(window).TransformBounds(new Rect(control.RenderSize));
         Assert.True(bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= window.ActualWidth && bounds.Bottom <= window.ActualHeight,
-            $"The {AutomationProperties.GetName(control)} control must fit inside the compact viewport.");
+            $"The {AutomationProperties.GetName(control)} control must fit inside the compact viewport. Bounds={bounds}; window={window.ActualWidth}x{window.ActualHeight}.");
     }
 
     private static IEnumerable<T> FindVisualDescendants<T>(DependencyObject parent) where T : DependencyObject

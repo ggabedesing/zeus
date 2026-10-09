@@ -11,6 +11,62 @@ public sealed class DesktopStorageTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "zeus-desktop-storage-tests-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public async Task IntegrityStatesAndLinkedVerificationPersistWithoutRequiringParentHistory()
+    {
+        var storage = new DesktopStorage(_root);
+        var report = new MaintenanceReport(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, false,
+            [new(MaintenanceActionId.ScanWindowsImage, StepOutcome.Succeeded, "Scan", ImageHealthState: WindowsImageHealthState.NoCorruptionDetected),
+             new(MaintenanceActionId.VerifySystemFiles, StepOutcome.Succeeded, "Verify", SystemFilesState: SfcVerificationState.IntegrityViolationsDetected)],
+            VerificationOfSessionId: Guid.NewGuid());
+        await storage.SaveHistoryAsync([report]);
+        var restored = Assert.Single(await storage.ReadHistoryAsync());
+        Assert.Equal(report.VerificationOfSessionId, restored.VerificationOfSessionId);
+        Assert.Equal(WindowsImageHealthState.NoCorruptionDetected, restored.Steps[0].ImageHealthState);
+        Assert.Equal(SfcVerificationState.Unknown, restored.Steps[0].SystemFilesState);
+        Assert.Equal(SfcVerificationState.IntegrityViolationsDetected, restored.Steps[1].SystemFilesState);
+        Assert.Equal(WindowsImageHealthState.Unknown, restored.Steps[1].ImageHealthState);
+        Assert.Equal(6, (await storage.CheckHealthAsync()).SchemaVersion);
+    }
+
+    [Fact]
+    public void HistoryRejectsInvalidIntegrityEnumsActionStatesAndVerificationLinks()
+    {
+        var report = new MaintenanceReport(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, false,
+            [new(MaintenanceActionId.ScanWindowsImage, StepOutcome.Succeeded, "Scan")]);
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with { VerificationOfSessionId = Guid.Empty }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with { VerificationOfSessionId = report.SessionId }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with { VerificationOfSessionId = Guid.NewGuid(), Steps = [] }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with { VerificationOfSessionId = Guid.NewGuid(),
+            Steps = [new(MaintenanceActionId.RepairWindowsImage, StepOutcome.Succeeded, "Repair")] }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with {
+            Steps = [report.Steps[0] with { ImageHealthState = (WindowsImageHealthState)999 }] }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with {
+            Steps = [report.Steps[0] with { SystemFilesState = (SfcVerificationState)999 }] }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with {
+            Steps = [new(MaintenanceActionId.RepairWindowsImage, StepOutcome.Succeeded, "Repair", ImageHealthState: WindowsImageHealthState.NoCorruptionDetected)] }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with {
+            Steps = [report.Steps[0] with { SystemFilesState = SfcVerificationState.NoIntegrityViolationsDetected }] }]));
+    }
+
+    [Fact]
+    public async Task CorruptedStoredIntegrityEnumAndVerificationGuidAreRejectedOnRead()
+    {
+        var storage = new DesktopStorage(_root);
+        var report = new MaintenanceReport(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, false,
+            [new(MaintenanceActionId.ScanWindowsImage, StepOutcome.Succeeded, "Scan")]);
+        await storage.SaveHistoryAsync([report]);
+        await using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(_root, "zeus.db")};Pooling=False");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE maintenance_steps SET image_health_state='999';";
+        await command.ExecuteNonQueryAsync();
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadHistoryAsync());
+        command.CommandText = "UPDATE maintenance_steps SET image_health_state='Unknown'; UPDATE maintenance_sessions SET verification_of_session_id='not-a-guid';";
+        await command.ExecuteNonQueryAsync();
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadHistoryAsync());
+    }
+
+    [Fact]
     public async Task LightThemePreferencePersistsInSqlite()
     {
         var storage = new DesktopStorage(_root);
@@ -54,6 +110,9 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(report.SessionId, migratedHistory.SessionId);
         Assert.Equal(MaintenanceActionId.VerifySystemFiles, migratedHistory.Steps[0].Action);
         Assert.Equal(MaintenanceVerificationStatus.NotRecorded, migratedHistory.Steps[0].Verification);
+        Assert.Equal(WindowsImageHealthState.Unknown, migratedHistory.Steps[0].ImageHealthState);
+        Assert.Equal(SfcVerificationState.Unknown, migratedHistory.Steps[0].SystemFilesState);
+        Assert.Null(migratedHistory.VerificationOfSessionId);
         Assert.True(migratedPreferences.IsMinimal);
         Assert.Equal(DesktopDensity.Comfortable, migratedPreferences.Density);
         Assert.False(migratedPreferences.ReduceZeusMotion, "Older preference JSON keeps the existing motion behavior by default.");

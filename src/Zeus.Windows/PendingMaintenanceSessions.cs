@@ -29,10 +29,11 @@ public sealed class PendingMaintenanceSessions
     }
 
     public async Task RememberAsync(Guid sessionId, IReadOnlyCollection<MaintenanceRequest> requests,
-        DateTimeOffset startedAt, CancellationToken cancellationToken = default)
+        DateTimeOffset startedAt, CancellationToken cancellationToken = default, Guid? verificationOfSessionId = null)
     {
         ValidateId(sessionId);
         _ = MaintenancePolicy.ValidateRequests(requests);
+        ValidateVerificationLink(sessionId, requests, verificationOfSessionId);
         Directory.CreateDirectory(_directory);
         AssertSafeDirectory();
         var destination = Path.Combine(_directory, sessionId.ToString("D") + ".json");
@@ -42,7 +43,7 @@ public sealed class PendingMaintenanceSessions
             await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
                 await JsonSerializer.SerializeAsync(stream,
-                    new LaunchReceipt(sessionId, startedAt, requests.ToArray()), Options, cancellationToken);
+                    new LaunchReceipt(sessionId, startedAt, requests.ToArray(), verificationOfSessionId), Options, cancellationToken);
                 await stream.FlushAsync(cancellationToken);
                 stream.Flush(flushToDisk: true);
             }
@@ -63,6 +64,7 @@ public sealed class PendingMaintenanceSessions
                 continue;
             var started = DateTimeOffset.UtcNow;
             IReadOnlyList<MaintenanceRequest> requests = [];
+            Guid? verificationOfSessionId = null;
             try
             {
                 var file = new FileInfo(path);
@@ -75,13 +77,20 @@ public sealed class PendingMaintenanceSessions
                     if (receipt.SessionId != id || receipt.Requests is null || receipt.Requests.Any(request => request is null))
                         throw new InvalidDataException("Registro pendente não corresponde à sessão.");
                     _ = MaintenancePolicy.ValidateRequests(receipt.Requests);
+                    ValidateVerificationLink(id, receipt.Requests, receipt.VerificationOfSessionId);
                     started = receipt.StartedAt;
                     requests = receipt.Requests;
+                    verificationOfSessionId = receipt.VerificationOfSessionId;
                 }
                 var report = await SessionStore.ReadReportAsync(id);
                 if (report.Steps is null || report.Steps.Any(step => step is null || !Enum.IsDefined(step.Action) || !Enum.IsDefined(step.Outcome)))
                     throw new InvalidDataException("Relatório protegido inválido.");
-                reports.Add(report);
+                if (verificationOfSessionId is not null && report.Steps.Any(step =>
+                    step.TargetId is not null || !requests.Any(request => request.Action == step.Action)))
+                    throw new InvalidDataException("O relatório protegido não corresponde às varreduras posteriores solicitadas.");
+                if (verificationOfSessionId is not null && report.Steps.Count == 0)
+                    throw new InvalidDataException("Nenhum resultado das varreduras posteriores foi recebido.");
+                reports.Add(report with { VerificationOfSessionId = verificationOfSessionId });
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
@@ -91,7 +100,7 @@ public sealed class PendingMaintenanceSessions
                         "O resultado desta ação não foi confirmado. Nenhuma ação será repetida automaticamente.", TargetId: request.TargetId,
                         Verification: MaintenanceVerificationStatus.ManualReviewRequired)).ToArray(),
                     "Sessão pendente: não foi possível confirmar a conclusão. Consulte os logs antes de iniciar outro plano. " + error.Message,
-                    IsComplete: false));
+                    IsComplete: false, VerificationOfSessionId: verificationOfSessionId));
             }
         }
         return reports.OrderByDescending(report => report.StartedAt).ToArray();
@@ -125,5 +134,14 @@ public sealed class PendingMaintenanceSessions
         if (id == Guid.Empty) throw new ArgumentException("Sessão inválida.", nameof(id));
     }
 
-    private sealed record LaunchReceipt(Guid SessionId, DateTimeOffset StartedAt, IReadOnlyList<MaintenanceRequest> Requests);
+    private static void ValidateVerificationLink(Guid id, IReadOnlyCollection<MaintenanceRequest> requests, Guid? parent)
+    {
+        if (parent is null) return;
+        if (parent == Guid.Empty || parent == id || requests.Count == 0 || requests.Any(request =>
+            request.Action is not MaintenanceActionId.ScanWindowsImage and not MaintenanceActionId.VerifySystemFiles || request.TargetId is not null))
+            throw new ArgumentException("Vínculo posterior inválido: somente varreduras SCAN são permitidas.");
+    }
+
+    private sealed record LaunchReceipt(Guid SessionId, DateTimeOffset StartedAt, IReadOnlyList<MaintenanceRequest> Requests,
+        Guid? VerificationOfSessionId = null);
 }

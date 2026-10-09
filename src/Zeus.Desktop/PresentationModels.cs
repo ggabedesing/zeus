@@ -200,7 +200,8 @@ internal sealed record MaintenanceResultPresentation(string Title, string Detail
     }
 }
 
-public sealed record HistoryRow(Guid SessionId, string Title, string Summary, string Protection, IReadOnlyList<string> Steps, string Error, bool HasLogFiles)
+public sealed record HistoryRow(Guid SessionId, string Title, string Summary, string Protection, IReadOnlyList<string> Steps, string Error, bool HasLogFiles,
+    bool CanVerifyAfterRepair = false, string PostRepairSummary = "")
 {
     public static HistoryRow From(MaintenanceReport report)
     {
@@ -219,7 +220,9 @@ public sealed record HistoryRow(Guid SessionId, string Title, string Summary, st
         return new(report.SessionId, report.StartedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss"), summary,
             protection,
             report.Steps.Select(step => $"{MaintenanceCatalog.Get(step.Action).Title}{(step.TargetId is null ? "" : $" [{step.TargetId}]")} — {OutcomeTitle(step.Outcome)} · {VerificationTitle(step.Verification)}: {step.Message}").ToArray(),
-            report.Error ?? string.Empty, report.Steps.Any(step => !string.IsNullOrWhiteSpace(step.LogFile)));
+            report.Error ?? string.Empty, report.Steps.Any(step => !string.IsNullOrWhiteSpace(step.LogFile)),
+            PostRepairVerification.CreatePlan(report).Count > 0,
+            report.VerificationOfSessionId is { } parent ? $"Verificação posterior do reparo na sessão {parent:D}." : string.Empty);
     }
     private static string OutcomeTitle(StepOutcome outcome) => outcome switch
     {
