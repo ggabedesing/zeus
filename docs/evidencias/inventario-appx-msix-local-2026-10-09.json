@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "phase-2-installed-software-inventory",
+  "recordedAtUtc": "2026-10-09T05:30:00Z",
+  "sourceCommit": "55ad76dc9657252844721574b35dc27f8a0ec6bd",
+  "elevation": "not requested",
+  "outcome": "success",
+  "checks": {
+    "focusedWindowsAcceptanceTestsPassed": 4,
+    "focusedWindowsAcceptanceTestsFailed": 0,
+    "uninstallRegistryEntries": 196,
+    "currentUserAppxMsixMainAndBundlePackages": 113,
+    "totalInstalledSoftwareEntries": 309,
+    "portableExecutableSmoke": "main window opened, responded, and closed cleanly",
+    "portablePackageSourceDirty": false
+  },
+  "limitations": [
+    "Registry inventory covers uninstall entries visible to the current diagnostic session; it is not an audit of every installer format.",
+    "Appx/MSIX enumeration covers only the current user and only Main/Bundle package types; it does not query all profiles or framework/resource packages.",
+    "The separate WinGet operation is an update-catalog query, not the source for this local inventory; no network lookup, update, or install was performed here.",
+    "Names, publishers, package identifiers, computer name, and process names are omitted from this evidence record.",
+    "No repair, driver change, restore point, reboot, or Windows setting change was performed."
+  ]
+}
