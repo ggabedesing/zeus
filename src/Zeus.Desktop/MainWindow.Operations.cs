@@ -543,6 +543,85 @@ public partial class MainWindow
         finally { _preferenceLock.Release(); }
     }
 
+    private async Task RefreshDesktopOrganizationSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        var sessions = await _desktopOrganizer.ListSessionsAsync(cancellationToken);
+        DesktopOrganizationSessions.Clear();
+        foreach (var session in sessions) DesktopOrganizationSessions.Add(session);
+    }
+
+    private async void PreviewDesktopOrganization_Click(object sender, RoutedEventArgs e)
+    {
+        DesktopOrganizationPreview = null;
+        DesktopOrganizationSummary = "Analisando a Área de Trabalho. Nenhum arquivo foi movido.";
+        await RunOperationAsync("Analisando a Área de Trabalho", "Somente leitura: preparando uma lista dos arquivos elegíveis e dos itens preservados.", async token =>
+        {
+            DesktopOrganizationPreview = await _desktopOrganizer.PreviewAsync(token);
+            var preview = DesktopOrganizationPreview;
+            if (preview is null) DesktopOrganizationSummary = "A prévia não foi produzida.";
+            else
+            {
+                var counts = preview.Items.GroupBy(item => item.Category).Select(group => $"{group.Key}: {group.Count()}");
+                var skipped = preview.Skipped.Take(10).Select(reason => "• " + reason).ToArray();
+                var remaining = preview.Skipped.Count - skipped.Length;
+                var details = skipped.Length == 0 ? "" : Environment.NewLine + "Preservados:" + Environment.NewLine + string.Join(Environment.NewLine, skipped) +
+                    (remaining > 0 ? Environment.NewLine + $"• e mais {remaining} item(ns) preservados" : "");
+                DesktopOrganizationSummary = preview.Items.Count == 0
+                    ? $"Nenhum arquivo elegível encontrado. {preview.Skipped.Count} item(ns) foram preservados.{details}"
+                    : $"{preview.Items.Count} arquivo(s) · {FormatBytes((ulong)Math.Max(0, preview.TotalBytes))} · destinos: {string.Join(", ", counts)}.{details}";
+            }
+            StatusTitle = "Prévia da Área de Trabalho pronta";
+            StatusDetail = DesktopOrganizationSummary;
+        }, cancellable: true);
+        if (DesktopOrganizationPreview is null && DesktopOrganizationSummary.StartsWith("Analisando", StringComparison.Ordinal))
+            DesktopOrganizationSummary = $"{StatusTitle}: {StatusDetail} Nenhum arquivo foi movido.";
+    }
+
+    private async void ApplyDesktopOrganization_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanApplyDesktopOrganization || DesktopOrganizationPreview is not { } preview) return;
+        var names = string.Join("\n", preview.Items.Take(20).Select(item => $"• {item.Name} → ZEUS - {item.Category}"));
+        if (preview.Items.Count > 20) names += $"\n• e mais {preview.Items.Count - 20} arquivo(s)";
+        if (!Confirm($"Organizar {preview.Items.Count} arquivo(s) da Área de Trabalho em pastas por categoria?\n\n{names}\n\nPastas, atalhos e tipos não reconhecidos não serão movidos. Cada arquivo será verificado contra a prévia e registrado antes da mudança. Se algo mudar, o ZEUS preservará o conflito sem sobrescrever. Você poderá restaurar pelo histórico.", "Revisar organização da Área de Trabalho")) return;
+        DesktopOrganizationPreview = null;
+        var completed = false;
+        await RunOperationAsync("Organizando a Área de Trabalho", "Verificando cada arquivo e registrando a sessão reversível antes dos movimentos.", async token =>
+        {
+            try
+            {
+                var result = await _desktopOrganizer.ApplyAsync(preview, token);
+                completed = true;
+                DesktopOrganizationSummary = result.Message;
+                StatusTitle = result.Succeeded ? "Organização concluída" : "Organização não concluída";
+                StatusDetail = result.Message;
+            }
+            finally { await RefreshDesktopOrganizationSessionsAsync(CancellationToken.None); }
+        }, mutation: true);
+        if (!completed) DesktopOrganizationSummary = "Organização interrompida ou não confirmada. Consulte Estados guardados antes de tentar novamente; nenhum arquivo será sobrescrito.";
+    }
+
+    private async void RestoreDesktopOrganization_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy || sender is not FrameworkElement { Tag: Guid id }) return;
+        var session = DesktopOrganizationSessions.FirstOrDefault(item => item.Id == id);
+        if (session is null || !session.CanRestore) return;
+        if (!Confirm($"Restaurar os arquivos desta sessão para a Área de Trabalho? O ZEUS verificará o hash de cada arquivo e não substituirá arquivos que já existam no local original.", "Revisar restauração")) return;
+        var completed = false;
+        await RunOperationAsync("Restaurando arquivos da Área de Trabalho", "Validando conteúdo, destino e conflitos antes de cada movimento.", async token =>
+        {
+            try
+            {
+                var result = await _desktopOrganizer.RestoreAsync(id, token);
+                completed = true;
+                DesktopOrganizationSummary = result.Message;
+                StatusTitle = result.Succeeded ? "Restauração verificada" : "Restauração precisa de revisão";
+                StatusDetail = result.Message;
+            }
+            finally { await RefreshDesktopOrganizationSessionsAsync(CancellationToken.None); }
+        }, mutation: true);
+        if (!completed) DesktopOrganizationSummary = "Restauração interrompida ou não confirmada. Confira Estados guardados antes de repetir; arquivos modificados foram preservados.";
+    }
+
     private void ChooseWallpaper_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog

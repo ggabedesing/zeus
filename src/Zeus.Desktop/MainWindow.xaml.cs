@@ -28,6 +28,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly WingetUpdateService _wingetUpdates = new();
     private readonly PendingMaintenanceSessions _pendingSessions = new();
     private readonly UserOptimizationService _userOptimization;
+    private readonly DesktopFileOrganizer _desktopOrganizer;
     private readonly TemporaryFileCleanup _cleanup;
     private readonly Action<string> _openUri;
     private readonly bool _isFixture;
@@ -65,6 +66,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private PowerPlanInfo? _selectedPowerPlan;
     private string? _selectedWallpaperPath;
     private ImageSource? _wallpaperPreview;
+    private DesktopOrganizationPreview? _desktopOrganizationPreview;
+    private string _desktopOrganizationSummary = "Gere uma prévia para ver quais arquivos comuns seriam movidos. Pastas, atalhos e itens não reconhecidos ficam onde estão.";
     private string _statusTitle = "Preparando diagnóstico", _statusDetail = "As informações serão lidas diretamente neste computador.";
     private string _executionLog = "Nenhuma manutenção executada nesta sessão.", _maintenanceResultSummary = string.Empty;
     private string _cleanupSummary = "Analise temporários com mais de sete dias. Nenhum arquivo será selecionado automaticamente.";
@@ -84,6 +87,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _openUri = openUri ?? OpenSystemUri;
         _storage = new(storageRoot);
         _userOptimization = new(storageRoot is null ? null : Path.Combine(storageRoot, "Changes"));
+        _desktopOrganizer = new(storageRoot is null ? null : Path.Combine(storageRoot, "Desktop"), storageRoot is null ? null : Path.Combine(storageRoot, "DesktopOrganization"));
         _cleanup = new(storageRoot is null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp") : Path.Combine(storageRoot, "Temporary"),
             Path.Combine(storageRoot ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zeus"), "Cleanup"));
         InitializeComponent();
@@ -180,6 +184,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<CleanupSessionRow> CleanupSessions { get; } = [];
     public ObservableCollection<StartupChoice> StartupChoices { get; } = [];
     public ObservableCollection<ChangeRow> UserChanges { get; } = [];
+    public ObservableCollection<DesktopOrganizationSession> DesktopOrganizationSessions { get; } = [];
     public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
     public ObservableCollection<DriverInventoryRow> InstalledDriverRows { get; } = [];
@@ -202,6 +207,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanDisableStartup => !_isBusy && StartupChoices.Any(f => f.IsSelected && f.CanSelect);
     public bool CanSetPowerPlan => !_isBusy && SelectedPowerPlan is { IsActive: false };
     public bool CanApplyWallpaper => !_isBusy && !string.IsNullOrWhiteSpace(SelectedWallpaperPath);
+    public DesktopOrganizationPreview? DesktopOrganizationPreview { get => _desktopOrganizationPreview; private set { if (Set(ref _desktopOrganizationPreview, value)) Notify(nameof(CanApplyDesktopOrganization)); } }
+    public string DesktopOrganizationSummary { get => _desktopOrganizationSummary; private set => Set(ref _desktopOrganizationSummary, value); }
+    public bool CanApplyDesktopOrganization => !_isBusy && DesktopOrganizationPreview is { Items.Count: > 0 };
     public bool CanInstallDriver => !_isBusy && DriverCandidates.Count(d => d.IsSelected) == 1 && DriverCandidates.Where(d => d.IsSelected).All(d => d.CanSelectForInstall && d.LicenseReady);
     public bool CanVerifyPendingDriverUpdates => !_isBusy && _historyReadable && _reports.Any(report =>
         report.Steps.Any(step => step.Action == MaintenanceActionId.InstallDriverUpdate &&
@@ -337,6 +345,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _storageHealth = new(false, 0, "unavailable", "unavailable", 0, 0, 0, error.GetType().Name);
             }
             await LoadLocalSessionsAsync();
+            try { await RefreshDesktopOrganizationSessionsAsync(); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
+            { _startupWarnings.Add("O histórico de organização da Área de Trabalho não pôde ser lido; nenhum arquivo foi alterado."); }
             ApplyTheme();
             _loaded = true;
             QueueActivity(new(DateTimeOffset.UtcNow, "application", "started", "info", "ZEUS iniciado."));
@@ -707,7 +718,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanVerifyPendingDriverUpdates), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
-    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanRollbackDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }
+    private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanRollbackDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanApplyDesktopOrganization)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }
     private string? MaintenanceSelectionError()
     {
         var selected = MaintenanceChoices.Where(choice => choice.IsSelected)

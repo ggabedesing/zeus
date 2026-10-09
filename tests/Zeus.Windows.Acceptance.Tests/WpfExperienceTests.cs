@@ -169,6 +169,13 @@ public sealed class WpfExperienceTests
         Assert.True(chooseWallpaperButton.IsEnabled);
         var applyWallpaperButton = Assert.IsType<Button>(window.FindName("ApplyWallpaperButton"));
         Assert.False(applyWallpaperButton.IsEnabled, "A aplicação exige primeiro uma imagem escolhida e pré-visualizada.");
+        var organizePreviewButton = Assert.IsType<Button>(window.FindName("PreviewDesktopOrganizationButton"));
+        Assert.Equal("preview-desktop-organization", AutomationProperties.GetAutomationId(organizePreviewButton));
+        Assert.True(organizePreviewButton.IsEnabled);
+        var organizeApplyButton = Assert.IsType<Button>(window.FindName("ApplyDesktopOrganizationButton"));
+        Assert.Equal("apply-desktop-organization", AutomationProperties.GetAutomationId(organizeApplyButton));
+        Assert.False(organizeApplyButton.IsEnabled, "A organização exige uma prévia explícita.");
+        Assert.Null(window.DesktopOrganizationPreview);
         var windowsSettingsButtons = new[]
         {
             (Name: "OpenWindowsThemesButton", AutomationId: "open-windows-themes", Uri: "ms-settings:themes"),
