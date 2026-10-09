@@ -211,8 +211,8 @@ internal static class CommandRunner
         // The interpolated data has already been parsed to GUIDs, integers and a boolean.
         // Installation re-queries the exact WUA identity and server selection; titles are never matched.
         var expectedServerSelection = request.UpdateServerSelection!.Value;
-        var activeLogName = $"driver-{updateId:N}-{revision}-active.json";
-        using (SessionStore.CreateLog(sessionId, activeLogName)) { }
+        var activeLogName = SessionStore.GetDriverActiveCheckpointFileName(updateId, revision);
+        using (SessionStore.CreateDriverActiveCheckpoint(sessionId, updateId, revision)) { }
         var activeLogPath = Path.Combine(SessionStore.GetSessionDirectory(sessionId), activeLogName);
         var encodedActivePath = Convert.ToBase64String(Encoding.UTF8.GetBytes(activeLogPath));
         var expectedServiceId = request.UpdateServiceId is null ? string.Empty : Guid.Parse(request.UpdateServiceId).ToString("D");
@@ -224,13 +224,10 @@ internal static class CommandRunner
             TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility), Timeout.InfiniteTimeSpan);
         try
         {
-            var activeFile = new FileInfo(activeLogPath);
-            if ((activeFile.Attributes & FileAttributes.ReparsePoint) != 0 || activeFile.Length > 256 * 1024)
-                throw new InvalidDataException("Arquivo de observação inválido ou grande demais.");
-            var candidateEvidence = JsonSerializer.Deserialize<DriverActiveEvidence>(await File.ReadAllTextAsync(activeLogPath));
-            if (candidateEvidence is not null) activeEvidence = DriverActiveStatePolicy.BoundForPersistence(candidateEvidence);
+            activeEvidence = DriverActiveStatePolicy.BoundForPersistence(
+                await SessionStore.ReadDriverActiveCheckpointAsync(sessionId, updateId, revision));
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
         { /* Missing or invalid active-state evidence never confirms device activation. */ }
         if (result.Output.Contains("ZEUS_DRIVER_BASELINE_BLOCKED", StringComparison.Ordinal))
             return DriverResult(StepOutcome.Skipped,
@@ -304,7 +301,7 @@ internal static class CommandRunner
             try {
                 $stream = [System.IO.FileStream]::new($temporary, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
                 try { $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
-                [System.IO.File]::Replace($temporary,$activeObservationPath,$null)
+                [System.IO.File]::Replace($temporary,$activeObservationPath,[System.Management.Automation.Language.NullString]::Value)
             } finally { if ([System.IO.File]::Exists($temporary)) { [System.IO.File]::Delete($temporary) } }
         }
         $session = [System.Activator]::CreateInstance([System.Type]::GetTypeFromProgID('Microsoft.Update.Session'));

@@ -90,20 +90,60 @@ public sealed class PendingMaintenanceSessions
                     throw new InvalidDataException("O relatório protegido não corresponde às varreduras posteriores solicitadas.");
                 if (verificationOfSessionId is not null && report.Steps.Count == 0)
                     throw new InvalidDataException("Nenhum resultado das varreduras posteriores foi recebido.");
-                reports.Add(report with { VerificationOfSessionId = verificationOfSessionId });
+                reports.Add(await RecoverDriverObservationsAsync(report with { VerificationOfSessionId = verificationOfSessionId }, requests,
+                    SessionStore.ReadDriverActiveCheckpointAsync, cancellationToken));
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+            catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
             {
-                reports.Add(new MaintenanceReport(id, started, DateTimeOffset.UtcNow, false,
+                var unresolved = new MaintenanceReport(id, started, DateTimeOffset.UtcNow, false,
                     requests.Select(request => new MaintenanceStepResult(request.Action, StepOutcome.Skipped,
                         "O resultado desta ação não foi confirmado. Nenhuma ação será repetida automaticamente.", TargetId: request.TargetId,
-                        Verification: MaintenanceVerificationStatus.ManualReviewRequired)).ToArray(),
+                        Verification: MaintenanceVerificationStatus.ManualReviewRequired,
+                        UpdateServerSelection: request.UpdateServerSelection, UpdateServiceId: request.UpdateServiceId)).ToArray(),
                     "Sessão pendente: não foi possível confirmar a conclusão. Consulte os logs antes de iniciar outro plano. " + error.Message,
-                    IsComplete: false, VerificationOfSessionId: verificationOfSessionId));
+                    IsComplete: false, VerificationOfSessionId: verificationOfSessionId);
+                reports.Add(await RecoverDriverObservationsAsync(unresolved, requests, SessionStore.ReadDriverActiveCheckpointAsync,
+                    cancellationToken));
             }
         }
         return reports.OrderByDescending(report => report.StartedAt).ToArray();
+    }
+
+    internal static async Task<MaintenanceReport> RecoverDriverObservationsAsync(MaintenanceReport report,
+        IReadOnlyList<MaintenanceRequest> requests,
+        Func<Guid, Guid, int, CancellationToken, Task<DriverActiveEvidence>> readCheckpoint,
+        CancellationToken cancellationToken)
+    {
+        // A receipt identifies a possible protected observation. It never authorizes execution
+        // or supplies evidence of WUA success. Preserve every original outcome and verification.
+        if (requests.Count == 0) return report;
+        _ = MaintenancePolicy.ValidateRequests(requests);
+        var steps = report.Steps.ToArray();
+        for (var index = 0; index < steps.Length; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var step = steps[index];
+            if (step.Action != MaintenanceActionId.InstallDriverUpdate || step.ActiveDriver is not null ||
+                !MaintenanceRequestProtocol.TryParseDriverIdentity(step.TargetId, out var updateId, out var revision)) continue;
+            var matches = requests.Where(request => request.Action == MaintenanceActionId.InstallDriverUpdate &&
+                MaintenanceRequestProtocol.TryParseDriverIdentity(request.TargetId, out var requestedId, out var requestedRevision) &&
+                requestedId == updateId && requestedRevision == revision).ToArray();
+            if (matches.Length != 1 || step.UpdateServerSelection is not null && step.UpdateServerSelection != matches[0].UpdateServerSelection ||
+                step.UpdateServiceId is not null && !string.Equals(step.UpdateServiceId, matches[0].UpdateServiceId, StringComparison.OrdinalIgnoreCase)) continue;
+            try
+            {
+                var evidence = await readCheckpoint(report.SessionId, updateId, revision, cancellationToken);
+                DriverActiveStatePolicy.Validate(evidence);
+                steps[index] = step with { ActiveDriver = DriverActiveStatePolicy.BoundForPersistence(evidence),
+                    UpdateServerSelection = step.UpdateServerSelection ?? matches[0].UpdateServerSelection,
+                    UpdateServiceId = step.UpdateServiceId ?? matches[0].UpdateServiceId };
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
+            { /* Invalid or missing checkpoints remain unavailable; the unresolved attempt is preserved. */ }
+        }
+        return report with { Steps = steps };
     }
 
     public Task ForgetAsync(Guid sessionId, CancellationToken cancellationToken = default)

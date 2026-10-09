@@ -8,6 +8,65 @@ namespace Zeus.Windows.Acceptance.Tests;
 public sealed class ProtectedSessionStoreTests
 {
     [AdministratorFact]
+    public async Task ProtectedDriverCheckpointRecoversObservationWithoutClaimingInstallSuccess()
+    {
+        var id = Guid.NewGuid(); var updateId = Guid.NewGuid(); var started = DateTimeOffset.UtcNow;
+        var request = new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, $"{updateId:D}:1", UpdateServerSelection: 2);
+        var evidence = new DriverActiveEvidence("PCI\\VEN_1234", new(started, true,
+            [new("PCI\\VEN_1234\\DEVICE", "oem1.inf", "1", "Vendor", true)], []));
+        var receiptRoot = Path.Combine(Path.GetTempPath(), "Zeus.PendingDriver." + Guid.NewGuid().ToString("N"));
+        var receipts = new PendingMaintenanceSessions(receiptRoot);
+        string? directory = null;
+        try
+        {
+            directory = SessionStore.CreateSession(id);
+            await using (var file = SessionStore.CreateDriverActiveCheckpoint(id, updateId, 1))
+                await System.Text.Json.JsonSerializer.SerializeAsync(file, evidence);
+            var path = Path.Combine(directory, SessionStore.GetDriverActiveCheckpointFileName(updateId, 1));
+            AssertProtectedAcl(new FileInfo(path).GetAccessControl());
+            Assert.Throws<ArgumentException>(() => SessionStore.CreateLog(id, Path.GetFileName(path)));
+            var checkpoint = await SessionStore.ReadDriverActiveCheckpointAsync(id, updateId, 1);
+            Assert.Equal(evidence.Before.Devices[0], checkpoint.Before.Devices[0]);
+            await receipts.RememberAsync(id, [request], started);
+
+            // No report exists: the checkpoint must survive but cannot confirm WUA outcomes.
+            var recovered = Assert.Single(await receipts.RecoverAsync());
+            Assert.False(recovered.IsComplete);
+            var step = Assert.Single(recovered.Steps);
+            Assert.Equal(StepOutcome.Skipped, step.Outcome);
+            Assert.Equal(MaintenanceVerificationStatus.ManualReviewRequired, step.Verification);
+            Assert.Equal(2, step.UpdateServerSelection);
+            Assert.NotNull(step.ActiveDriver);
+            Assert.Single(MaintenancePolicy.FindUnresolvedAttempts([request], [recovered]));
+
+            var pending = step with { ActiveDriver = null, UpdateServerSelection = null, Verification = MaintenanceVerificationStatus.Pending };
+            await SessionStore.WriteProgressReportAsync(id, recovered with { Steps = [pending] });
+            var recoveredPending = Assert.Single(await receipts.RecoverAsync());
+            Assert.False(recoveredPending.IsComplete);
+            Assert.Equal(MaintenanceVerificationStatus.Pending, recoveredPending.Steps[0].Verification);
+            Assert.Equal(2, recoveredPending.Steps[0].UpdateServerSelection);
+            Assert.NotNull(recoveredPending.Steps[0].ActiveDriver);
+
+            // Administrative corruption and an ACL granting user writes are both rejected.
+            await File.WriteAllBytesAsync(path, new byte[DriverActiveStatePolicy.MaximumPersistedBytes + 1]);
+            await Assert.ThrowsAsync<InvalidDataException>(() => SessionStore.ReadDriverActiveCheckpointAsync(id, updateId, 1));
+            await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(evidence));
+            var fileInfo = new FileInfo(path);
+            var security = fileInfo.GetAccessControl();
+            security.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+                FileSystemRights.WriteData, AccessControlType.Allow));
+            fileInfo.SetAccessControl(security);
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => SessionStore.ReadDriverActiveCheckpointAsync(id, updateId, 1));
+        }
+        finally
+        {
+            await receipts.ForgetAsync(id);
+            if (Directory.Exists(receiptRoot)) Directory.Delete(receiptRoot, recursive: true);
+            if (directory is not null && Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [AdministratorFact]
     public async Task RecoveryPreservesDurablePendingProgressWithoutClaimingCompletion()
     {
         var id = Guid.NewGuid();

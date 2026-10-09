@@ -1,6 +1,7 @@
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Zeus.Core;
 
 namespace Zeus.Windows;
@@ -119,6 +120,64 @@ public static class SessionStore
             !fileName.EndsWith(".log", StringComparison.Ordinal) || fileName.StartsWith('.'))
             throw new ArgumentException("Nome de log inválido.", nameof(fileName));
         return CreateProtectedFile(Path.Combine(GetSessionDirectory(sessionId), fileName));
+    }
+
+    /// <summary>Fixed identity-derived checkpoint; arbitrary JSON file names are never accepted.</summary>
+    public static string GetDriverActiveCheckpointFileName(Guid updateId, int revision)
+    {
+        if (updateId == Guid.Empty || revision <= 0)
+            throw new ArgumentException("Identidade de atualização inválida.");
+        return $"driver-{updateId:N}-{revision.ToString(System.Globalization.CultureInfo.InvariantCulture)}-active.json";
+    }
+
+    public static FileStream CreateDriverActiveCheckpoint(Guid sessionId, Guid updateId, int revision) =>
+        CreateProtectedFile(Path.Combine(GetSessionDirectory(sessionId), GetDriverActiveCheckpointFileName(updateId, revision)));
+
+    public static async Task<DriverActiveEvidence> ReadDriverActiveCheckpointAsync(Guid sessionId, Guid updateId,
+        int revision, CancellationToken cancellationToken = default)
+    {
+        var path = Path.Combine(GetSessionDirectory(sessionId), GetDriverActiveCheckpointFileName(updateId, revision));
+        ValidateFile(path);
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        if (stream.Length > DriverActiveStatePolicy.MaximumPersistedBytes)
+            throw new InvalidDataException("Observação de driver excede o tamanho permitido.");
+        var bytes = new byte[checked((int)stream.Length)];
+        await stream.ReadExactlyAsync(bytes, cancellationToken);
+        return ParseDriverActiveCheckpoint(bytes);
+    }
+
+    internal static DriverActiveEvidence ParseDriverActiveCheckpoint(byte[] bytes)
+    {
+        if (bytes.Length > DriverActiveStatePolicy.MaximumPersistedBytes)
+            throw new InvalidDataException("Observação de driver excede o tamanho permitido.");
+        using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 16 });
+        AssertUniqueProperties(document.RootElement);
+        var options = new JsonSerializerOptions
+        {
+            RespectRequiredConstructorParameters = true,
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+            MaxDepth = 16
+        };
+        var evidence = JsonSerializer.Deserialize<DriverActiveEvidence>(bytes, options)
+            ?? throw new InvalidDataException("Observação de driver vazia.");
+        try { DriverActiveStatePolicy.Validate(evidence); }
+        catch (ArgumentException error) { throw new InvalidDataException("Observação de driver inválida.", error); }
+        return evidence;
+    }
+
+    private static void AssertUniqueProperties(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in element.EnumerateObject())
+            {
+                if (!names.Add(property.Name)) throw new InvalidDataException("Observação contém propriedades repetidas.");
+                AssertUniqueProperties(property.Value);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+            foreach (var item in element.EnumerateArray()) AssertUniqueProperties(item);
     }
 
     private static FileStream CreateProtectedFile(string path, FileShare share = FileShare.Read)

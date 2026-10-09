@@ -6,6 +6,30 @@ namespace Zeus.Windows.Acceptance.Tests;
 public sealed class PendingMaintenanceSessionsTests
 {
     [Fact]
+    public async Task InvalidReceiptDoesNotPreventRecoveryOfOtherSessions()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "Zeus.InvalidReceipt." + Guid.NewGuid().ToString("N"));
+        var sessions = new PendingMaintenanceSessions(root);
+        var invalid = Guid.NewGuid(); var valid = Guid.NewGuid();
+        try
+        {
+            await sessions.RememberAsync(valid, [new(MaintenanceActionId.VerifySystemFiles)], DateTimeOffset.UtcNow);
+            await File.WriteAllTextAsync(Path.Combine(root, invalid.ToString("D") + ".json"), "{}");
+            var recovered = await sessions.RecoverAsync();
+            Assert.Equal(2, recovered.Count);
+            var invalidReport = Assert.Single(recovered, report => report.SessionId == invalid);
+            Assert.False(invalidReport.IsComplete);
+            Assert.Empty(invalidReport.Steps);
+            Assert.Single(Assert.Single(recovered, report => report.SessionId == valid).Steps);
+        }
+        finally
+        {
+            await sessions.ForgetAsync(valid); await sessions.ForgetAsync(invalid);
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task PostRepairReceiptPreservesLinkWhenNoHelperResultExists()
     {
         var root = Path.Combine(Path.GetTempPath(), "Zeus.PendingRepair." + Guid.NewGuid().ToString("N"));

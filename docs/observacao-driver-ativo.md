@@ -12,7 +12,9 @@ Antes do download, uma captura completa com presença/INF/versão é obrigatóri
 
 ## Checkpoints e histórico
 
-O auxiliar cria arquivo JSON com nome fixo derivado de GUID/revisão da oferta, dentro da sessão protegida. Antes da operação grava Before com Flush(true) e substituição atômica; depois grava After. Não envia esse documento pelo stdout, cuja prévia é limitada. Falha posterior de captura/gravação não elimina os marcadores de resultado/reinício WUA e preserva Before. O arquivo secundário ainda exige revisão manual se o auxiliar cair antes de anexá-lo ao relatório.
+O auxiliar cria arquivo JSON com nome fixo derivado de GUID/revisão da oferta, dentro da sessão protegida, usando uma API específica de checkpoint. A rotina de logs continua aceitando somente `.log`. Antes da operação grava Before com Flush(true) e substituição atômica; depois grava After. Não envia esse documento pelo stdout, cuja prévia é limitada. Falha posterior de captura/gravação não elimina os marcadores de resultado/reinício WUA e preserva Before.
+
+Na recuperação, o recibo validado identifica GUID/revisão e origem da tentativa; a leitura do checkpoint verifica sessão, proprietário/ACL, ausência de redirecionamento, tamanho e estrutura JSON. Uma observação ausente pode ser preenchida sem substituir evidência existente nem alterar Outcome, Verification ou IsComplete. Se o relatório estiver ausente, a tentativa permanece Skipped/ManualReviewRequired e incompleta. Checkpoint inválido ou ausente continua indisponível; nenhum comando é repetido. A captura preservada não prova instalação nem autentica o pacote WUA exato. Recibos ilegíveis não impedem a leitura das outras sessões.
 
 Reconsultar pacotes e drivers ativos é somente leitura. Preserva Before/After, acrescenta Latest e salva inclusive observação inconclusiva. Outcome original da instalação permanece; uma leitura atual não transforma tentativa falha em instalação bem-sucedida. A mensagem original não acumula descrições; eventos de consulta ficam no registro de atividades. Reinício é manual e sua ocorrência não é comprovada por esta leitura.
 

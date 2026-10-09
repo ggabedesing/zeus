@@ -6,6 +6,54 @@ namespace Zeus.Windows.Acceptance.Tests;
 public sealed class DriverActiveInstallerScriptTests
 {
     [Fact]
+    public async Task ActualCheckpointWriterPreservesBeforeAndProducesReadableEvidenceWithoutInstalling()
+    {
+        var assembly = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "MaintenanceContract", "Zeus.Maintenance.dll"));
+        var script = (string)assembly.GetType("Zeus.Maintenance.CommandRunner", true)!.GetField("DriverInstallScript", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
+        var begin = script.IndexOf("function Save-ZeusDriverObservation", StringComparison.Ordinal);
+        var end = script.IndexOf("$session =", begin, StringComparison.Ordinal);
+        var root = Path.Combine(Path.GetTempPath(), "Zeus.CheckpointWriter." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, Zeus.Windows.SessionStore.GetDriverActiveCheckpointFileName(Guid.NewGuid(), 1));
+        try
+        {
+            File.WriteAllBytes(path, []);
+            var fixture = new Zeus.Core.DriverActiveEvidence("PCI\\FIXTURE", new(DateTimeOffset.UtcNow.AddSeconds(-1), true,
+                [new("PCI\\FIXTURE\\1", "oem1.inf", "1.0", "Fornecedor ç", true)], []));
+            var payload = Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(fixture));
+            var encodedPath = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(path));
+            var command = "$ErrorActionPreference='Stop'; $activeObservationPath=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + encodedPath + "')); " +
+                script[begin..end] + " $fixture=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + payload + "')) | ConvertFrom-Json; " +
+                "Save-ZeusDriverObservation $fixture.HardwareId $fixture.Before $null; " +
+                "$after=$fixture.Before.PSObject.Copy(); $after.CheckedAt=[DateTimeOffset]::UtcNow.ToString('o'); " +
+                "Save-ZeusDriverObservation $fixture.HardwareId $fixture.Before $after";
+            var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe"))
+            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            start.ArgumentList.Add("-NoProfile"); start.ArgumentList.Add("-NonInteractive"); start.ArgumentList.Add("-Command");
+            start.ArgumentList.Add("Invoke-Expression ([Console]::In.ReadToEnd())");
+            using var process = Process.Start(start)!;
+            await process.StandardInput.WriteAsync(command); process.StandardInput.Close();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+                Assert.True(process.ExitCode == 0, await process.StandardError.ReadToEndAsync());
+            }
+            finally { if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); } }
+            var parsed = (Zeus.Core.DriverActiveEvidence)typeof(Zeus.Windows.SessionStore)
+                .GetMethod("ParseDriverActiveCheckpoint", BindingFlags.Static | BindingFlags.NonPublic)!
+                .Invoke(null, [await File.ReadAllBytesAsync(path)])!;
+            Assert.Equal(fixture.HardwareId, parsed.HardwareId);
+            Assert.Equal(fixture.Before.CheckedAt, parsed.Before.CheckedAt);
+            Assert.Equal("Fornecedor ç", Assert.Single(parsed.Before.Devices).Provider);
+            Assert.NotNull(parsed.After);
+            Assert.Null(parsed.Latest);
+            Assert.False(File.Exists(path + ".pending"));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
     public async Task ActualInstallScriptParsesAndRequiresCheckpointBeforeDownloadWithoutRunningInstaller()
     {
         var assembly = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "MaintenanceContract", "Zeus.Maintenance.dll"));
