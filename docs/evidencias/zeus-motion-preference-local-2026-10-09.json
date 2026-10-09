@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "collectedAtLocal": "2026-10-09T12:35:55-03:00",
+  "sourceCommit": "ea322839d83d652529f46511c347bfdf37693910",
+  "sourceDirty": false,
+  "motionPreference": {
+    "scope": "ZEUS workspace fade only",
+    "durationMillisecondsWhenEnabled": 140,
+    "persistedInSqliteBackedPreferences": true,
+    "legacyPreferenceDefault": false,
+    "windowsReducedMotionAndHighContrastStillDisableFade": true,
+    "windowsSettingsChanged": false,
+    "focusedTestsPassed": 3
+  },
+  "fullWpfAcceptance": {
+    "total": 91,
+    "passed": 89,
+    "failed": 0,
+    "skippedForElevation": 2,
+    "trx": "artifacts/TestResults/zeus-wpf-motion-regression-pathfix-20261009/zeus-wpf-motion-regression-pathfix.trx"
+  },
+  "solutionBuild": {
+    "configuration": "Release",
+    "warnings": 0,
+    "errors": 0
+  },
+  "portablePackage": {
+    "runtime": "win-x64",
+    "windowOpenedAndResponded": true,
+    "closedNormally": true,
+    "packageZip": "artifacts/zeus-motion-exe-local-20261009/zeus-win-x64.zip",
+    "packageSha256": "fe7a944f04e15fd151aea5d36fd4e079dafdd7a4471d8bf9e337104f2d06d01f",
+    "executable": "artifacts/zeus-motion-exe-local-20261009/zeus-win-x64-ea322839d83d-20261009T153555500Z-1f79bd06/Zeus.Desktop.exe",
+    "executableSha256": "E048E0F7ACB02EBCF2A243B5269F04AAA26BF28F9667906EB09E05BEBB3D731E",
+    "productionAuthenticodeSignature": false
+  }
+}
