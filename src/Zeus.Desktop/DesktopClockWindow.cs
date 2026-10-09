@@ -8,6 +8,8 @@ using Zeus.Core;
 
 namespace Zeus.Desktop;
 
+internal enum DesktopClockAnchor { TopLeft, TopRight, BottomLeft, BottomRight }
+
 internal sealed class DesktopClockWindow : Window
 {
     private readonly TextBlock _time = new() { FontSize = 32, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center };
@@ -112,6 +114,18 @@ internal sealed class DesktopClockWindow : Window
     internal static Point ClampPosition(double left, double top, double width, double height, Rect bounds) => new(
         Math.Clamp(left, bounds.Left, Math.Max(bounds.Left, bounds.Right - width)),
         Math.Clamp(top, bounds.Top, Math.Max(bounds.Top, bounds.Bottom - height)));
+
+    internal static Point GetAnchoredPosition(DesktopClockAnchor anchor, Rect workArea, double width, double height, double margin = 16)
+    {
+        var inset = Math.Max(0, margin);
+        var left = anchor is DesktopClockAnchor.TopLeft or DesktopClockAnchor.BottomLeft
+            ? workArea.Left + inset
+            : workArea.Right - width - inset;
+        var top = anchor is DesktopClockAnchor.TopLeft or DesktopClockAnchor.TopRight
+            ? workArea.Top + inset
+            : workArea.Bottom - height - inset;
+        return ClampPosition(left, top, width, height, workArea);
+    }
 
     private void UpdateTime()
     {

@@ -68,6 +68,18 @@ public sealed class WpfExperienceTests
             $"Clock text {foregroundHex} must keep at least 4.5:1 contrast on {backgroundHex}.");
     }
 
+    [Theory]
+    [InlineData("TopLeft", -1904d, -184d)]
+    [InlineData("TopRight", -216d, -184d)]
+    [InlineData("BottomLeft", -1904d, 764d)]
+    [InlineData("BottomRight", -216d, 764d)]
+    public void DesktopClockQuickPositionsRespectWorkAreaAndMargin(string anchor, double expectedLeft, double expectedTop)
+    {
+        var position = DesktopClockWindow.GetAnchoredPosition(Enum.Parse<DesktopClockAnchor>(anchor), new Rect(-1920, -200, 1920, 1080), 200, 100);
+        Assert.Equal(expectedLeft, position.X);
+        Assert.Equal(expectedTop, position.Y);
+    }
+
     [Fact]
     public void DriverSearchSummaryDistinguishesCompleteEmptyResultsFromPartialResultsAndUnknownSource()
     {
@@ -1116,10 +1128,14 @@ public sealed class WpfExperienceTests
         var resetClockPositionButton = Assert.IsType<Button>(window.FindName("ResetDesktopClockPositionButton"));
         Assert.Equal("reset-desktop-clock-position", AutomationProperties.GetAutomationId(resetClockPositionButton));
         Assert.True(resetClockPositionButton.IsEnabled);
+        var quickPositionButton = Assert.IsType<Button>(window.FindName("DesktopClockTopLeftButton"));
+        Assert.Equal("Posicionar relógio no canto superior esquerdo", AutomationProperties.GetName(quickPositionButton));
         var committedClockLeft = clockPreferences.Clock!.Left;
         var committedClockTop = clockPreferences.Clock.Top;
-        resetClockPositionButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, resetClockPositionButton));
+        quickPositionButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, quickPositionButton));
         Assert.True(window.IsDesktopClockSettingsPreviewing);
+        Assert.InRange(desktopClock.Left, SystemParameters.WorkArea.Left, SystemParameters.WorkArea.Right - desktopClock.Width);
+        Assert.InRange(desktopClock.Top, SystemParameters.WorkArea.Top, SystemParameters.WorkArea.Bottom - desktopClock.Height);
         cancelClockPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, cancelClockPreviewButton));
         Assert.Equal(committedClockLeft, desktopClock.Left);
         Assert.Equal(committedClockTop, desktopClock.Top);

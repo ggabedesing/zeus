@@ -1489,6 +1489,21 @@ public partial class MainWindow
         ClockChanged();
     }
 
+    private void PlaceDesktopClock_Click(object sender, RoutedEventArgs e)
+    {
+        if (!DesktopClockEnabled || sender is not FrameworkElement { Tag: string value } ||
+            !Enum.TryParse<DesktopClockAnchor>(value, ignoreCase: false, out var anchor) || !Enum.IsDefined(anchor)) return;
+        if (_desktopClock is null) SyncDesktopClock();
+        if (_desktopClock is null) return;
+        var area = SystemParameters.WorkArea;
+        var position = DesktopClockWindow.GetAnchoredPosition(anchor, area, _desktopClock.Width, _desktopClock.Height);
+        _desktopClock.Left = position.X;
+        _desktopClock.Top = position.Y;
+        _desktopClockLeft = position.X;
+        _desktopClockTop = position.Y;
+        ClockChanged();
+    }
+
     private void ConfirmDesktopClockSettings_Click(object sender, RoutedEventArgs e)
     {
         if (!CanConfirmDesktopClockSettings) return;
