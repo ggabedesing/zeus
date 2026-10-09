@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "6c22b36ee103faf432dcadd3fbf030043644c401",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "productionSigned": false,
+  "validation": {
+    "releaseBuildWarnings": 0,
+    "releaseBuildErrors": 0,
+    "testsPassed": 541,
+    "testsSkipped": 11,
+    "testsFailed": 0,
+    "newFocusedTestsPassed": 8,
+    "portableExeOpenedRespondedClosed": true
+  },
+  "readOnlyTaskCollection": {
+    "tasks": 189,
+    "runtimeAvailable": 189,
+    "lastResultsAvailable": 189,
+    "lastRunTimesAvailable": 189,
+    "nextRunTimesAvailable": 25,
+    "missedRunCountsAvailable": 189,
+    "taskNamesRecorded": false,
+    "taskChangesPerformed": false
+  },
+  "package": {
+    "directory": "artifacts/scheduled-task-runtime-exe/zeus-win-x64-6c22b36ee103-20261009T163430715Z-e380cda6",
+    "exeSha256": "3df708531fa00c684e742ae1cc045a9a4eeccfd13446852abc48197bdc8cc1b4",
+    "zipSha256": "05DE10798500AC540D5C7D59869D4D601EB198AE5D88DE0307037BEF6B5F7E40"
+  },
+  "limitations": [
+    "Scheduled task information is point-in-time provider metadata, not proof of successful task effects.",
+    "Eleven elevated or opt-in tests were skipped in this run.",
+    "Portable package is a development build, not a signed production release."
+  ]
+}
