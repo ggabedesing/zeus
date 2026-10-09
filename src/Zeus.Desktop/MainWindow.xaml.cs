@@ -369,7 +369,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (!Enum.IsDefined(value) || !Set(ref _selectedTheme, value)) return;
-            ApplyTheme(); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption)); QueuePreferencesSave();
+            ApplyTheme(); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption));
+            UpdateAppearanceStatus();
+            QueuePreferencesSave();
         }
     }
     public AppAccentColor SelectedAccentColor
@@ -378,7 +380,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (!Enum.IsDefined(value) || !Set(ref _selectedAccentColor, value)) return;
-            ApplyTheme(); QueuePreferencesSave();
+            ApplyTheme();
+            UpdateAppearanceStatus();
+            QueuePreferencesSave();
         }
     }
     public UsageProfile SelectedProfile { get => _selectedProfile; set { if (Enum.IsDefined(value) && Set(ref _selectedProfile, value)) ProfileChanged(); } }
@@ -906,6 +910,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private static SolidColorBrush BrushFromHex(string value) =>
         new((Color)ColorConverter.ConvertFromString(value));
+
+    private void UpdateAppearanceStatus()
+    {
+        if (!_loaded) return;
+        StatusTitle = "Aparência do ZEUS atualizada";
+        StatusDetail = $"{SelectedThemeOption.Name} e a cor de destaque escolhida afetam somente a interface do ZEUS. Papel de parede, relógio, animações e configurações do Windows permanecem independentes.";
+    }
 
     internal void RefreshSelectedThemeAfterContrastChange()
     {

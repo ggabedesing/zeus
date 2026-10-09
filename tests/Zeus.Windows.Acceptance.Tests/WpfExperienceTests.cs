@@ -338,6 +338,8 @@ public sealed class WpfExperienceTests
             Assert.Equal(wallpaperBeforeThemeChange, window.SelectedWallpaperPath);
             Assert.Same(Application.Current.Resources["PanelBrush"], themeSelector.Background);
             Assert.Same(Application.Current.Resources["TextBrush"], themeSelector.Foreground);
+            Assert.Equal("Aparência do ZEUS atualizada", window.StatusTitle);
+            Assert.Contains("somente a interface do ZEUS", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
             if (theme == DesktopTheme.RetroAmber)
                 Assert.Equal(Color.FromRgb(0xFF, 0xC8, 0x57), Assert.IsType<SolidColorBrush>(Application.Current.Resources["AccentBrush"]).Color);
             if (theme == DesktopTheme.Monochrome)
