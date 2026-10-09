@@ -402,6 +402,13 @@ public sealed class WpfExperienceTests
         Assert.True(chooseWallpaperButton.IsEnabled);
         var applyWallpaperButton = Assert.IsType<Button>(window.FindName("ApplyWallpaperButton"));
         Assert.False(applyWallpaperButton.IsEnabled, "A aplicação exige primeiro uma imagem escolhida e pré-visualizada.");
+        var wallpaperPositionSelector = Assert.IsType<ComboBox>(window.FindName("WallpaperPositionSelector"));
+        Assert.Equal("wallpaper-position-selector", AutomationProperties.GetAutomationId(wallpaperPositionSelector));
+        Assert.Equal(7, wallpaperPositionSelector.Items.Count);
+        Assert.Equal("Manter ajuste atual", Assert.IsType<WallpaperPositionOption>(wallpaperPositionSelector.SelectedItem).Name);
+        Assert.Null(window.SelectedWallpaperPosition);
+        Assert.Contains(window.WallpaperPositionOptions, option => option.Value == WallpaperPosition.Span && option.Description.Contains("todos os monitores", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("Ajuste atual no Windows:", window.CurrentWallpaperPositionSummary, StringComparison.Ordinal);
         var organizePreviewButton = Assert.IsType<Button>(window.FindName("PreviewDesktopOrganizationButton"));
         Assert.Equal("preview-desktop-organization", AutomationProperties.GetAutomationId(organizePreviewButton));
         Assert.True(organizePreviewButton.IsEnabled);

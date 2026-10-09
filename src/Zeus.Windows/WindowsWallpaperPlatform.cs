@@ -49,6 +49,26 @@ public sealed class WindowsWallpaperPlatform : IWallpaperPlatform
         return WithDesktopWallpaper(api => api.SetWallpaper(monitorId, path) == 0);
     }
 
+    public WallpaperPosition GetWallpaperPosition() => WithDesktopWallpaper(api =>
+    {
+        var result = api.GetPosition(out var position);
+        if (result < 0) Marshal.ThrowExceptionForHR(result);
+        if (result != 0 || !Enum.IsDefined(typeof(WallpaperPosition), (int)position))
+            throw new InvalidDataException("O Windows não confirmou um ajuste de papel de parede reconhecido.");
+        return (WallpaperPosition)position;
+    });
+
+    public bool SetWallpaperPosition(WallpaperPosition position)
+    {
+        if (!Enum.IsDefined(position)) throw new ArgumentOutOfRangeException(nameof(position));
+        return WithDesktopWallpaper(api =>
+        {
+            var result = api.SetPosition((uint)position);
+            if (result < 0) Marshal.ThrowExceptionForHR(result);
+            return true; // S_FALSE means Windows already uses the requested position.
+        });
+    }
+
     private static T WithDesktopWallpaper<T>(Func<IDesktopWallpaper, T> action)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("A personalização do papel de parede requer Windows 8 ou posterior.");

@@ -763,6 +763,8 @@ public partial class MainWindow
         try
         {
             var discovery = await _userOptimization.ReadWallpaperMonitorDiscoveryAsync(_lifetime.Token);
+            _currentWallpaperPosition = discovery.Position;
+            Notify(nameof(CurrentWallpaperPositionSummary));
             _wallpaperSlideshowDetected = discovery.IsSlideshowConfigured;
             Notify(nameof(CanApplyWallpaper));
             if (discovery.IsSlideshowConfigured)
@@ -782,6 +784,8 @@ public partial class MainWindow
         }
         catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException or Win32Exception or UnauthorizedAccessException)
         {
+            _currentWallpaperPosition = null;
+            Notify(nameof(CurrentWallpaperPositionSummary));
             _wallpaperSlideshowDetected = false;
             WallpaperMonitorChoices.Add(new(null, "Todos os monitores (seleção individual indisponível)", "A leitura dos monitores falhou; a seleção será revalidada ao aplicar."));
             SelectedWallpaperMonitor = WallpaperMonitorChoices[0];
@@ -794,10 +798,13 @@ public partial class MainWindow
         if (!CanApplyWallpaper || SelectedWallpaperPath is not { } imagePath || SelectedWallpaperMonitor is not { } target) return;
         var fileName = Path.GetFileName(imagePath);
         if (target.Name.Contains("slides", StringComparison.OrdinalIgnoreCase)) return;
-        if (!Confirm($"Aplicar “{fileName}” em {target.Name}?\n\nO ZEUS guardará a imagem anterior de cada monitor no histórico e verificará o resultado. Apresentações de slides ficam intactas. Se algum monitor ou papel de parede mudar depois fora do ZEUS, a restauração será bloqueada para preservar a escolha mais recente.", "Revisar papel de parede")) return;
-        await RunOperationAsync("Aplicando papel de parede", "Guardando e verificando o estado por monitor antes de alterar o Windows.", async token =>
+        var position = SelectedWallpaperPosition is { } selectedPosition
+            ? UserOptimizationService.WallpaperPositionName(selectedPosition)
+            : "manter o ajuste atual";
+        if (!Confirm($"Aplicar “{fileName}” em {target.Name}?\n\nModo de exibição global: {position}. Esse modo vale para todos os monitores, mesmo quando a imagem é aplicada a apenas uma tela. O ZEUS guardará as imagens anteriores de cada monitor e o ajuste global no histórico, verificará o resultado e bloqueará a restauração se detectar alterações externas. Apresentações de slides ficam intactas.", "Revisar papel de parede")) return;
+        await RunOperationAsync("Aplicando papel de parede", "Guardando e verificando as imagens por monitor e o ajuste global antes de alterar o Windows.", async token =>
         {
-            var result = await _userOptimization.ApplyWallpaperAsync(imagePath, target.MonitorId, token);
+            var result = await _userOptimization.ApplyWallpaperAsync(imagePath, target.MonitorId, SelectedWallpaperPosition, token);
             await RefreshUserChangesAsync();
             ProfileSummary = result.Message;
             StatusTitle = result.Succeeded ? "Papel de parede aplicado" : "Papel de parede não alterado";

@@ -77,6 +77,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private PowerPlanInfo? _selectedPowerPlan;
     private string? _selectedWallpaperPath;
     private WallpaperMonitorChoice? _selectedWallpaperMonitor;
+    private WallpaperPosition? _selectedWallpaperPosition;
+    private WallpaperPosition? _currentWallpaperPosition;
     private bool _wallpaperSlideshowDetected;
     private ImageSource? _wallpaperPreview;
     private DesktopOrganizationPreview? _desktopOrganizationPreview;
@@ -236,6 +238,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<DesktopOrganizationSession> DesktopOrganizationSessions { get; } = [];
     public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
     public ObservableCollection<WallpaperMonitorChoice> WallpaperMonitorChoices { get; } = [];
+    public IReadOnlyList<WallpaperPositionOption> WallpaperPositionOptions { get; } =
+    [
+        new(null, "Manter ajuste atual", "Preserva o modo definido no Windows."),
+        new(WallpaperPosition.Fill, "Preencher · pode cortar bordas", "Preenche a tela mantendo proporção; partes da imagem podem ficar fora da área visível."),
+        new(WallpaperPosition.Fit, "Ajustar · sem recorte", "Mantém a imagem inteira; o Windows pode mostrar faixas da cor de fundo."),
+        new(WallpaperPosition.Stretch, "Esticar", "Preenche cada tela e pode distorcer a proporção."),
+        new(WallpaperPosition.Center, "Centralizar", "Mantém o tamanho original da imagem e a centraliza."),
+        new(WallpaperPosition.Tile, "Lado a lado", "Repete a imagem em blocos nas telas."),
+        new(WallpaperPosition.Span, "Estender pelos monitores", "Usa uma imagem contínua no conjunto de telas; exige selecionar todos os monitores.")
+    ];
+    public string CurrentWallpaperPositionSummary => _currentWallpaperPosition is { } position
+        ? $"Ajuste atual no Windows: {UserOptimizationService.WallpaperPositionName(position)}."
+        : "Ajuste atual no Windows: indisponível nesta leitura.";
+    public WallpaperPosition? SelectedWallpaperPosition => _selectedWallpaperPosition;
+    public WallpaperPositionOption SelectedWallpaperPositionOption
+    {
+        get => WallpaperPositionOptions.First(option => option.Value == _selectedWallpaperPosition);
+        set
+        {
+            if (value is null || !WallpaperPositionOptions.Contains(value) || !Set(ref _selectedWallpaperPosition, value.Value)) return;
+            Notify(nameof(CanApplyWallpaper));
+        }
+    }
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
     public ObservableCollection<DriverInventoryRow> InstalledDriverRows { get; } = [];
     public ObservableCollection<DriverRollbackChoice> RollbackDriverChoices { get; } = [];
@@ -282,7 +307,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanQuarantine => !_isBusy && _cleanupScan is not null && CleanupFiles.Any(f => f.IsSelected);
     public bool CanDisableStartup => !_isBusy && StartupChoices.Any(f => f.IsSelected && f.CanSelect);
     public bool CanSetPowerPlan => !_isBusy && SelectedPowerPlan is { IsActive: false };
-    public bool CanApplyWallpaper => !_isBusy && !_wallpaperSlideshowDetected && !string.IsNullOrWhiteSpace(SelectedWallpaperPath) && SelectedWallpaperMonitor is not null;
+    public bool CanApplyWallpaper => !_isBusy && !_wallpaperSlideshowDetected && !string.IsNullOrWhiteSpace(SelectedWallpaperPath) &&
+        SelectedWallpaperMonitor is not null && (_selectedWallpaperPosition is null || Enum.IsDefined(_selectedWallpaperPosition.Value)) &&
+        !(_selectedWallpaperPosition == WallpaperPosition.Span && SelectedWallpaperMonitor?.MonitorId is not null);
     public DesktopOrganizationPreview? DesktopOrganizationPreview { get => _desktopOrganizationPreview; private set { if (Set(ref _desktopOrganizationPreview, value)) Notify(nameof(CanApplyDesktopOrganization)); } }
     public string DesktopOrganizationSummary { get => _desktopOrganizationSummary; private set => Set(ref _desktopOrganizationSummary, value); }
     public bool CanApplyDesktopOrganization => !_isBusy && DesktopOrganizationPreview is { Items.Count: > 0 };

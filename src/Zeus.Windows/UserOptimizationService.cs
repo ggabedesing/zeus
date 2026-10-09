@@ -42,14 +42,17 @@ public sealed class UserOptimizationService
             cancellationToken.ThrowIfCancellationRequested();
             RequireWindows();
             if (wallpaperPlatform.IsSlideshowConfigured())
-                return new WallpaperMonitorDiscovery(true, []);
-            return new WallpaperMonitorDiscovery(false, wallpaperPlatform.GetAttachedMonitorWallpapers());
+                return new WallpaperMonitorDiscovery(true, [], wallpaperPlatform.GetWallpaperPosition());
+            return new WallpaperMonitorDiscovery(false, wallpaperPlatform.GetAttachedMonitorWallpapers(), wallpaperPlatform.GetWallpaperPosition());
         }, cancellationToken);
 
     public Task<UserChangeResult> ApplyWallpaperAsync(string imagePath, CancellationToken cancellationToken = default) =>
         ApplyWallpaperAsync(imagePath, targetMonitorId: null, cancellationToken);
 
     public Task<UserChangeResult> ApplyWallpaperAsync(string imagePath, string? targetMonitorId, CancellationToken cancellationToken = default) =>
+        ApplyWallpaperAsync(imagePath, targetMonitorId, requestedPosition: null, cancellationToken);
+
+    public Task<UserChangeResult> ApplyWallpaperAsync(string imagePath, string? targetMonitorId, WallpaperPosition? requestedPosition, CancellationToken cancellationToken = default) =>
         WithChangeLockAsync(async () =>
         {
             RequireWindows();
@@ -57,8 +60,12 @@ public sealed class UserOptimizationService
             if (policy is not null) return Failure(policy);
             if (wallpaperPlatform.IsSlideshowConfigured()) return Failure("Há uma apresentação de slides de papel de parede configurada. O ZEUS preservou a apresentação e não fez alterações.");
             var selectedPath = ValidateWallpaperFile(imagePath, requireMatchingExtension: true);
+            if (requestedPosition is { } position && !Enum.IsDefined(position)) return Failure("O ajuste de papel de parede selecionado não é reconhecido.");
             var selectedHash = ComputeWallpaperHash(selectedPath);
             var previousStates = wallpaperPlatform.GetAttachedMonitorWallpapers();
+            var previousPosition = wallpaperPlatform.GetWallpaperPosition();
+            if (!Enum.IsDefined(previousPosition)) return Failure("O ajuste atual do papel de parede é desconhecido. Nenhuma alteração foi feita.");
+            var appliedPosition = requestedPosition ?? previousPosition;
             if (previousStates.Count is 0 or > 64 || previousStates.Any(state => string.IsNullOrWhiteSpace(state.MonitorId) || state.MonitorId.Length > 4096 || state.MonitorId.Contains('\0')) ||
                 previousStates.Select(state => state.MonitorId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != previousStates.Count)
                 return Failure("O Windows não confirmou uma lista válida de monitores conectados. Nenhuma alteração foi feita.");
@@ -67,6 +74,8 @@ public sealed class UserOptimizationService
                 : previousStates.Where(state => string.Equals(state.MonitorId, targetMonitorId, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (targetStates.Count == 0)
                 return Failure("O monitor selecionado não está mais conectado ou sua identidade mudou. Atualize a lista; nenhuma alteração foi feita.");
+            if (requestedPosition == WallpaperPosition.Span && targetStates.Count != previousStates.Count)
+                return Failure("O modo estendido precisa da imagem em todos os monitores. Selecione todos os monitores; nenhuma alteração foi feita.");
             var targetMonitorIds = targetStates.Select(state => state.MonitorId).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var previousPaths = previousStates.Select(state => ValidateWallpaperFile(state.Path, requireMatchingExtension: false)).ToArray();
             var backupBytes = previousPaths.Sum(path => new FileInfo(path).Length);
@@ -78,13 +87,16 @@ public sealed class UserOptimizationService
                 PreviousSha256 = ComputeWallpaperHash(previousPaths[index])
             }).ToList();
             if (previousHashes.Where(state => targetMonitorIds.Contains(state.MonitorId))
-                .All(state => string.Equals(selectedHash, state.PreviousSha256, StringComparison.OrdinalIgnoreCase)))
+                    .All(state => string.Equals(selectedHash, state.PreviousSha256, StringComparison.OrdinalIgnoreCase)) && appliedPosition == previousPosition)
                 return Success(Guid.Empty, "Esse já é o papel de parede ativo.");
 
-            var document = NewDocument("wallpaper", $"Papel de parede em {targetStates.Count} de {previousStates.Count} monitor(es): {Path.GetFileName(selectedPath)[..Math.Min(Path.GetFileName(selectedPath).Length, 120)]}");
+            var positionLabel = WallpaperPositionName(appliedPosition);
+            var document = NewDocument("wallpaper", $"Papel de parede em {targetStates.Count} de {previousStates.Count} monitor(es) · ajuste global {positionLabel}: {Path.GetFileName(selectedPath)[..Math.Min(Path.GetFileName(selectedPath).Length, 120)]}");
             var backupPaths = new List<string>(previousStates.Count);
             document.NewWallpaperSha256 = selectedHash;
             document.NewWallpaperMonitorIds = targetStates.Select(state => state.MonitorId).ToList();
+            document.PreviousWallpaperPosition = previousPosition;
+            document.NewWallpaperPosition = appliedPosition;
             var saved = false;
             try
             {
@@ -102,7 +114,7 @@ public sealed class UserOptimizationService
                         throw new IOException("Uma cópia de papel de parede anterior não passou na verificação; nenhuma alteração foi aplicada.");
                 await SaveDocumentAsync(document, cancellationToken);
                 saved = true;
-                if (!WallpaperStatesMatch(previousHashes, wallpaperPlatform.GetAttachedMonitorWallpapers()))
+                if (!WallpaperStatesMatch(previousHashes, wallpaperPlatform.GetAttachedMonitorWallpapers()) || wallpaperPlatform.GetWallpaperPosition() != previousPosition)
                     return Failure("O papel de parede ou a lista de monitores mudou durante a preparação; nenhuma alteração foi aplicada.", document.Id);
                 cancellationToken.ThrowIfCancellationRequested();
                 document.Status = UserChangeStatus.Applying;
@@ -110,10 +122,17 @@ public sealed class UserOptimizationService
                 foreach (var state in targetStates)
                 {
                     if (wallpaperPlatform.SetWallpaperPath(state.MonitorId, selectedPath)) continue;
-                    var rolledBack = TryRestoreWallpaperStates(previousHashes, selectedHash, targetMonitorIds);
+                    var rolledBack = TryRestoreWallpaperStates(previousHashes, selectedHash, targetMonitorIds, previousPosition, appliedPosition);
                     document.Restored = rolledBack;
                     await SetChangeStatusAsync(document, rolledBack ? UserChangeStatus.Restored : UserChangeStatus.NeedsReview);
                     return Failure(rolledBack ? "O Windows recusou uma imagem e os papéis de parede anteriores foram restaurados." : "O Windows recusou uma imagem e não confirmou a restauração de todos os monitores; revise o histórico.", document.Id);
+                }
+                if (requestedPosition is { } && appliedPosition != previousPosition && !wallpaperPlatform.SetWallpaperPosition(appliedPosition))
+                {
+                    var rolledBack = TryRestoreWallpaperStates(previousHashes, selectedHash, targetMonitorIds, previousPosition, appliedPosition);
+                    document.Restored = rolledBack;
+                    await SetChangeStatusAsync(document, rolledBack ? UserChangeStatus.Restored : UserChangeStatus.NeedsReview);
+                    return Failure(rolledBack ? "O Windows recusou o ajuste e as configurações anteriores foram restauradas." : "O Windows recusou o ajuste e não confirmou a restauração; revise o estado atual.", document.Id);
                 }
                 var appliedStates = wallpaperPlatform.GetAttachedMonitorWallpapers();
                 var previousById = previousHashes.ToDictionary(state => state.MonitorId, StringComparer.OrdinalIgnoreCase);
@@ -123,21 +142,21 @@ public sealed class UserOptimizationService
                         var actualHash = ComputeWallpaperHash(state.Path);
                         var expectedHash = targetMonitorIds.Contains(state.MonitorId) ? selectedHash : previousById[state.MonitorId].PreviousSha256;
                         return !string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase);
-                    }))
+                    }) || wallpaperPlatform.GetWallpaperPosition() != appliedPosition)
                 {
-                    var rolledBack = TryRestoreWallpaperStates(previousHashes, selectedHash, targetMonitorIds);
+                    var rolledBack = TryRestoreWallpaperStates(previousHashes, selectedHash, targetMonitorIds, previousPosition, appliedPosition);
                     document.Restored = rolledBack;
                     await SetChangeStatusAsync(document, rolledBack ? UserChangeStatus.Restored : UserChangeStatus.NeedsReview);
                     return Failure(rolledBack ? "A verificação não confirmou a imagem em todos os monitores; os estados anteriores foram restaurados." : "O Windows não confirmou a imagem em todos os monitores nem a restauração; revise o estado atual.", document.Id);
                 }
                 await SetChangeStatusAsync(document, UserChangeStatus.Applied);
-                return Success(document.Id, $"Papel de parede aplicado e verificado em {targetStates.Count} de {previousStates.Count} monitor(es). As imagens anteriores foram guardadas por monitor para restauração.");
+                return Success(document.Id, $"Papel de parede aplicado e verificado em {targetStates.Count} de {previousStates.Count} monitor(es), com ajuste global {positionLabel}. As imagens e o ajuste anteriores foram guardados para restauração.");
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or Win32Exception or ArgumentException or COMException)
             {
                 if (saved && document.Status == UserChangeStatus.Applying)
                 {
-                    var rolledBack = TryRestoreWallpaperStates(previousHashes, selectedHash, targetMonitorIds);
+                    var rolledBack = TryRestoreWallpaperStates(previousHashes, selectedHash, targetMonitorIds, previousPosition, appliedPosition);
                     document.Restored = rolledBack;
                     await SetChangeStatusAsync(document, rolledBack ? UserChangeStatus.Restored : UserChangeStatus.NeedsReview);
                     return Failure(rolledBack
@@ -420,6 +439,16 @@ public sealed class UserOptimizationService
 
             if (document.PreviousWallpaperStates is { Count: > 0 } previousStates)
             {
+                WallpaperPosition? currentPosition = null;
+                if (document.PreviousWallpaperPosition is { } previousPosition && document.NewWallpaperPosition is { } appliedPosition)
+                {
+                    currentPosition = wallpaperPlatform.GetWallpaperPosition();
+                    if (currentPosition != appliedPosition && currentPosition != previousPosition)
+                    {
+                        await SetChangeStatusAsync(document, UserChangeStatus.RestoreBlocked);
+                        return Failure("O ajuste de exibição do papel de parede mudou fora desta sessão. A restauração preservou a configuração atual.", document.Id);
+                    }
+                }
                 if (!SameMonitorSet(previousStates.Select(state => state.MonitorId), currentStates.Select(state => state.MonitorId)))
                 {
                     await SetChangeStatusAsync(document, UserChangeStatus.RestoreBlocked);
@@ -455,6 +484,19 @@ public sealed class UserOptimizationService
                     {
                         await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
                         return Failure("O Windows não confirmou a restauração de todos os monitores. Revise o estado no histórico.", document.Id);
+                    }
+                }
+                if (document.PreviousWallpaperPosition is { } originalPosition)
+                {
+                    if (currentPosition != originalPosition && !wallpaperPlatform.SetWallpaperPosition(originalPosition))
+                    {
+                        await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
+                        return Failure("O Windows não confirmou a restauração do ajuste do papel de parede. Revise o estado no histórico.", document.Id);
+                    }
+                    if (wallpaperPlatform.GetWallpaperPosition() != originalPosition)
+                    {
+                        await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
+                        return Failure("A verificação não confirmou o ajuste anterior do papel de parede.", document.Id);
                     }
                 }
                 if (!WallpaperStatesMatch(previousStates, wallpaperPlatform.GetAttachedMonitorWallpapers()))
@@ -638,6 +680,10 @@ public sealed class UserOptimizationService
                     throw new InvalidDataException("Registro de papel de parede inválido.");
                 if (document.PreviousWallpaperStates is { Count: > 0 } states)
                 {
+                    if ((document.PreviousWallpaperPosition is null) != (document.NewWallpaperPosition is null) ||
+                        document.PreviousWallpaperPosition is { } previousPosition && !Enum.IsDefined(previousPosition) ||
+                        document.NewWallpaperPosition is { } newPosition && !Enum.IsDefined(newPosition))
+                        throw new InvalidDataException("O histórico contém ajuste de papel de parede inválido.");
                     if (states.Count > 64 || states.Any(state => string.IsNullOrWhiteSpace(state.MonitorId) || state.MonitorId.Length > 4096 ||
                             state.MonitorId.Contains('\0') || !IsSha256(state.PreviousSha256) || string.IsNullOrWhiteSpace(state.BackupPath)) ||
                         states.Select(state => state.MonitorId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != states.Count)
@@ -723,11 +769,14 @@ public sealed class UserOptimizationService
         return Convert.ToHexString(SHA256.HashData(stream));
     }
 
-    private bool TryRestoreWallpaperStates(IReadOnlyList<WallpaperMonitorBackup> previousStates, string newHash, IReadOnlySet<string> targetMonitorIds)
+    private bool TryRestoreWallpaperStates(IReadOnlyList<WallpaperMonitorBackup> previousStates, string newHash,
+        IReadOnlySet<string> targetMonitorIds, WallpaperPosition previousPosition, WallpaperPosition newPosition)
     {
         try
         {
             var currentStates = wallpaperPlatform.GetAttachedMonitorWallpapers();
+            var currentPosition = wallpaperPlatform.GetWallpaperPosition();
+            if (currentPosition != previousPosition && currentPosition != newPosition) return false;
             if (!SameMonitorSet(previousStates.Select(state => state.MonitorId), currentStates.Select(state => state.MonitorId))) return false;
             var currentById = currentStates.ToDictionary(state => state.MonitorId, StringComparer.OrdinalIgnoreCase);
             foreach (var previous in previousStates)
@@ -745,11 +794,24 @@ public sealed class UserOptimizationService
                 if (!string.Equals(currentHash, previous.PreviousSha256, StringComparison.OrdinalIgnoreCase) &&
                     !wallpaperPlatform.SetWallpaperPath(previous.MonitorId, previous.BackupPath)) return false;
             }
-            return WallpaperStatesMatch(previousStates, wallpaperPlatform.GetAttachedMonitorWallpapers());
+            if (currentPosition != previousPosition && !wallpaperPlatform.SetWallpaperPosition(previousPosition)) return false;
+            return wallpaperPlatform.GetWallpaperPosition() == previousPosition &&
+                WallpaperStatesMatch(previousStates, wallpaperPlatform.GetAttachedMonitorWallpapers());
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or Win32Exception or ArgumentException or COMException)
         { return false; }
     }
+
+    public static string WallpaperPositionName(WallpaperPosition position) => position switch
+    {
+        WallpaperPosition.Center => "Centralizar",
+        WallpaperPosition.Tile => "Lado a lado",
+        WallpaperPosition.Stretch => "Esticar",
+        WallpaperPosition.Fit => "Ajustar sem recorte",
+        WallpaperPosition.Fill => "Preencher com recorte",
+        WallpaperPosition.Span => "Estender por todos os monitores",
+        _ => "Desconhecido"
+    };
 
     private bool WallpaperStatesMatch(IReadOnlyList<WallpaperMonitorBackup> expected, IReadOnlyList<WallpaperMonitorState> actual)
     {
@@ -928,6 +990,8 @@ public sealed class UserOptimizationService
         public string? NewWallpaperSha256 { get; set; }
         public List<string>? NewWallpaperMonitorIds { get; set; }
         public List<WallpaperMonitorBackup>? PreviousWallpaperStates { get; set; }
+        public WallpaperPosition? PreviousWallpaperPosition { get; set; }
+        public WallpaperPosition? NewWallpaperPosition { get; set; }
     }
 
     private sealed class WallpaperMonitorBackup

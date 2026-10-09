@@ -105,6 +105,111 @@ public sealed class WindowsVisualPreferencesTests
 public sealed class WallpaperChangeTests
 {
     [WindowsFact]
+    public async Task WallpaperPositionIsAppliedVerifiedAndRestoredFromHistory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperPositionTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previous = Path.Combine(root, "previous.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(previous, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        var platform = new FixtureWallpaperPlatform(previous) { Position = WallpaperPosition.Fill };
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var applied = await service.ApplyWallpaperAsync(selected, null, WallpaperPosition.Fit);
+            Assert.True(applied.Succeeded, applied.Message);
+            Assert.Equal(WallpaperPosition.Fit, platform.Position);
+            Assert.Contains("Ajustar sem recorte", applied.Message, StringComparison.Ordinal);
+
+            var restored = await service.RestoreAsync(applied.SessionId);
+
+            Assert.True(restored.Succeeded, restored.Message);
+            Assert.Equal(WallpaperPosition.Fill, platform.Position);
+            Assert.Equal(Bmp(1, 2, 3), await File.ReadAllBytesAsync(platform.CurrentPath));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [WindowsFact]
+    public async Task WallpaperRestorePreservesPositionChangedOutsideTheZeusSession()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperPositionTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previous = Path.Combine(root, "previous.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(previous, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        var platform = new FixtureWallpaperPlatform(previous) { Position = WallpaperPosition.Fill };
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var applied = await service.ApplyWallpaperAsync(selected, null, WallpaperPosition.Fit);
+            Assert.True(applied.Succeeded, applied.Message);
+            platform.Position = WallpaperPosition.Tile;
+
+            var restored = await service.RestoreAsync(applied.SessionId);
+
+            Assert.False(restored.Succeeded);
+            Assert.Contains("ajuste de exibição", restored.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(WallpaperPosition.Tile, platform.Position);
+            Assert.Equal(Path.GetFullPath(selected), platform.CurrentPath);
+            Assert.Equal(UserChangeStatus.RestoreBlocked, Assert.Single(await service.ListChangesAsync()).Status);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [WindowsFact]
+    public async Task SpanPositionRequiresEveryAttachedMonitor()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperPositionTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "first.bmp");
+        var second = Path.Combine(root, "second.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(first, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(second, Bmp(2, 3, 4));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        var platform = new FixtureWallpaperPlatform(new Dictionary<string, string> { ["DISPLAY-1"] = first, ["DISPLAY-2"] = second });
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var result = await service.ApplyWallpaperAsync(selected, "DISPLAY-1", WallpaperPosition.Span);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("todos os monitores", result.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(Path.GetFullPath(first), platform.MonitorPaths["DISPLAY-1"]);
+            Assert.Equal(WallpaperPosition.Fill, platform.Position);
+            Assert.Empty(await service.ListChangesAsync());
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [WindowsFact]
+    public async Task WallpaperPositionRejectionRollsBackImageAndHistoryRemainsReviewable()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperPositionTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previous = Path.Combine(root, "previous.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(previous, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        var platform = new FixtureWallpaperPlatform(previous) { Position = WallpaperPosition.Fill, RejectPositionChanges = true };
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var result = await service.ApplyWallpaperAsync(selected, null, WallpaperPosition.Fit);
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("recusou o ajuste", result.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(Bmp(1, 2, 3), await File.ReadAllBytesAsync(platform.CurrentPath));
+            Assert.Equal(WallpaperPosition.Fill, platform.Position);
+            Assert.Equal(UserChangeStatus.Restored, Assert.Single(await service.ListChangesAsync()).Status);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [WindowsFact]
     public void WindowsWallpaperStatusCanBeReadWithoutChangingTheDesktop()
     {
         var platform = new WindowsWallpaperPlatform();
@@ -412,8 +517,17 @@ public sealed class WallpaperChangeTests
         public Dictionary<string, string> MonitorPaths { get; }
         public string CurrentPath { get => MonitorPaths["DISPLAY-1"]; set => MonitorPaths["DISPLAY-1"] = Path.GetFullPath(value); }
         public bool Slideshow { get; set; }
+        public WallpaperPosition Position { get; set; } = WallpaperPosition.Fill;
+        public bool RejectPositionChanges { get; set; }
         public bool IsSlideshowConfigured() => Slideshow;
         public IReadOnlyList<WallpaperMonitorState> GetAttachedMonitorWallpapers() => MonitorPaths.Select(pair => new WallpaperMonitorState(pair.Key, pair.Value)).ToArray();
+        public WallpaperPosition GetWallpaperPosition() => Position;
+        public bool SetWallpaperPosition(WallpaperPosition position)
+        {
+            if (RejectPositionChanges) return false;
+            Position = position;
+            return true;
+        }
         public bool SetWallpaperPath(string monitorId, string path)
         {
             if (!MonitorPaths.ContainsKey(monitorId) || !File.Exists(path)) return false;

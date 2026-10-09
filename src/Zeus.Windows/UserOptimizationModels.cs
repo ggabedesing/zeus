@@ -3,6 +3,7 @@ namespace Zeus.Windows;
 public enum UsageProfile { Balanced = 0, Work = 1, Gaming = 2, Creative = 3, Battery = 4, GamingStreaming = 5, Development = 6 }
 public enum DesktopTheme { Minimal, Complete, MacInspired, Light, GamingNeon, Cyberpunk, RetroAmber, Monochrome }
 public enum AppAccentColor { ThemeDefault, Blue, Violet, Green, Rose, Amber }
+public enum WallpaperPosition { Center = 0, Tile = 1, Stretch = 2, Fit = 3, Fill = 4, Span = 5 }
 
 /// <summary>The usage profile records a preference; it never selects a power plan automatically.</summary>
 public sealed record UserOptimizationPreferences(UsageProfile Profile, bool ReduceAnimations, bool ReduceTransparency);
@@ -29,8 +30,12 @@ public sealed record WallpaperMonitorBounds(int Left, int Top, int Right, int Bo
     public int Width => Right - Left;
     public int Height => Bottom - Top;
 }
-public sealed record WallpaperMonitorDiscovery(bool IsSlideshowConfigured, IReadOnlyList<WallpaperMonitorState> Monitors);
+public sealed record WallpaperMonitorDiscovery(bool IsSlideshowConfigured, IReadOnlyList<WallpaperMonitorState> Monitors, WallpaperPosition? Position = null);
 public sealed record WallpaperMonitorChoice(string? MonitorId, string Name, string TechnicalDetails)
+{
+    public override string ToString() => Name;
+}
+public sealed record WallpaperPositionOption(WallpaperPosition? Value, string Name, string Description)
 {
     public override string ToString() => Name;
 }
@@ -43,4 +48,6 @@ public interface IWallpaperPlatform
     bool IsSlideshowConfigured();
     IReadOnlyList<WallpaperMonitorState> GetAttachedMonitorWallpapers();
     bool SetWallpaperPath(string monitorId, string path);
+    WallpaperPosition GetWallpaperPosition();
+    bool SetWallpaperPosition(WallpaperPosition position);
 }
