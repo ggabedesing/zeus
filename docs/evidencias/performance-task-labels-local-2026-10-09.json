@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-09",
+  "feature": "declared activity labels in before-and-after performance comparisons",
+  "sourceCommit": "94340b75df0452bc65f94879d10a45045e37d1c4",
+  "sourceTreeDirty": false,
+  "behavior": {
+    "sameLabel": "shown as declared in both sessions, with a reminder that labels do not prove equivalent conditions",
+    "differentLabels": "shown side by side with a prompt to review whether periods are comparable",
+    "missingLabels": "shown as unavailable without inferring the measured task"
+  },
+  "localVerification": {
+    "focusedTestsPassed": 4,
+    "focusedTestsFailed": 0,
+    "fullSuitePassed": 517,
+    "fullSuiteFailed": 0,
+    "fullSuiteSkipped": 10,
+    "portableExeSmoke": "main window opened, remained responsive, and closed cleanly"
+  },
+  "githubActions": {
+    "runId": 37930980618,
+    "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37930980618",
+    "accepted": true,
+    "build": "success",
+    "windowsTests": "success",
+    "portableSmoke": "success",
+    "msiInstallUpgradeUninstall": "success",
+    "testsPassed": 527,
+    "testsFailed": 0,
+    "testsSkipped": 0
+  },
+  "package": {
+    "runtime": "win-x64",
+    "zip": "artifacts/performance-task-label-package/zeus-win-x64.zip",
+    "zipSha256": "2E4BD65D58A7C55A2D3ECDB55CFAC58E302ACB05490923679174E6B0BB6513C2",
+    "exeSha256": "50F72A53884D64EA95AE4AB311D65F32EF240931CDD7EF627717C888B4D3E2DC",
+    "productionAuthenticodeSignature": false
+  },
+  "scope": "No Windows configuration or optimization was applied. Session labels are supplied by the user and are not evidence that workloads or conditions were identical.",
+  "ciLimitations": [
+    "CI acceptance ran on a Windows virtual machine, not every physical configuration.",
+    "The workflow does not perform real Windows repairs, restore-point creation, driver installation, offline scan, or reboot."
+  ]
+}

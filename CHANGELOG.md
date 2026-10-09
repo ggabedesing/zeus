@@ -70,3 +70,4 @@
 - A reconsulta de driver só começa quando o tempo de inicialização do Windows indica uma reinicialização posterior à sessão de instalação.
 - O pacote portátil inclui este histórico de versões.
 - Consultas de atualização do ZEUS agora registram respostas HTTP malsucedidas como inconclusivas, sem oferecer o link de release como resultado confirmado.
+- Comparações antes/depois do Observador agora mostram os rótulos declarados das sessões e alertam quando os nomes diferem; rótulos continuam sem comprovar condições equivalentes.
