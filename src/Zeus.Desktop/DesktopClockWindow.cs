@@ -49,11 +49,20 @@ internal sealed class DesktopClockWindow : Window
         _date.Foreground = highContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(0xC8, 0xD4, 0xE0));
         _surface.Background = highContrast ? SystemColors.WindowBrush : new SolidColorBrush(Color.FromArgb(225, 20, 28, 39));
         _surface.BorderBrush = highContrast ? SystemColors.WindowFrameBrush : new SolidColorBrush(Color.FromArgb(100, 130, 160, 185));
-        var area = SystemParameters.WorkArea;
-        Left = Math.Clamp(Left, area.Left, Math.Max(area.Left, area.Right - width));
-        Top = Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - height));
+        var virtualScreen = new Rect(
+            SystemParameters.VirtualScreenLeft,
+            SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth,
+            SystemParameters.VirtualScreenHeight);
+        var position = ClampPosition(Left, Top, width, height, virtualScreen);
+        Left = position.X;
+        Top = position.Y;
         UpdateTime();
     }
+
+    internal static Point ClampPosition(double left, double top, double width, double height, Rect bounds) => new(
+        Math.Clamp(left, bounds.Left, Math.Max(bounds.Left, bounds.Right - width)),
+        Math.Clamp(top, bounds.Top, Math.Max(bounds.Top, bounds.Bottom - height)));
 
     private void UpdateTime()
     {
