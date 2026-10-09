@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- A janela principal agora reduz seus limites mínimos para caber na área útil do monitor em resoluções menores, sem definir um tamanho máximo abaixo do mínimo.
 - O relógio flutuante ajusta a frequência do timer ao conteúdo: atualiza a cada segundo quando exibe segundos e na próxima virada do minuto quando não exibe, reduzindo despertares sem atrasar a mudança visível do horário.
 - O pacote portátil inclui os avisos do runtime .NET, expressões de licença NuGet e avisos adicionais das dependências empacotadas.
 - Ao fechar o ZEUS com registros de atividade pendentes, o encerramento final agora também fecha o relógio flutuante; isso evita deixar o processo aberto depois que a janela principal desaparece.

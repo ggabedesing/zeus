@@ -1,0 +1,24 @@
+{
+  "evidenceType": "small-work-area-window-sizing-acceptance",
+  "date": "2026-10-09",
+  "sourceBaseCommit": "37cb5b53c02c5c36c1fad8fde42ec86d63cb3c50",
+  "sourceIncludesWorkingTreeChanges": true,
+  "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+  "tests": [
+    "WindowMinimumSizeFitsSmallWorkAreasWithoutContradictingMaximumSize",
+    "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme"
+  ],
+  "result": { "passed": 2, "failed": 0, "skipped": 0, "durationSeconds": 24 },
+  "portableExecutableSmoke": {
+    "result": "passed",
+    "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
+    "runtime": "win-x64",
+    "sourceCommit": "37cb5b53c02c5c36c1fad8fde42ec86d63cb3c50",
+    "sourceDirty": true,
+    "zipSha256": "52f1af605e989db90dbdc063a2d194aebf09582b6f146c9d943c47f9f85e2b4f"
+  },
+  "limitations": [
+    "The test checks the minimum-size calculation for an 800x450 work area and the default 900x600 size.",
+    "The app was not opened on a physical low-resolution monitor; page readability at that size remains unverified."
+  ]
+}

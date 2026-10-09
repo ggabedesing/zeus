@@ -107,7 +107,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _cleanup = new(storageRoot is null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp") : Path.Combine(storageRoot, "Temporary"),
             Path.Combine(storageRoot ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zeus"), "Cleanup"));
         InitializeComponent();
-        MaxWidth = SystemParameters.WorkArea.Width; MaxHeight = SystemParameters.WorkArea.Height;
+        var workArea = SystemParameters.WorkArea;
+        var minimumSize = ClampMinimumWindowSize(new Size(MinWidth, MinHeight), new Size(workArea.Width, workArea.Height));
+        MinWidth = minimumSize.Width; MinHeight = minimumSize.Height;
+        MaxWidth = Math.Max(MinWidth, workArea.Width); MaxHeight = Math.Max(MinHeight, workArea.Height);
         foreach (var definition in MaintenanceCatalog.All.Where(d => d.Id is not MaintenanceActionId.InstallDriverUpdate and not MaintenanceActionId.RollbackDriver and not MaintenanceActionId.DefenderOfflineScan))
         {
             var choice = new MaintenanceChoice(definition);
@@ -121,6 +124,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static void OpenSystemUri(string uri) =>
         _ = Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true })
             ?? throw new InvalidOperationException("O Windows não abriu o destino solicitado.");
+
+    internal static Size ClampMinimumWindowSize(Size configuredMinimum, Size workArea) => new(
+        Math.Max(1, Math.Min(configuredMinimum.Width, Math.Max(1, workArea.Width))),
+        Math.Max(1, Math.Min(configuredMinimum.Height, Math.Max(1, workArea.Height))));
 
     public HardwareSnapshot? Snapshot => _snapshot;
     public string BuildVersion { get; } = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Indisponível";

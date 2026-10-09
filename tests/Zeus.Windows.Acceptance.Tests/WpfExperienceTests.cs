@@ -18,6 +18,17 @@ namespace Zeus.Windows.Acceptance.Tests;
 public sealed class WpfExperienceTests
 {
     [Fact]
+    public void WindowMinimumSizeFitsSmallWorkAreasWithoutContradictingMaximumSize()
+    {
+        var minimum = MainWindow.ClampMinimumWindowSize(new Size(900, 600), new Size(800, 450));
+
+        Assert.Equal(new Size(800, 450), minimum);
+        Assert.True(800 >= minimum.Width);
+        Assert.True(450 >= minimum.Height);
+        Assert.Equal(new Size(900, 600), MainWindow.ClampMinimumWindowSize(new Size(900, 600), new Size(1600, 900)));
+    }
+
+    [Fact]
     public void VisualLayoutCatalogLoadsVersionedDataAndRejectsExecutableFields()
     {
         var presets = VisualLayoutCatalog.Load();
