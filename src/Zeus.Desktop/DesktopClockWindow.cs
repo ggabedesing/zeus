@@ -40,7 +40,7 @@ internal sealed class DesktopClockWindow : Window
 
     internal TimeSpan NextUpdateInterval => _timer.Interval;
 
-    public void Configure(bool showDate, bool showSeconds, bool use24HourFormat, bool alwaysOnTop, double opacity, DesktopClockSize size, Brush accentBrush, bool highContrast, bool hideDuringFullscreen = true)
+    public void Configure(bool showDate, bool showSeconds, bool use24HourFormat, bool alwaysOnTop, double opacity, DesktopClockSize size, DesktopClockStyle style, Brush accentBrush, bool highContrast, bool hideDuringFullscreen = true)
     {
         _showDate = showDate; _showSeconds = showSeconds; _use24HourFormat = use24HourFormat;
         _alwaysOnTop = alwaysOnTop; _hideDuringFullscreen = hideDuringFullscreen; Topmost = alwaysOnTop;
@@ -56,10 +56,21 @@ internal sealed class DesktopClockWindow : Window
         _surface.Padding = padding;
         Width = width;
         Height = height;
-        _time.Foreground = highContrast ? SystemColors.WindowTextBrush : accentBrush;
-        _date.Foreground = highContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(0xC8, 0xD4, 0xE0));
-        _surface.Background = highContrast ? SystemColors.WindowBrush : new SolidColorBrush(Color.FromArgb(225, 20, 28, 39));
-        _surface.BorderBrush = highContrast ? SystemColors.WindowFrameBrush : new SolidColorBrush(Color.FromArgb(100, 130, 160, 185));
+        var appearance = style switch
+        {
+            DesktopClockStyle.Minimal => (Background: Color.FromArgb(242, 17, 22, 30), Border: Color.FromArgb(150, 105, 120, 138), Radius: new CornerRadius(5), BorderThickness: new Thickness(1), TimeForeground: (Brush)Brushes.White),
+            DesktopClockStyle.Neon => (Background: Color.FromArgb(245, 8, 13, 25), Border: GetBrushColor(accentBrush), Radius: new CornerRadius(9), BorderThickness: new Thickness(2), TimeForeground: accentBrush),
+            DesktopClockStyle.Classic => (Background: Color.FromArgb(248, 35, 31, 27), Border: Color.FromArgb(180, 203, 178, 132), Radius: new CornerRadius(3), BorderThickness: new Thickness(1), TimeForeground: (Brush)Brushes.WhiteSmoke),
+            _ => (Background: Color.FromArgb(225, 20, 28, 39), Border: Color.FromArgb(100, 130, 160, 185), Radius: new CornerRadius(14), BorderThickness: new Thickness(1), TimeForeground: accentBrush)
+        };
+        _time.Foreground = highContrast ? SystemColors.WindowTextBrush : appearance.TimeForeground;
+        _date.Foreground = highContrast ? SystemColors.WindowTextBrush : style == DesktopClockStyle.Classic
+            ? new SolidColorBrush(Color.FromRgb(0xDE, 0xD4, 0xC2))
+            : new SolidColorBrush(Color.FromRgb(0xC8, 0xD4, 0xE0));
+        _surface.Background = highContrast ? SystemColors.WindowBrush : new SolidColorBrush(appearance.Background);
+        _surface.BorderBrush = highContrast ? SystemColors.WindowFrameBrush : new SolidColorBrush(appearance.Border);
+        _surface.CornerRadius = highContrast ? new CornerRadius(0) : appearance.Radius;
+        _surface.BorderThickness = highContrast ? new Thickness(1) : appearance.BorderThickness;
         var virtualScreen = new Rect(
             SystemParameters.VirtualScreenLeft,
             SystemParameters.VirtualScreenTop,
@@ -71,6 +82,8 @@ internal sealed class DesktopClockWindow : Window
         UpdateTime();
         RefreshFullscreenVisibility();
     }
+
+    private static Color GetBrushColor(Brush brush) => brush is SolidColorBrush solid ? solid.Color : Colors.DeepSkyBlue;
 
     internal void RefreshFullscreenVisibility()
     {

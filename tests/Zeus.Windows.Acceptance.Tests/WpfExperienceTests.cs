@@ -994,6 +994,7 @@ public sealed class WpfExperienceTests
         window.DesktopClockAlwaysOnTop = true;
         window.DesktopClockOpacity = 0.72;
         window.SelectedDesktopClockSize = DesktopClockSize.Large;
+        window.SelectedDesktopClockStyle = DesktopClockStyle.Neon;
         window.DesktopClockEnabled = true;
         Assert.True(window.IsDesktopClockSettingsPreviewing);
         Assert.False((await new DesktopStorage(fixture).ReadPreferencesAsync()).Clock!.Enabled,
@@ -1003,6 +1004,7 @@ public sealed class WpfExperienceTests
         cancelClockPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, cancelClockPreviewButton));
         Assert.False(window.IsDesktopClockSettingsPreviewing);
         Assert.False(window.DesktopClockEnabled);
+        Assert.Equal(DesktopClockStyle.Glass, window.SelectedDesktopClockStyle);
         Assert.Equal(clockPreferencesBeforePreview.Clock, (await new DesktopStorage(fixture).ReadPreferencesAsync()).Clock);
 
         window.DesktopClockShowDate = false;
@@ -1011,6 +1013,7 @@ public sealed class WpfExperienceTests
         window.DesktopClockAlwaysOnTop = true;
         window.DesktopClockOpacity = 0.72;
         window.SelectedDesktopClockSize = DesktopClockSize.Large;
+        window.SelectedDesktopClockStyle = DesktopClockStyle.Neon;
         window.DesktopClockEnabled = true;
         Assert.True(window.IsDesktopClockSettingsPreviewing);
         var confirmClockPreviewButton = Assert.IsType<Button>(window.FindName("ConfirmDesktopClockSettingsButton"));
@@ -1024,12 +1027,32 @@ public sealed class WpfExperienceTests
             await Task.Delay(25);
             clockPreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
         } while (clockPreferences.Clock?.Enabled != true && DateTimeOffset.UtcNow < clockDeadline);
-        Assert.Equal(new DesktopClockPreferences(true, false, true, true, 0.72, clockPreferences.Clock!.Left, clockPreferences.Clock.Top, DesktopClockSize.Large) { Use24HourFormat = false }, clockPreferences.Clock);
+        Assert.Equal(new DesktopClockPreferences(true, false, true, true, 0.72, clockPreferences.Clock!.Left, clockPreferences.Clock.Top, DesktopClockSize.Large) { Use24HourFormat = false, Style = DesktopClockStyle.Neon }, clockPreferences.Clock);
         var desktopClock = Assert.Single(Application.Current!.Windows.OfType<DesktopClockWindow>());
         var hideFullscreenToggle = Assert.IsType<CheckBox>(window.FindName("DesktopClockHideDuringFullscreenToggle"));
         Assert.Equal("clock-hide-fullscreen", AutomationProperties.GetAutomationId(hideFullscreenToggle));
         Assert.True(hideFullscreenToggle.IsChecked);
         Assert.Equal(42, Assert.IsType<TextBlock>(desktopClock.Content is Border clockBorder ? (clockBorder.Child as StackPanel)?.Children[0] : null).FontSize);
+        var clockStyleSelector = Assert.IsType<ComboBox>(window.FindName("DesktopClockStyleSelector"));
+        Assert.Equal("Estilo visual do relógio", AutomationProperties.GetName(clockStyleSelector));
+        Assert.Contains(window.DesktopClockStyleOptions, option => option.Label == "Neon" && option.Value == DesktopClockStyle.Neon);
+        Assert.Equal(new CornerRadius(9), Assert.IsType<Border>(desktopClock.Content).CornerRadius);
+        Assert.Equal(new Thickness(2), Assert.IsType<Border>(desktopClock.Content).BorderThickness);
+        foreach (var style in window.DesktopClockStyleOptions)
+        {
+            window.SelectedDesktopClockStyle = style.Value;
+            var surface = Assert.IsType<Border>(desktopClock.Content);
+            var expectedRadius = style.Value switch
+            {
+                DesktopClockStyle.Minimal => new CornerRadius(5),
+                DesktopClockStyle.Neon => new CornerRadius(9),
+                DesktopClockStyle.Classic => new CornerRadius(3),
+                _ => new CornerRadius(14)
+            };
+            Assert.Equal(expectedRadius, surface.CornerRadius);
+            Assert.True(surface.BorderThickness.Left > 0);
+        }
+        window.SelectedDesktopClockStyle = DesktopClockStyle.Neon;
         var clockSizeSelector = Assert.IsType<ComboBox>(window.FindName("DesktopClockSizeSelector"));
         Assert.Equal("Tamanho do relógio", AutomationProperties.GetName(clockSizeSelector));
         Assert.Contains(window.DesktopClockSizeOptions, option => option.Label == "Grande" && option.Value == DesktopClockSize.Large);
@@ -1050,7 +1073,7 @@ public sealed class WpfExperienceTests
         Assert.Equal(Color.FromRgb(0xFF, 0x63, 0xD8), Assert.IsType<SolidColorBrush>(Application.Current.Resources["AccentBrush"]).Color);
         var simulatedFullscreen = true;
         var transitionClock = new DesktopClockWindow(() => { }, () => simulatedFullscreen) { Left = 360, Top = 260 };
-        transitionClock.Configure(false, false, true, true, 1, DesktopClockSize.Compact,
+        transitionClock.Configure(false, false, true, true, 1, DesktopClockSize.Compact, DesktopClockStyle.Glass,
             SystemColors.HighlightBrush, highContrast: false, hideDuringFullscreen: true);
         transitionClock.Show();
         transitionClock.RefreshFullscreenVisibility();

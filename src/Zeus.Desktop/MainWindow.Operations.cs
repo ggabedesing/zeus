@@ -1512,6 +1512,7 @@ public partial class MainWindow
         _desktopClockAlwaysOnTop = saved.AlwaysOnTop;
         _desktopClockOpacity = Math.Clamp(saved.Opacity, 0.45, 1);
         _desktopClockSize = ResolveClockSize(saved.Size);
+        _desktopClockStyle = ResolveClockStyle(saved.Style);
         _desktopClockLeft = saved.Left;
         _desktopClockTop = saved.Top;
         _desktopClockSettingsPreviewing = false;
@@ -1524,7 +1525,7 @@ public partial class MainWindow
         {
             nameof(DesktopClockEnabled), nameof(DesktopClockShowDate), nameof(DesktopClockShowSeconds),
             nameof(DesktopClockUse24HourFormat), nameof(DesktopClockHideDuringFullscreen), nameof(DesktopClockAlwaysOnTop),
-            nameof(DesktopClockOpacity), nameof(SelectedDesktopClockSize)
+            nameof(DesktopClockOpacity), nameof(SelectedDesktopClockSize), nameof(SelectedDesktopClockStyle)
         }) Notify(property);
         SyncDesktopClock();
         RefreshDesktopClockPreviewState();

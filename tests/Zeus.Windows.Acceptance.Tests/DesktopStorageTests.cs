@@ -57,9 +57,11 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Null(migratedPreferences.VisualLayoutPresetId);
         Assert.True(migratedPreferences.Clock!.Use24HourFormat, "Older clock preferences without a format field must default to 24-hour time.");
         Assert.True(migratedPreferences.Clock.HideDuringFullscreen, "Older clock preferences default to hiding the widget in fullscreen applications.");
+        Assert.Equal(DesktopClockStyle.Glass, migratedPreferences.Clock.Style);
         Assert.Null(migratedPreferences.Clock.Size);
         Assert.Equal(DesktopClockSize.Medium, MainWindow.ResolveClockSize(migratedPreferences.Clock.Size));
         Assert.Equal(DesktopClockSize.Medium, MainWindow.ResolveClockSize((DesktopClockSize)999));
+        Assert.Equal(DesktopClockStyle.Glass, MainWindow.ResolveClockStyle((DesktopClockStyle)999));
         Assert.Equal(UsageProfile.Gaming, migratedPreferences.Profile);
         Assert.True(migratedPreferences.FirstRunSetupComplete);
         Assert.True(File.Exists(historyPath));

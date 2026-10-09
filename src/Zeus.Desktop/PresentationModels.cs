@@ -248,10 +248,13 @@ internal sealed record DesktopClockPreferences(bool Enabled = false, bool ShowDa
     DesktopClockSize? Size = null, bool HideDuringFullscreen = true)
 {
     public bool Use24HourFormat { get; init; } = true;
+    public DesktopClockStyle Style { get; init; } = DesktopClockStyle.Glass;
 }
 
 public enum DesktopClockSize { Compact, Medium, Large }
 public sealed record DesktopClockSizeOption(string Label, DesktopClockSize Value);
+public enum DesktopClockStyle { Glass, Minimal, Neon, Classic }
+public sealed record DesktopClockStyleOption(string Label, DesktopClockStyle Value);
 
 // Export deliberately excludes startup command strings, raw logs and process environment.
 internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset ExportedAt, HardwareSnapshot? Diagnostics,

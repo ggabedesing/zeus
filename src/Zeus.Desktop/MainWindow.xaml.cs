@@ -74,6 +74,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop, _desktopClockHideDuringFullscreen = true, _desktopClockUse24HourFormat = true;
     private DesktopClockSize _desktopClockSize = DesktopClockSize.Medium;
+    private DesktopClockStyle _desktopClockStyle = DesktopClockStyle.Glass;
     private double _desktopClockOpacity = 0.88, _desktopClockLeft = 40, _desktopClockTop = 80;
     private DesktopClockPreferences _savedClockPreferences = new();
     private bool _desktopClockSettingsPreviewing;
@@ -547,6 +548,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public DesktopClockSize SelectedDesktopClockSize { get => _desktopClockSize; set { if (Enum.IsDefined(value) && Set(ref _desktopClockSize, value)) ClockChanged(); } }
     public DesktopClockSizeOption[] DesktopClockSizeOptions { get; } =
     [new("Pequeno", DesktopClockSize.Compact), new("Médio", DesktopClockSize.Medium), new("Grande", DesktopClockSize.Large)];
+    public DesktopClockStyle SelectedDesktopClockStyle { get => _desktopClockStyle; set { if (Enum.IsDefined(value) && Set(ref _desktopClockStyle, value)) ClockChanged(); } }
+    public DesktopClockStyleOption[] DesktopClockStyleOptions { get; } =
+    [new("Vidro", DesktopClockStyle.Glass), new("Minimalista", DesktopClockStyle.Minimal), new("Neon", DesktopClockStyle.Neon), new("Clássico", DesktopClockStyle.Classic)];
     public bool DesktopClockAlwaysOnTop { get => _desktopClockAlwaysOnTop; set { if (Set(ref _desktopClockAlwaysOnTop, value)) ClockChanged(); } }
     public double DesktopClockOpacity { get => _desktopClockOpacity; set { if (Set(ref _desktopClockOpacity, Math.Clamp(value, 0.45, 1))) ClockChanged(); } }
     public bool IsDesktopClockSettingsPreviewing => _desktopClockSettingsPreviewing;
@@ -644,6 +648,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _desktopClockHideDuringFullscreen = clock.HideDuringFullscreen;
                 _desktopClockAlwaysOnTop = clock.AlwaysOnTop; _desktopClockOpacity = Math.Clamp(clock.Opacity, 0.45, 1);
                 _desktopClockSize = ResolveClockSize(clock.Size);
+                _desktopClockStyle = ResolveClockStyle(clock.Style);
                 _desktopClockLeft = clock.Left; _desktopClockTop = clock.Top;
             }
             catch (Exception error) when (IsStorageError(error)) { _startupWarnings.Add("As preferências salvas não puderam ser lidas; os valores padrão serão usados."); }
@@ -1022,11 +1027,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
+    internal static DesktopClockStyle ResolveClockStyle(DesktopClockStyle savedStyle) =>
+        Enum.IsDefined(savedStyle) ? savedStyle : DesktopClockStyle.Glass;
     internal static Point ResolveInitialClockPosition(double left, double top, double width, double height, Rect virtualScreen) =>
         DesktopClockWindow.ClampPosition(left, top, width, height, virtualScreen);
     private DesktopClockPreferences CaptureDesktopClockPreferences() => new(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds,
         DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop,
-        SelectedDesktopClockSize, DesktopClockHideDuringFullscreen) { Use24HourFormat = DesktopClockUse24HourFormat };
+        SelectedDesktopClockSize, DesktopClockHideDuringFullscreen) { Use24HourFormat = DesktopClockUse24HourFormat, Style = SelectedDesktopClockStyle };
 
     private void ClockChanged()
     {
@@ -1071,7 +1078,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _desktopClock.Show();
         }
         var accentBrush = Application.Current.Resources["AccentBrush"] as Brush ?? SystemColors.WindowTextBrush;
-        _desktopClock.Configure(DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockUse24HourFormat, DesktopClockAlwaysOnTop, DesktopClockOpacity, SelectedDesktopClockSize, accentBrush, highContrastOverride ?? SystemParameters.HighContrast, DesktopClockHideDuringFullscreen);
+        _desktopClock.Configure(DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockUse24HourFormat, DesktopClockAlwaysOnTop, DesktopClockOpacity, SelectedDesktopClockSize, SelectedDesktopClockStyle, accentBrush, highContrastOverride ?? SystemParameters.HighContrast, DesktopClockHideDuringFullscreen);
     }
     private void QueuePreferencesSave() { if (_loaded) _ = SavePreferencesAsync(); }
     private async Task SavePreferencesAsync()
