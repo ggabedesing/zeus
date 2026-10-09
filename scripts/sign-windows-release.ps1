@@ -70,37 +70,17 @@ if ($null -eq $signtool) {
 if ($null -eq $signtool) { throw 'Windows SDK SignTool was not found.' }
 $signtoolPath = if ($signtool.Path) { $signtool.Path } else { $signtool.FullName }
 
-$certificateStorePath = 'Cert:\CurrentUser\My'
-$certificatesBeforeSigning = @(Get-ChildItem -LiteralPath $certificateStorePath -ErrorAction Stop)
-$thumbprintsBeforeSigning = @($certificatesBeforeSigning | ForEach-Object Thumbprint)
-$certificateImportStarted = $false
-$certificateStoreEntriesToRemove = @()
+$certificateStoreModule = Join-Path $PSScriptRoot 'ZeusSigningCertificateStore.psm1'
+Import-Module -Name $certificateStoreModule -Force -ErrorAction Stop
+$signingCertificateState = $null
 $secureCertificatePassword = ConvertTo-SecureString -String $CertificatePassword -AsPlainText -Force
 $CertificatePassword = $null
 
 try {
     Remove-Item Env:ZEUS_SIGNING_PFX_PASSWORD -ErrorAction SilentlyContinue
-    $existingPinnedCertificates = @($certificatesBeforeSigning | Where-Object Thumbprint -eq $normalizedThumbprint)
-    if ($existingPinnedCertificates.Count -gt 1) {
-        throw 'More than one certificate with the pinned thumbprint exists in the current-user store.'
-    }
-    if ($existingPinnedCertificates.Count -eq 1 -and !$existingPinnedCertificates[0].HasPrivateKey) {
-        throw 'The pinned certificate already exists in the current-user store without a private key; signing stopped without replacing it.'
-    }
-
-    if ($existingPinnedCertificates.Count -eq 0) {
-        $certificateImportStarted = $true
-        Import-PfxCertificate -FilePath $CertificatePath -CertStoreLocation $certificateStorePath `
-            -Password $secureCertificatePassword -ErrorAction Stop | Out-Null
-    }
-
-    $storePinnedCertificates = @(
-        Get-ChildItem -LiteralPath $certificateStorePath -ErrorAction Stop |
-            Where-Object Thumbprint -eq $normalizedThumbprint
-    )
-    if ($storePinnedCertificates.Count -ne 1 -or !$storePinnedCertificates[0].HasPrivateKey) {
-        throw 'The pinned private-key certificate was not available in the current-user My store.'
-    }
+    $signingCertificateState = Add-ZeusSigningCertificateToUserStore -PfxPath $CertificatePath `
+        -Password $secureCertificatePassword -ExpectedThumbprint $normalizedThumbprint -PfxThumbprints $pfxThumbprints
+    $certificate = $signingCertificateState.Certificate
 
 # Sign an isolated copy so a failed release attempt cannot partially modify its unsigned input.
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
@@ -217,19 +197,11 @@ Write-Output "Signed MSI installer: $msiPath"
 Write-Output "Pinned signer: $($certificate.Subject) [$normalizedThumbprint]"
 } finally {
     try {
-        if ($certificateImportStarted) {
-            $certificateStoreEntriesToRemove = @(
-                Get-ChildItem -LiteralPath $certificateStorePath -ErrorAction Stop |
-                    Where-Object {
-                        $_.Thumbprint -notin $thumbprintsBeforeSigning -and
-                        $_.Thumbprint -in $pfxThumbprints
-                    }
-            )
-            foreach ($entry in $certificateStoreEntriesToRemove) {
-                Remove-Item -LiteralPath $entry.PSPath -Force -ErrorAction Stop
-            }
+        if ($null -ne $signingCertificateState) {
+            Remove-ZeusSigningCertificateFromUserStore -State $signingCertificateState
         }
     } finally {
+        if ($null -ne $signingCertificateState) { $signingCertificateState.Certificate.Dispose() }
         $secureCertificatePassword.Dispose()
         foreach ($entry in $certificateCollection) { $entry.Dispose() }
     }

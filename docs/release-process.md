@@ -14,6 +14,8 @@ O fluxo valida validade temporal, chave privada, EKU `Code Signing`, thumbprint 
 
 O Windows SDK SignTool assina os executáveis e assemblies próprios, carimba com RFC 3161/SHA-256, confere cada assinatura, abre e encerra o ZEUS, recalcula o manifesto SHA-256 após assinar, constrói o MSI a partir dos arquivos assinados e assina/verifica também o MSI. O mesmo runner executa instalação, atualização, abertura, preservação de dados e desinstalação do MSI assinado.
 
+O job Windows normal também testa a fronteira de assinatura sem usar o certificado de produção: cria um certificado de código de teste, exporta/importa no repositório do usuário, assina uma cópia temporária do executável com SignTool pelo thumbprint e confirma que a assinatura identifica o certificado de teste. Em seguida remove a entrada temporária do repositório e os arquivos de teste. Este ensaio confirma a integração com o armazenamento e o SignTool; não substitui a assinatura, o timestamp ou a validação da cadeia de confiança de uma release real.
+
 ## Revisão e publicação
 
 Depois da validação, o workflow cria uma **release em rascunho** com o ZIP portátil assinado, o MSI assinado, hashes SHA-256 e `build-info.json`. Uma pessoa deve revisar o certificado, os hashes, as notas e os artefatos e publicar o rascunho manualmente. Isso mantém a checagem de atualização do aplicativo ligada somente a releases estáveis publicadas.
