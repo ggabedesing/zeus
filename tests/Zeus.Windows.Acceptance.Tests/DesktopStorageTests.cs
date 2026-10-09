@@ -96,6 +96,26 @@ public sealed class DesktopStorageTests : IDisposable
     }
 
     [Fact]
+    public void ReportExportRetainsPerProcessGpuCapacityShareComparisonAndCoverage()
+    {
+        var process = new PerformanceGpuProcessMemoryComparison(42, "game", 123,
+            "luid_adapter", 2_000, 4_000, 3, 3, 25, 50, 2, 3);
+        var comparison = new PerformanceComparison(3, 3, null, null, null, null,
+            DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddMinutes(1),
+            GpuProcessMemoryUsage: [process]);
+        var report = new ExportDocument(8, DateTimeOffset.UnixEpoch, null, [], PerformanceComparison: comparison);
+
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(report, DesktopStorage.JsonOptions));
+        var exported = json.RootElement.GetProperty("PerformanceComparison")
+            .GetProperty("GpuProcessMemoryUsage").EnumerateArray().Single();
+
+        Assert.Equal(25, exported.GetProperty("ReferenceCapacitySharePercent").GetDouble());
+        Assert.Equal(50, exported.GetProperty("LaterCapacitySharePercent").GetDouble());
+        Assert.Equal(2, exported.GetProperty("ReferenceCapacityShareSamples").GetInt32());
+        Assert.Equal(3, exported.GetProperty("LaterCapacityShareSamples").GetInt32());
+    }
+
+    [Fact]
     public async Task LargePerformanceObservationIsSummarizedBeforeTheSqliteSampleLimit()
     {
         Directory.CreateDirectory(_root);

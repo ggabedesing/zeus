@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "gpu-process-capacity-share-session-comparison",
+  "recordedAtUtc": "2026-10-09T07:00:22Z",
+  "sourceCommit": "60770be7643fa147518832adead816166c08a1c9",
+  "outcome": "success",
+  "tests": {
+    "hardwareComparisonTests": { "passed": 2, "failed": 0 },
+    "reportExportTest": { "passed": 1, "failed": 0 },
+    "releasePackageSmoke": "passed"
+  },
+  "comparison": {
+    "referenceSampleCount": 2,
+    "laterSampleCount": 1,
+    "referenceCapacitySharePercent": 50,
+    "referenceValidShareSamples": 2,
+    "laterCapacitySharePercent": 25,
+    "laterValidShareSamples": 1,
+    "missingOrAmbiguousCapacityRemainsNull": true,
+    "exportIncludesShareAndCoverage": true
+  },
+  "limitations": [
+    "Comparison cases use synthetic observations; physical game and streaming sessions were not compared.",
+    "Percentages represent average process allocation divided by matched adapter capacity and do not establish pressure, a per-process budget, or performance gain."
+  ]
+}
