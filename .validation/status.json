@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "2c853290cd4fe36f6ddc531a8c2ed55db8c3811f",
+  "sourceBranch": "feat/zeus-windows-mvp",
+  "runId": "37878211320",
+  "runAttempt": "1",
+  "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37878211320",
+  "recordedAtUtc": "2026-10-09T03:13:29.2025212+00:00",
+  "runner": "windows-latest",
+  "accepted": false,
+  "outcomes": {
+    "build": "failure",
+    "windowsTests": "skipped",
+    "smoke": "skipped",
+    "publish": "skipped",
+    "installerTest": "skipped"
+  },
+  "testCounts": {
+    "passed": 0,
+    "skipped": 0,
+    "failed": 0,
+    "total": 0
+  },
+  "testProjects": [],
+  "localRunner": null,
+  "failures": [],
+  "screenshots": [],
+  "limitations": [
+    "Acceptance runs on a Windows CI virtual machine, not on every physical hardware configuration.",
+    "Repair, restore-point creation, driver installation, offline scan and reboot are not executed by CI.",
+    "CI does not establish measured performance gains or production code-signing status."
+  ]
+}
