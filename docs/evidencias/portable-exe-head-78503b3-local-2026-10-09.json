@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "collectedAtLocal": "2026-10-09T12:39:58-03:00",
+  "sourceCommit": "78503b3b6dcda92bc966ea1548f39f7d97b359fb",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "productVersion": "1.0.0",
+  "developmentBuild": true,
+  "portableSmoke": {
+    "windowOpened": true,
+    "windowResponded": true,
+    "closedNormally": true
+  },
+  "package": {
+    "zip": "artifacts/exe-acceptance-head-78503b3/zeus-win-x64.zip",
+    "zipSha256": "CA975914BFB734654ECA4B408697AD537C8A1F94A4368B0F657996D5BB365651",
+    "executable": "artifacts/exe-acceptance-head-78503b3/zeus-win-x64-78503b3b6dcd-20261009T153938175Z-125ce48f/Zeus.Desktop.exe",
+    "executableSha256": "9B29ABCC951E57CCDE97D78FBEEA35F5E065E47F6902C321DC8BD67F31CE0C57"
+  },
+  "productionAuthenticodeSignature": false
+}
