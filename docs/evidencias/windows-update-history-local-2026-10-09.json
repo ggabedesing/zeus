@@ -22,7 +22,7 @@
       "skipped": 0
     },
     "localWindowsUpdateAgentCall": "passed on this Windows PC; result remained within the configured 50-entry cap",
-    "wpfAcceptance": "passed; history query control is present and requires explicit user action",
+    "wpfAcceptance": "passed end to end; clicked the real history query button, awaited the local query, checked the rendered state, and confirmed the 50-entry limit",
     "fullReleaseSuite": {
       "passed": 512,
       "failed": 0,

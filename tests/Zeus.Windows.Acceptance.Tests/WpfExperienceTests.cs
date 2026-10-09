@@ -745,6 +745,16 @@ public sealed class WpfExperienceTests
         Assert.Equal("read-windows-update-history", AutomationProperties.GetAutomationId(updateHistoryButton));
         Assert.True(updateHistoryButton.IsEnabled, "A consulta local somente leitura do histórico também deve exigir ação explícita.");
         Assert.Contains("consultado quando você solicitar", window.WindowsUpdateHistorySummary, StringComparison.OrdinalIgnoreCase);
+        var initialWindowsUpdateHistorySummary = window.WindowsUpdateHistorySummary;
+        updateHistoryButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, updateHistoryButton));
+        var historyDeadline = DateTimeOffset.UtcNow.AddSeconds(55);
+        while (window.WindowsUpdateHistorySummary == initialWindowsUpdateHistorySummary && DateTimeOffset.UtcNow < historyDeadline)
+            await Task.Delay(50);
+        Assert.NotEqual(initialWindowsUpdateHistorySummary, window.WindowsUpdateHistorySummary);
+        Assert.True(window.WindowsUpdateHistory.Count <= Zeus.Windows.WindowsUpdateService.WindowsUpdateHistoryLimit);
+        Assert.True(window.WindowsUpdateHistorySummary.StartsWith("Leitura concluída", StringComparison.Ordinal) ||
+            window.WindowsUpdateHistorySummary.StartsWith("Histórico incompleto/desconhecido", StringComparison.Ordinal),
+            window.WindowsUpdateHistorySummary);
         var verifyDriverButton = Assert.IsType<Button>(window.FindName("VerifyPendingDriverUpdatesButton"));
         Assert.Equal("verify-pending-driver-updates", AutomationProperties.GetAutomationId(verifyDriverButton));
         Assert.False(verifyDriverButton.IsEnabled, "A reconsulta de driver só fica disponível para histórico pendente com origem registrada.");
