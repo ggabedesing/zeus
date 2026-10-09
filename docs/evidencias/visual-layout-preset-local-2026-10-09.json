@@ -1,7 +1,7 @@
 {
   "evidenceType": "visual-layout-preset-persistence",
   "date": "2026-10-09",
-  "sourceCommit": "60b4e8c912d5f52eee09d6fb2e04198f94ce2752",
+  "sourceCommit": "bef63fe06e6edcc89e50d06c68e8bc7873249af9",
   "sourceDirty": false,
   "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
   "tests": [
@@ -19,19 +19,21 @@
     "SQLite preferences retain the selected visual layout preset identifier.",
     "Legacy preferences without a preset identifier remain readable and return null for that field.",
     "The WPF acceptance applies Aurora and confirms that its identifier survives window close and storage reload.",
-    "A segunda janela WPF foi reaberta com o mesmo banco e restaurou Aurora no seletor após concluir o diagnóstico."
+    "A segunda janela WPF foi reaberta com o mesmo banco e restaurou Aurora no seletor após concluir o diagnóstico.",
+    "A segunda janela WPF foi reaberta com área de trabalho simulada 800x450: confirmou limites, botão principal dentro da janela e rolagem até a aba Histórico."
   ],
   "portableExecutableSmoke": {
     "result": "passed",
     "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
     "runtime": "win-x64",
-    "packageDirectory": "artifacts/visual-layout-preset-exe/zeus-win-x64-60b4e8c912d5-20261009T081632054Z-30fdd637",
+    "packageDirectory": "artifacts/visual-layout-preset-exe/zeus-win-x64-bef63fe06e6e-20261009T081933118Z-09f4ca0a",
     "zipPath": "artifacts/visual-layout-preset-exe/zeus-win-x64.zip",
-    "sourceCommit": "60b4e8c912d5f52eee09d6fb2e04198f94ce2752",
+    "sourceCommit": "bef63fe06e6edcc89e50d06c68e8bc7873249af9",
     "sourceDirty": false,
-    "zipSha256": "10773caed520c7afd52e5cfd01ea1bdc9516ca9533e4dc6926ac6bc33b930309"
+    "zipSha256": "14ad82a7a04c508608f74ffd25a961f69618737cedf7393c3025fcb1cb406d78"
   },
   "limitations": [
-    "This is a portable development build, not a signed production release."
+    "This is a portable development build, not a signed production release.",
+    "The constrained 800x450 WPF window was simulated on this PC; a physical 800x450 monitor was not used."
   ]
 }
