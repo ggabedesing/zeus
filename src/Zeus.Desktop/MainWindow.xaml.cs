@@ -64,6 +64,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _visualLayoutPreviewActive;
     private string? _savedVisualLayoutPresetId;
     private string? _customVisualLayoutsJson;
+    private string? _customAccentHex, _customAccentPreviewHex;
+    private string _customAccentDraftHex = "#00FFFF";
+    private string _customAccentValidationSummary = "Informe uma cor #RRGGBB; a prévia fica somente nesta janela até confirmar.";
     private string _visualLayoutCatalogStatus = "Perfis personalizados aceitam somente cores e temas do ZEUS; nenhum código ou imagem será executado.";
     private readonly List<VisualLayoutPreset> _customVisualLayoutPresets = [];
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
@@ -394,6 +397,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (value is null || !VisualLayoutPresets.Contains(value) || !Set(ref _selectedVisualLayoutPreset, value)) return;
+            if (_customAccentPreviewHex is not null)
+            {
+                _customAccentPreviewHex = null;
+                Notify(nameof(IsCustomAccentPreviewing));
+                RefreshCustomAccentValidation();
+            }
             Notify(nameof(SelectedVisualLayoutPreview));
             if (_loaded)
             {
@@ -408,6 +417,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public VisualLayoutPreview SelectedVisualLayoutPreview => CreateVisualLayoutPreview(SelectedVisualLayoutPreset);
     public string VisualLayoutCatalogStatus => _visualLayoutCatalogStatus;
     public bool IsVisualLayoutPreviewing => _visualLayoutPreviewActive;
+    public string CustomAccentDraftHex
+    {
+        get => _customAccentDraftHex;
+        set
+        {
+            if (!Set(ref _customAccentDraftHex, value ?? string.Empty)) return;
+            RefreshCustomAccentValidation();
+        }
+    }
+    public string CustomAccentValidationSummary => _customAccentValidationSummary;
+    public bool IsCustomAccentPreviewing => _customAccentPreviewHex is not null;
+    public bool CanPreviewCustomAccent => CanChooseActions && !_visualLayoutPreviewActive && !SystemParameters.HighContrast &&
+        TryValidateCustomAccent(CustomAccentDraftHex, SelectedTheme, out var normalized, out _) &&
+        !string.Equals(normalized, _customAccentPreviewHex ?? _customAccentHex ?? GetAccentHex(SelectedAccentColor, SelectedTheme), StringComparison.OrdinalIgnoreCase);
+    public bool CanConfirmCustomAccent => CanChooseActions && _customAccentPreviewHex is not null &&
+        TryValidateCustomAccent(CustomAccentDraftHex, SelectedTheme, out var normalized, out _) &&
+        string.Equals(normalized, _customAccentPreviewHex, StringComparison.OrdinalIgnoreCase);
+    public bool CanCancelCustomAccentPreview => CanChooseActions && _customAccentPreviewHex is not null;
     public bool CanConfirmVisualLayout => CanChooseActions &&
         (_visualLayoutPreviewActive ||
          (SelectedVisualLayoutPreset.Theme == SelectedTheme && SelectedVisualLayoutPreset.Accent == SelectedAccentColor &&
@@ -427,6 +454,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (!Enum.IsDefined(value) || !Set(ref _selectedTheme, value)) return;
+            ClearCustomAccentForThemeChange();
             _visualLayoutPreviewActive = false;
             ApplyTheme(); Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout)); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption));
             UpdateAppearanceStatus();
@@ -439,6 +467,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (!Enum.IsDefined(value) || !Set(ref _selectedAccentColor, value)) return;
+            ClearCustomAccentForThemeChange();
             _visualLayoutPreviewActive = false;
             ApplyTheme();
             Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout));
@@ -528,6 +557,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                         Notify(nameof(VisualLayoutCatalogStatus));
                     }
                 }
+                _customAccentHex = p.CustomAccentHex is { } customHex && TryValidateCustomAccent(customHex, p.IsMinimal ? DesktopTheme.Minimal : p.Theme, out var normalizedCustomHex, out _)
+                    ? normalizedCustomHex
+                    : null;
+                if (_customAccentHex is not null) _customAccentDraftHex = _customAccentHex;
                 SelectedVisualLayoutPreset = VisualLayoutPresets.FirstOrDefault(preset =>
                     string.Equals(preset.Id, p.VisualLayoutPresetId, StringComparison.Ordinal)) ?? VisualLayoutPresets[0];
                 _savedVisualLayoutPresetId = p.VisualLayoutPresetId;
@@ -911,7 +944,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
-        new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop, SelectedDesktopClockSize, DesktopClockHideDuringFullscreen) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson);
+        new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop, SelectedDesktopClockSize, DesktopClockHideDuringFullscreen) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson, _customAccentHex);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
     internal static Point ResolveInitialClockPosition(double left, double top, double width, double height, Rect virtualScreen) =>
@@ -955,11 +988,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (pending.Length > 0) await Task.WhenAll(pending).WaitAsync(cancellationToken);
     }
 
-    private void ApplyTheme(DesktopTheme? previewTheme = null, AppAccentColor? previewAccent = null)
+    private void ApplyTheme(DesktopTheme? previewTheme = null, AppAccentColor? previewAccent = null, string? customAccentOverride = null)
     {
         if (SystemParameters.HighContrast) return;
         var theme = previewTheme ?? SelectedTheme;
         var colors = GetThemePalette(theme, previewAccent ?? SelectedAccentColor);
+        var customAccent = previewAccent is null && previewTheme is null
+            ? customAccentOverride ?? _customAccentPreviewHex ?? _customAccentHex
+            : customAccentOverride;
+        if (customAccent is not null) colors[5] = customAccent;
         var keys = new[] { "BackgroundBrush", "PanelBrush", "BorderBrush", "TextBrush", "MutedBrush", "AccentBrush", "ButtonBrush", "SelectedTabBrush", "LogBackgroundBrush" };
         for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = BrushFromHex(colors[i]);
         Application.Current.Resources["PrimaryButtonBrush"] = Application.Current.Resources["AccentBrush"];
@@ -1028,7 +1065,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     internal void RefreshSelectedThemeAfterContrastChange()
     {
+        if (SystemParameters.HighContrast && _customAccentPreviewHex is not null)
+        {
+            _customAccentPreviewHex = null;
+            Notify(nameof(IsCustomAccentPreviewing));
+        }
         ApplyTheme();
+        RefreshCustomAccentValidation();
         Notify(nameof(SelectedVisualLayoutPreview));
     }
     internal void RefreshDesktopClockAppearance(bool highContrast) { if (DesktopClockEnabled) SyncDesktopClock(highContrast); }
@@ -1073,6 +1116,50 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         },
         _ => theme == DesktopTheme.Light ? "#176B87" : "#65E3E0"
     };
+
+    internal static bool TryValidateCustomAccent(string? value, DesktopTheme theme, out string normalized, out double minimumContrast)
+    {
+        normalized = string.Empty;
+        minimumContrast = 0;
+        if (!AccentColorAccessibility.TryNormalize(value, out normalized)) return false;
+        var accent = normalized;
+        var surfaces = GetThemePalette(theme, AppAccentColor.ThemeDefault);
+        var buttonText = theme == DesktopTheme.Light ? "#FFFFFF" : "#071623";
+        var ratios = surfaces.Where((_, index) => index is 0 or 1 or 7 or 8)
+            .Select(surface => AccentColorAccessibility.ContrastRatio(accent, surface))
+            .Append(AccentColorAccessibility.ContrastRatio(buttonText, accent))
+            .ToArray();
+        minimumContrast = ratios.Min();
+        return ratios.All(ratio => ratio >= 4.5);
+    }
+
+    private void RefreshCustomAccentValidation()
+    {
+        if (SystemParameters.HighContrast)
+            _customAccentValidationSummary = "O alto contraste do Windows prevalece; a cor personalizada ficará salva, mas não será exibida enquanto ele estiver ativo.";
+        else if (!AccentColorAccessibility.TryNormalize(CustomAccentDraftHex, out var normalized))
+            _customAccentValidationSummary = "Use o formato #RRGGBB com seis dígitos hexadecimais.";
+        else if (!TryValidateCustomAccent(normalized, SelectedTheme, out _, out var minimumContrast))
+            _customAccentValidationSummary = $"Contraste mínimo {minimumContrast:0.00}:1 nesta paleta; escolha uma cor com pelo menos 4,5:1 nos fundos e no texto dos botões.";
+        else if (_customAccentPreviewHex is not null && !string.Equals(normalized, _customAccentPreviewHex, StringComparison.OrdinalIgnoreCase))
+            _customAccentValidationSummary = "O valor mudou desde a prévia; pré-visualize a nova cor antes de confirmar.";
+        else if (_customAccentPreviewHex is not null)
+            _customAccentValidationSummary = $"Prévia temporária de {normalized} · contraste mínimo {minimumContrast:0.00}:1. Confirme para salvar ou cancele para restaurar.";
+        else
+            _customAccentValidationSummary = $"Cor válida · contraste mínimo {minimumContrast:0.00}:1. Pré-visualize, confirme para salvar ou cancele.";
+        Notify(nameof(CustomAccentValidationSummary));
+        Notify(nameof(CanPreviewCustomAccent));
+        Notify(nameof(CanConfirmCustomAccent));
+        Notify(nameof(CanCancelCustomAccentPreview));
+    }
+
+    private void ClearCustomAccentForThemeChange()
+    {
+        _customAccentHex = null;
+        _customAccentPreviewHex = null;
+        Notify(nameof(IsCustomAccentPreviewing));
+        RefreshCustomAccentValidation();
+    }
 
     private async Task RunOperationAsync(string title, string detail, Func<CancellationToken, Task> operation, bool cancellable = false, bool mutation = false)
     {
@@ -1165,7 +1252,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SetBusy(bool busy)
     {
         _isBusy = busy;
-        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanConfirmVisualLayout), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanVerifyPendingDriverUpdates), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
+        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanConfirmVisualLayout), nameof(CanPreviewCustomAccent), nameof(CanConfirmCustomAccent), nameof(CanCancelCustomAccentPreview), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanVerifyPendingDriverUpdates), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
     private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanRollbackDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanApplyDesktopOrganization)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }

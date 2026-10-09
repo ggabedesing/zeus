@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-09",
+  "feature": "custom-accent-color",
+  "repository": "ggabedesing/zeus",
+  "branch": "feat/zeus-windows-mvp",
+  "sourceCommit": "4f5a65a38f3daa1e1b0859f28fd375a901d7281c",
+  "sourceTreeDirtyAtBuild": true,
+  "runtime": "win-x64",
+  "validation": {
+    "fullReleaseSuite": {
+      "passed": 508,
+      "failed": 0,
+      "skipped": 10,
+      "total": 518
+    },
+    "wpfFlow": "passed: live preview without persistence, cancel restore, confirm persistence, and contrast rejection",
+    "portableExeSmoke": "passed: main window opened, responded, and closed cleanly",
+    "diffCheck": "passed"
+  },
+  "package": {
+    "zip": "artifacts/custom-accent-package/zeus-win-x64.zip",
+    "zipSha256": "7F8340F5945839CAB06CC2C54ED61B38A89931E73D2AAE8AC58727D8A376A02F",
+    "executable": "artifacts/custom-accent-package/zeus-win-x64-4f5a65a38f3d-20261009T114242089Z-e18c2d7f/Zeus.Desktop.exe",
+    "executableSha256": "1FD5DEFE0E5DC5C7FB4C2C150C614CD7A1EB660D93CCBD5CB26E62D243CA894F",
+    "developmentBuild": true,
+    "authenticodeProductionSignature": false
+  },
+  "scope": {
+    "changesWindowsAppearance": false,
+    "requiresConsentToSave": true,
+    "contrastMinimum": 4.5,
+    "highContrastWindowsOverridesCustomAccent": true
+  },
+  "limitations": [
+    "Windows administrative and UAC validation was not part of this visual feature check.",
+    "The portable development executable is unsigned for production distribution."
+  ]
+}

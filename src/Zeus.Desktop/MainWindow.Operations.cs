@@ -715,16 +715,51 @@ public partial class MainWindow
     {
         if (!CanChooseActions || !CanConfirmVisualLayout) return;
         var preset = SelectedVisualLayoutPreset;
+        ClearCustomAccentForThemeChange();
         _visualLayoutPreviewActive = false;
         _savedVisualLayoutPresetId = preset.Id;
         SelectedTheme = preset.Theme;
         SelectedAccentColor = preset.Accent;
+        ApplyTheme();
         QueuePreferencesSave();
         Notify(nameof(IsVisualLayoutPreviewing));
         Notify(nameof(VisualLayoutPreviewState));
         Notify(nameof(CanConfirmVisualLayout));
         StatusTitle = "Perfil visual aplicado";
         StatusDetail = $"{preset.Name} foi aplicado somente à interface do ZEUS. Papel de parede, relógio, animações e configurações do Windows permanecem independentes.";
+    }
+
+    private void PreviewCustomAccent_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanChooseActions || _visualLayoutPreviewActive ||
+            !TryValidateCustomAccent(CustomAccentDraftHex, SelectedTheme, out var normalized, out var minimumContrast)) return;
+        _customAccentPreviewHex = normalized;
+        ApplyTheme(customAccentOverride: normalized);
+        RefreshCustomAccentValidation();
+        StatusTitle = "Prévia de cor personalizada";
+        StatusDetail = $"{normalized} está em prévia somente na interface do ZEUS; contraste mínimo {minimumContrast:0.00}:1. Confirme para salvar ou cancele para restaurar.";
+    }
+
+    private void ConfirmCustomAccent_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanConfirmCustomAccent || _customAccentPreviewHex is not { } normalized) return;
+        _customAccentHex = normalized;
+        _customAccentPreviewHex = null;
+        ApplyTheme();
+        RefreshCustomAccentValidation();
+        QueuePreferencesSave();
+        StatusTitle = "Cor personalizada salva";
+        StatusDetail = $"{normalized} foi salva localmente e afeta somente a interface do ZEUS. O papel de parede e as cores do Windows não foram alterados.";
+    }
+
+    private void CancelCustomAccentPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanCancelCustomAccentPreview) return;
+        _customAccentPreviewHex = null;
+        ApplyTheme();
+        RefreshCustomAccentValidation();
+        StatusTitle = "Prévia de cor cancelada";
+        StatusDetail = "A cor personalizada já salva foi restaurada; nenhuma preferência foi gravada pela prévia cancelada.";
     }
 
     private void CancelVisualLayoutPreview_Click(object sender, RoutedEventArgs e)

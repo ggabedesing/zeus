@@ -229,7 +229,7 @@ internal sealed record DesktopPreferences(bool IsMinimal, DesktopTheme Theme = D
     bool NeedsBluetooth = true, bool NeedsPrinting = true, bool NeedsCloudSync = true, bool NeedsVirtualization = false,
     bool FirstRunSetupComplete = true, bool IsTechnicalMode = false, DesktopClockPreferences? Clock = null,
     AppAccentColor AccentColor = AppAccentColor.ThemeDefault, string? VisualLayoutPresetId = null,
-    string? CustomVisualLayoutsJson = null);
+    string? CustomVisualLayoutsJson = null, string? CustomAccentHex = null);
 
 internal sealed record DesktopClockPreferences(bool Enabled = false, bool ShowDate = true, bool ShowSeconds = false,
     bool AlwaysOnTop = false, double Opacity = 0.88, double Left = 40, double Top = 80,
