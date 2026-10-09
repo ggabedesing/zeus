@@ -1,0 +1,43 @@
+{
+  "evidenceType": "desktop-volume-and-physical-disk-association-rendering-and-portable-exe-smoke",
+  "date": "2026-10-09",
+  "sourceCommit": "cc3e10092e7dbd605f052df97a86e779c7c697e4",
+  "sourceTreeDirtyAtBuild": false,
+  "ui": {
+    "volumeRows": "Windows WPF acceptance compared each real collected volume with the rendered row and required its confirmed disk numbers or explicit unavailable label.",
+    "physicalDiskRows": "Windows WPF acceptance compared each physical disk number from the live provider with the rendered disk card and required explicit unavailable text when absent.",
+    "multipleAndUnavailableFormatting": "Unit acceptance verifies multiple disk numbers and both null and empty mappings."
+  },
+  "tests": {
+    "command": "dotnet test tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~PhysicalDiskNumberFormattingKeepsUnknownExplicitAndSupportsMultipleDisks|FullyQualifiedName~ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "solutionBuildWarnings": 0,
+    "solutionBuildErrors": 0
+  },
+  "localMachineSample": {
+    "confirmedVolumeMappings": 1,
+    "volumeMappings": ["C: to physical disk #0"],
+    "physicalProviderDiskNumbers": 1,
+    "temperature": "unavailable",
+    "wear": "unavailable",
+    "powerOnHours": "unavailable",
+    "readWriteErrors": "unavailable",
+    "repairOrRestoreExecuted": false
+  },
+  "portablePackage": {
+    "path": "artifacts/desktop-storage-association-cc3e100/zeus-win-x64.zip",
+    "sha256": "E0CC89C3C8A560BEF4B4ECE7E734841118E4C266A2ADBC40E57D26554BB6E34B",
+    "desktopExePath": "artifacts/desktop-storage-association-cc3e100/zeus-win-x64-cc3e10092e7d-20261009T145115081Z-39d594d7/Zeus.Desktop.exe",
+    "desktopExeSha256": "F38C8A7DECDF1B502FFA0067EBE475ACC769D99546A20095F2BFDB053D7DC4EA",
+    "runtime": "win-x64",
+    "smoke": "Main window opened, responded, and closed cleanly.",
+    "productionAuthenticodeSigned": false
+  },
+  "limitations": [
+    "This PC exposed one fixed volume and one physical provider disk during the sample.",
+    "Multiple-disk and unknown mappings are verified by explicit formatting tests; a multi-disk physical machine was not available for this run.",
+    "Storage reliability counters are not exposed by this PC's provider and remain unavailable."
+  ]
+}
