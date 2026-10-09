@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "1d9e719b7e243ad7b29654fe4a56121cf4c8e9b5",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "productionSigned": false,
+  "validation": {
+    "releaseBuildWarnings": 0,
+    "releaseBuildErrors": 0,
+    "fullSolutionTestsPassed": 616,
+    "fullSolutionTestsSkipped": 11,
+    "fullSolutionTestsFailed": 0,
+    "fullSolutionTestsTotal": 627,
+    "coreTestsPassed": 158,
+    "storageTestsPassed": 22,
+    "windowsAcceptanceTestsPassed": 99,
+    "focusedWpfTestsPassed": 33,
+    "portableExeOpenedRespondedClosed": true,
+    "independentReadOnlyReview": true,
+    "historyCardRenderedFromControlledFixture": true,
+    "newScanOrRepairExecuted": false
+  },
+  "contracts": [
+    "Only completed eligible repairs create separate scan plans; no repair mixed in.",
+    "Structured DISM/SFC findings unknown in legacy reports, missing logs, failed or incomplete scans.",
+    "Parent link persisted in launch receipt before helper starts; unknown recovery never retries execution.",
+    "Recovered link preferred, saved link fallback, divergent links incomplete and receipt retained.",
+    "Empty initialization-error report persisted without invalid link.",
+    "SQLite schema 6 additive transactional migration; schema 5 backup restored via staging with source and safety copy preserved.",
+    "JSON export schema 11; post-scan evidence does not prove causation, prior corruption, overall health or restart."
+  ],
+  "package": {
+    "directory": "artifacts/post-repair-exe/zeus-win-x64-1d9e719b7e24-20261009T172218672Z-301aa5c2",
+    "exeSha256": "7fe8982328cbbdc964ca24680afd67b6328783a4445ccdf4c1ee4de41780cd58",
+    "zipSha256": "F04E682C52B8DBDE31711412029D859A997EE794528CF8087135EC4F9F87FF3A"
+  },
+  "limitations": [
+    "No real SFC/DISM repair, post-repair scan, driver operation or restart during this milestone.",
+    "Eleven administrative or opt-in tests skipped.",
+    "Controlled history fixture is not proof the PC was repaired.",
+    "No confirmed integrity baseline means no claim of improvement.",
+    "Production signing and remaining roadmap work pending."
+  ]
+}
