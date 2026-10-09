@@ -26,8 +26,8 @@ internal static class Program
             if (MaintenancePolicy.RequiresRestorePoint(requests.Select(request => request.Action).Distinct()))
             {
                 var restore = await CommandRunner.CreateRestorePointAsync(sessionId);
-                restoreConfirmed = restore.ExitCode == 0 && restore.LogError is null &&
-                    restore.Output.Contains("ZEUS_RESTORE_POINT_CONFIRMED", StringComparison.Ordinal);
+                restoreConfirmed = RestorePointConfirmationParser.ParseSequenceNumber(
+                    restore.ExitCode, restore.Output, restore.LogError) is not null;
                 if (!restoreConfirmed)
                     error = restore.LogError is not null
                         ? $"Falha ao registrar a preparação de recuperação: {restore.LogError}. Reparos foram bloqueados."
