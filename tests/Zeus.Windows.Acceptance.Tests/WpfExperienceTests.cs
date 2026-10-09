@@ -677,9 +677,16 @@ public sealed class WpfExperienceTests
             var row = Assert.Single(window.DiskRows, item => item.Title.StartsWith(volume.DriveLetter + " · ", StringComparison.OrdinalIgnoreCase));
             Assert.Contains($"Discos físicos: {MainWindow.FormatPhysicalDiskNumbers(volume.PhysicalDiskNumbers)}", row.Detail, StringComparison.Ordinal);
         }
-        foreach (var physicalDisk in window.Snapshot.PhysicalDisks ?? [])
+        var physicalDisks = window.Snapshot.PhysicalDisks ?? [];
+        var physicalDiskRows = window.ExtendedHardwareRows
+            .Where(item => item.Detail.StartsWith("Disco físico:", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(physicalDisks.Count, physicalDiskRows.Length);
+        for (var index = 0; index < physicalDisks.Count; index++)
         {
-            var row = Assert.Single(window.ExtendedHardwareRows, item => item.Title == (string.IsNullOrWhiteSpace(physicalDisk.Name) ? "Indisponível" : physicalDisk.Name) && item.Detail.StartsWith("Disco físico:", StringComparison.Ordinal));
+            var physicalDisk = physicalDisks[index];
+            var row = physicalDiskRows[index];
+            Assert.Equal(string.IsNullOrWhiteSpace(physicalDisk.Name) ? "Indisponível" : physicalDisk.Name, row.Title);
             var expectedNumber = physicalDisk.DiskNumber is { } number ? $"Disco físico: #{number}" : "Disco físico: número indisponível";
             Assert.Contains(expectedNumber, row.Detail, StringComparison.Ordinal);
         }
