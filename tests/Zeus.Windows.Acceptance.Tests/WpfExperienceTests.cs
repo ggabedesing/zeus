@@ -494,6 +494,7 @@ public sealed class WpfExperienceTests
         window.DesktopClockUse24HourFormat = false;
         window.DesktopClockAlwaysOnTop = true;
         window.DesktopClockOpacity = 0.72;
+        window.SelectedDesktopClockSize = DesktopClockSize.Large;
         window.DesktopClockEnabled = true;
         var clockDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
         DesktopPreferences clockPreferences;
@@ -502,8 +503,12 @@ public sealed class WpfExperienceTests
             await Task.Delay(25);
             clockPreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
         } while (clockPreferences.Clock?.Enabled != true && DateTimeOffset.UtcNow < clockDeadline);
-        Assert.Equal(new DesktopClockPreferences(true, false, true, true, 0.72, clockPreferences.Clock!.Left, clockPreferences.Clock.Top) { Use24HourFormat = false }, clockPreferences.Clock);
+        Assert.Equal(new DesktopClockPreferences(true, false, true, true, 0.72, clockPreferences.Clock!.Left, clockPreferences.Clock.Top, DesktopClockSize.Large) { Use24HourFormat = false }, clockPreferences.Clock);
         var desktopClock = Assert.Single(Application.Current!.Windows.OfType<DesktopClockWindow>());
+        Assert.Equal(42, Assert.IsType<TextBlock>(desktopClock.Content is Border clockBorder ? (clockBorder.Child as StackPanel)?.Children[0] : null).FontSize);
+        var clockSizeSelector = Assert.IsType<ComboBox>(window.FindName("DesktopClockSizeSelector"));
+        Assert.Equal("Tamanho do relógio", AutomationProperties.GetName(clockSizeSelector));
+        Assert.Contains(window.DesktopClockSizeOptions, option => option.Label == "Grande" && option.Value == DesktopClockSize.Large);
         Assert.True(desktopClock.IsVisible);
         Assert.True(desktopClock.Topmost);
         Assert.Equal(0.72, desktopClock.Opacity);
@@ -528,6 +533,7 @@ public sealed class WpfExperienceTests
         Assert.Equal(Color.FromRgb(0xFF, 0x63, 0xD8), Assert.IsType<SolidColorBrush>(clockLabels[0].Foreground).Color);
         Assert.Equal(0.72, desktopClock.Opacity);
         window.DesktopClockEnabled = false;
+        window.SelectedDesktopClockSize = DesktopClockSize.Medium;
         performanceLabel.Text = "Jogo teste + OBS";
         var measureButton = Assert.IsType<Button>(window.FindName("MeasurePerformanceButton"));
         Assert.Equal("measure-performance", AutomationProperties.GetAutomationId(measureButton));

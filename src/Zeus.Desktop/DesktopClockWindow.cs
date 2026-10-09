@@ -31,13 +31,27 @@ internal sealed class DesktopClockWindow : Window
         Closed += (_, _) => _timer.Stop();
     }
 
-    public void Configure(bool showDate, bool showSeconds, bool use24HourFormat, bool alwaysOnTop, double opacity, Brush accentBrush, bool highContrast)
+    public void Configure(bool showDate, bool showSeconds, bool use24HourFormat, bool alwaysOnTop, double opacity, DesktopClockSize size, Brush accentBrush, bool highContrast)
     {
         _showDate = showDate; _showSeconds = showSeconds; _use24HourFormat = use24HourFormat; Topmost = alwaysOnTop; Opacity = highContrast ? 1 : Math.Clamp(opacity, 0.45, 1);
+        var (timeSize, dateSize, width, height, padding) = size switch
+        {
+            DesktopClockSize.Compact => (24d, 10d, 180d, 70d, new Thickness(12, 7, 12, 8)),
+            DesktopClockSize.Large => (42d, 14d, 280d, 112d, new Thickness(22, 14, 22, 15)),
+            _ => (32d, 12d, 220d, 88d, new Thickness(18, 10, 18, 11))
+        };
+        _time.FontSize = timeSize;
+        _date.FontSize = dateSize;
+        _surface.Padding = padding;
+        Width = width;
+        Height = height;
         _time.Foreground = highContrast ? SystemColors.WindowTextBrush : accentBrush;
         _date.Foreground = highContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(0xC8, 0xD4, 0xE0));
         _surface.Background = highContrast ? SystemColors.WindowBrush : new SolidColorBrush(Color.FromArgb(225, 20, 28, 39));
         _surface.BorderBrush = highContrast ? SystemColors.WindowFrameBrush : new SolidColorBrush(Color.FromArgb(100, 130, 160, 185));
+        var area = SystemParameters.WorkArea;
+        Left = Math.Clamp(Left, area.Left, Math.Max(area.Left, area.Right - width));
+        Top = Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - height));
         UpdateTime();
     }
 
