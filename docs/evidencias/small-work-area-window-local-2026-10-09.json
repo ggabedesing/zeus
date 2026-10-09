@@ -1,7 +1,7 @@
 {
   "evidenceType": "small-work-area-window-sizing-acceptance",
   "date": "2026-10-09",
-  "sourceCommit": "734f85c4d135798f34691e49ec4d6410e4f5a0de",
+  "sourceCommit": "062aba954d82670d8e166537f91196b1f7c1640d",
   "sourceDirty": false,
   "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
   "tests": [
@@ -9,18 +9,23 @@
     "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme"
   ],
   "result": { "passed": 2, "failed": 0, "skipped": 0, "durationSeconds": 24 },
+  "constructorWorkAreaOverride": {
+    "simulatedWorkArea": { "width": 800, "height": 450 },
+    "assertedWindowMinimum": { "width": 800, "height": 450 },
+    "assertedWindowMaximum": { "width": 800, "height": 450 }
+  },
   "portableExecutableSmoke": {
     "result": "passed",
     "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
     "runtime": "win-x64",
-    "packageDirectory": "artifacts/small-work-area-clean-package/zeus-win-x64-734f85c4d135-20261009T075604257Z-705dc917",
-    "zipPath": "artifacts/small-work-area-clean-package/zeus-win-x64.zip",
-    "sourceCommit": "734f85c4d135798f34691e49ec4d6410e4f5a0de",
+    "packageDirectory": "artifacts/small-work-area-exe/zeus-win-x64-062aba954d82-20261009T081055567Z-d8e461e4",
+    "zipPath": "artifacts/small-work-area-exe/zeus-win-x64.zip",
+    "sourceCommit": "062aba954d82670d8e166537f91196b1f7c1640d",
     "sourceDirty": false,
-    "zipSha256": "c308bda4b38058089a38f9aedd54a0a6eefe09b1599cad152a27a68e3feb3fee"
+    "zipSha256": "43fe40c0c4af4727cd3ed5cf28dbf929592578b1992a9b083106a18eea7e6141"
   },
   "limitations": [
-    "The test checks the minimum-size calculation for an 800x450 work area and the default 900x600 size.",
+    "The WPF constructor and constraints were verified with a simulated 800x450 work area.",
     "The app was not opened on a physical low-resolution monitor; page readability at that size remains unverified."
   ]
 }
