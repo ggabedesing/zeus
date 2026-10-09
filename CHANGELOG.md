@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- As heurísticas do Observador agora reconhecem processos de Genshin Impact, Warframe, Minecraft Bedrock e OBS 32-bit; continuam descrevendo presença de processo e não inferem partida ou transmissão ao vivo.
 - O smoke de instalação do MSI agora exige que a janela instalada responda antes de confirmar o ciclo de atualização.
 - O aceite explícito da licença de um driver agora acompanha o SHA-256 do texto exibido; antes de aceitar os termos, o auxiliar compara o texto atual do Windows Update e interrompe a transação se ele mudou.
 - Antes de repetir uma manutenção, a revisão do plano agora destaca a mesma ação e alvo quando a tentativa anterior está pendente ou exige revisão manual; drivers também precisam corresponder à origem registrada. A nova tentativa continua exigindo confirmação explícita.

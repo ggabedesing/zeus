@@ -600,6 +600,28 @@ public sealed class PerformanceCounterTests
         Assert.Equal(DetectionConfidence.Low, java.Confidence);
     }
 
+    [Theory]
+    [InlineData("GenshinImpact")]
+    [InlineData("Warframe.x64")]
+    [InlineData("Minecraft.Windows")]
+    public void ActivityContextRecognizesAdditionalGameProcessesWithoutClaimingAnActiveGame(string processName)
+    {
+        var context = ActivityContextDetector.Detect([new(300, processName, null, 30)]);
+
+        Assert.True(context.KnownGameProcessDetected);
+        Assert.Equal(DetectionConfidence.Medium, context.Confidence);
+        Assert.Contains("não confirma uma partida", context.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ActivityContextRecognizesThirtyTwoBitObsProcessName()
+    {
+        var context = ActivityContextDetector.Detect([new(400, "obs32", null, 40)]);
+
+        Assert.True(context.ObsProcessDetected);
+        Assert.Contains("não confirma transmissão ao vivo", context.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void ActivityContextUsesAllAccessibleProcessesAndReportsMatchingObsVideoEncodeEngine()
     {

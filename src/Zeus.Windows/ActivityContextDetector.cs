@@ -16,14 +16,15 @@ public static class ActivityContextDetector
 {
     private static readonly HashSet<string> ObsNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "obs64", "obs", "obs-studio"
+        "obs64", "obs32", "obs", "obs-studio"
     };
 
     private static readonly HashSet<string> GameNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "FortniteClient-Win64-Shipping", "VALORANT-Win64-Shipping", "cs2", "csgo",
         "Overwatch", "r5apex", "GTA5", "RocketLeague",
-        "RobloxPlayerBeta", "Dota2", "League of Legends", "eldenring", "ForzaHorizon5"
+        "RobloxPlayerBeta", "Dota2", "League of Legends", "eldenring", "ForzaHorizon5",
+        "GenshinImpact", "Warframe.x64", "Minecraft.Windows"
     };
 
     public static ActivityContextInfo Detect(IEnumerable<ProcessObservation> processes, IEnumerable<GpuEngineObservation>? gpuEngines = null)
