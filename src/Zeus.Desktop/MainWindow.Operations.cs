@@ -1290,10 +1290,10 @@ public partial class MainWindow
     }
 
     internal ExportDocument CreateExportDocument() =>
-        new(8, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
+        new(9, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
             new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(),
             _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan,
-            _performanceSessionExports);
+            _performanceSessionExports, EventPatternAnalyzer.AnalyzeInventory(_snapshot?.WindowsInventory));
 
     private async void BackupDatabase_Click(object sender, RoutedEventArgs e)
     {

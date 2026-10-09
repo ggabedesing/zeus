@@ -857,14 +857,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             EventDiagnosticSummary = "Inventário de eventos indisponível nesta coleta; padrões desconhecidos.";
         else
         {
-            var eventSourcesComplete = !inventory.Warnings.Any(warning =>
-                warning.StartsWith("Eventos System:", StringComparison.OrdinalIgnoreCase) ||
-                warning.StartsWith("Eventos Application:", StringComparison.OrdinalIgnoreCase) ||
-                warning.StartsWith("Eventos Microsoft-Windows-WindowsUpdateClient/Operational:", StringComparison.OrdinalIgnoreCase));
-            var eventReport = EventPatternAnalyzer.Analyze(inventory.RecentEvents, eventSourcesComplete);
+            var eventReport = EventPatternAnalyzer.AnalyzeInventory(inventory);
             foreach (var finding in eventReport.Findings.Take(20)) EventDiagnosticRows.Add(new(finding.Title, finding.Detail));
             EventDiagnosticSummary = eventReport.Findings.Count > 20
-                ? $"{eventReport.Summary} Exibindo os primeiros 20 padrões."
+                ? $"{eventReport.Summary} Exibindo os primeiros 20 achados."
                 : eventReport.Summary;
         }
         Notify(nameof(EventDiagnosticSummary));

@@ -53,6 +53,8 @@ try
     var scheduledTasksTruncated = snapshot.WindowsInventory?.Warnings.Any(warning => warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase)) == true;
     Console.WriteLine($"Scheduled task inventory: collected={scheduledTasks.Count}; maximum=500; truncated={scheduledTasksTruncated}; names omitted.");
     Console.WriteLine($"Scheduled task runtime: available={scheduledTasks.Count(task => task.RuntimeInfoAvailable == true)}; last result={scheduledTasks.Count(task => task.LastTaskResult.HasValue)}; last run={scheduledTasks.Count(task => task.LastRunTime.HasValue)}; next run={scheduledTasks.Count(task => task.NextRunTime.HasValue)}; missed runs={scheduledTasks.Count(task => task.MissedRuns.HasValue)}; point-in-time metadata, not proof of task effects.");
+    var eventReport = Zeus.Core.EventPatternAnalyzer.AnalyzeInventory(snapshot.WindowsInventory);
+    Console.WriteLine($"Event investigation: collected={snapshot.WindowsInventory?.RecentEvents.Count ?? 0}; findings={eventReport.Findings.Count}; documented guidance={eventReport.Findings.Count(finding => finding.Detail.Contains("Referência oficial:", StringComparison.Ordinal))}; raw messages omitted; no repairs performed.");
     var inventoriedProcesses = snapshot.WindowsInventory?.Processes ?? [];
     var processesTruncated = snapshot.WindowsInventory?.Warnings.Any(warning => warning.StartsWith("Processos: amostra limitada aos 200", StringComparison.OrdinalIgnoreCase)) == true;
     var inventoriedRoutes = snapshot.WindowsInventory?.NetworkConfiguration.Sum(network => network.Routes?.Length ?? 0) ?? 0;

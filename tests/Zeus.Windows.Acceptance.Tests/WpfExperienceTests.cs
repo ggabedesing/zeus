@@ -594,6 +594,18 @@ public sealed class WpfExperienceTests
                 "Missing network data must be stated explicitly before any reset can be prepared.");
         }
         Assert.All(window.EventDiagnosticRows, row => Assert.False(string.IsNullOrWhiteSpace(row.Detail)));
+        if (window.Snapshot.WindowsInventory is { } eventInventory)
+        {
+            var eventReport = EventPatternAnalyzer.AnalyzeInventory(eventInventory);
+            var expectedEventRows = eventReport.Findings.Take(20).ToArray();
+            Assert.Equal(expectedEventRows.Length, window.EventDiagnosticRows.Count);
+            for (var index = 0; index < expectedEventRows.Length; index++)
+                Assert.Equal(expectedEventRows[index].Detail, window.EventDiagnosticRows[index].Detail);
+            var exportedEventReport = window.CreateExportDocument();
+            Assert.Equal(9, exportedEventReport.SchemaVersion);
+            Assert.Equal(eventReport.Summary, exportedEventReport.EventDiagnostics!.Summary);
+            Assert.Equal(eventReport.Findings, exportedEventReport.EventDiagnostics.Findings);
+        }
         Assert.All(window.DeviceRepairRows, row =>
         {
             Assert.False(string.IsNullOrWhiteSpace(row.Title));

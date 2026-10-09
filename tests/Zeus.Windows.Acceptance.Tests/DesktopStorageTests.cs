@@ -282,6 +282,24 @@ public sealed class DesktopStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task SchemaNinePreservesEventGuidanceAndSourceWithoutRawMessages()
+    {
+        var report = EventPatternAnalyzer.Analyze([
+            new(DateTimeOffset.UnixEpoch, "System", "Microsoft-Windows-Kernel-Power", 41, "Critical", "private raw message")],
+            sourcesComplete: false);
+        var path = Path.Combine(_root, "events-export.json");
+        await DesktopStorage.ExportAsync(path, new ExportDocument(9, DateTimeOffset.UtcNow, null, [], EventDiagnostics: report));
+        var text = await File.ReadAllTextAsync(path);
+        using var export = JsonDocument.Parse(text);
+        Assert.Equal(9, export.RootElement.GetProperty("SchemaVersion").GetInt32());
+        var events = export.RootElement.GetProperty("EventDiagnostics");
+        Assert.Contains("amostra está incompleta", events.GetProperty("Summary").GetString());
+        var finding = Assert.Single(events.GetProperty("Findings").EnumerateArray());
+        Assert.Contains("event-id-41-restart", finding.GetProperty("Detail").GetString());
+        Assert.DoesNotContain("private raw message", text);
+    }
+
+    [Fact]
     public async Task DiagnosticPackageContainsReviewInstructionsAndVerifiableReportHash()
     {
         Directory.CreateDirectory(_root);

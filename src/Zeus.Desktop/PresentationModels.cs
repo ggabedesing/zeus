@@ -269,7 +269,8 @@ internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset Exported
     IReadOnlyList<PerformanceObservation>? PerformanceBaseline = null,
     PerformanceComparison? PerformanceComparison = null,
     OptimizationPlan? FormalOptimizationPlan = null,
-    IReadOnlyList<PerformanceSessionExport>? PerformanceSessions = null);
+    IReadOnlyList<PerformanceSessionExport>? PerformanceSessions = null,
+    EventPatternReport? EventDiagnostics = null);
 
 internal sealed record PerformanceSessionExport(string Label, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt,
     bool IsReference, int SampleCount);
