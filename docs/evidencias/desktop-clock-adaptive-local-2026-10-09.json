@@ -1,0 +1,33 @@
+{
+  "evidenceType": "desktop-clock-adaptive-wpf-acceptance",
+  "date": "2026-10-09",
+  "sourceBaseCommit": "f9cef5b16abc5ccc975a5eb2e905b16ea617c0c8",
+  "sourceIncludesWorkingTreeChanges": true,
+  "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+  "testName": "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+  "result": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "durationSeconds": 23
+  },
+  "verifiedBehavior": [
+    "The real WPF application window opens and renders its workspaces and themes.",
+    "The floating clock shows seconds and schedules its next update one second later.",
+    "Hiding seconds reschedules the next update for the next minute boundary.",
+    "Showing seconds again restores one-second updates."
+  ],
+  "resultFile": "artifacts/TestResults/desktop-clock-adaptive-2026-10-09/desktop-clock-adaptive.trx",
+  "portableExecutableSmoke": {
+    "result": "passed",
+    "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
+    "runtime": "win-x64",
+    "productVersion": "1.0.0",
+    "sourceDirty": true,
+    "zipSha256": "97eeba01bd82f7778dd34bee34a841bf541126defe713859dbb444886414e8a3"
+  },
+  "limitations": [
+    "This is automated acceptance on one Windows machine, not a power or CPU benchmark across hardware.",
+    "It does not validate physical multi-monitor layouts or mixed-DPI behavior."
+  ]
+}

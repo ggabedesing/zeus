@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O relógio flutuante ajusta a frequência do timer ao conteúdo: atualiza a cada segundo quando exibe segundos e na próxima virada do minuto quando não exibe, reduzindo despertares sem atrasar a mudança visível do horário.
 - O pacote portátil inclui os avisos do runtime .NET, expressões de licença NuGet e avisos adicionais das dependências empacotadas.
 - Ao fechar o ZEUS com registros de atividade pendentes, o encerramento final agora também fecha o relógio flutuante; isso evita deixar o processo aberto depois que a janela principal desaparece.
 - O Observador mostra, por processo GPU, a alocação dedicada como parcela da capacidade dedicada reportada pelo adaptador quando o LUID tem uma única correspondência, e compara essa parcela entre sessões com cobertura das amostras válidas. O percentual não representa orçamento individual nem diagnóstico de pressão; correspondência ambígua ou dado ausente permanece indisponível também na comparação.

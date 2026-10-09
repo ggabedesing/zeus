@@ -12,7 +12,7 @@ internal sealed class DesktopClockWindow : Window
     private readonly TextBlock _date = new() { FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(0xC8, 0xD4, 0xE0)), HorizontalAlignment = HorizontalAlignment.Center };
     private readonly Border _surface = new() { Background = new SolidColorBrush(Color.FromArgb(225, 20, 28, 39)), BorderBrush = new SolidColorBrush(Color.FromArgb(100, 130, 160, 185)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(18, 10, 18, 11) };
     private readonly Action _positionChanged;
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly DispatcherTimer _timer = new();
     private bool _showDate = true, _showSeconds, _use24HourFormat = true;
 
     public DesktopClockWindow(Action positionChanged)
@@ -26,10 +26,12 @@ internal sealed class DesktopClockWindow : Window
         _surface.Child = new StackPanel { Children = { _time, _date } };
         Content = _surface;
         MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) { DragMove(); _positionChanged(); } };
-        _timer.Tick += (_, _) => UpdateTime();
-        Loaded += (_, _) => { UpdateTime(); _timer.Start(); };
+        _timer.Tick += (_, _) => { _timer.Stop(); UpdateTime(); };
+        Loaded += (_, _) => UpdateTime();
         Closed += (_, _) => _timer.Stop();
     }
+
+    internal TimeSpan NextUpdateInterval => _timer.Interval;
 
     public void Configure(bool showDate, bool showSeconds, bool use24HourFormat, bool alwaysOnTop, double opacity, DesktopClockSize size, Brush accentBrush, bool highContrast)
     {
@@ -73,5 +75,13 @@ internal sealed class DesktopClockWindow : Window
         if (!_use24HourFormat) _time.Text += now.Hour < 12 ? " AM" : " PM";
         _date.Text = now.ToString("dddd, d 'de' MMMM");
         _date.Visibility = _showDate ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!IsLoaded) return;
+        _timer.Interval = _showSeconds
+            ? TimeSpan.FromSeconds(1)
+            : TimeSpan.FromSeconds(60 - now.Second) - TimeSpan.FromMilliseconds(now.Millisecond);
+        if (_timer.Interval <= TimeSpan.Zero) _timer.Interval = TimeSpan.FromMilliseconds(100);
+        _timer.Stop();
+        _timer.Start();
     }
 }

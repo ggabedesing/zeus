@@ -607,6 +607,11 @@ public sealed class WpfExperienceTests
         Assert.Equal(0.72, desktopClock.Opacity);
         var clockLabels = FindVisualDescendants<TextBlock>(desktopClock).ToArray();
         Assert.Matches(@"^\d{2}:\d{2}:\d{2}\s+\S+$", clockLabels[0].Text);
+        Assert.Equal(TimeSpan.FromSeconds(1), desktopClock.NextUpdateInterval);
+        window.DesktopClockShowSeconds = false;
+        Assert.InRange(desktopClock.NextUpdateInterval, TimeSpan.FromMilliseconds(1), TimeSpan.FromSeconds(60));
+        window.DesktopClockShowSeconds = true;
+        Assert.Equal(TimeSpan.FromSeconds(1), desktopClock.NextUpdateInterval);
         window.DesktopClockUse24HourFormat = true;
         Assert.Matches(@"^\d{2}:\d{2}:\d{2}$", clockLabels[0].Text);
         var clockFormatToggle = Assert.IsType<CheckBox>(window.FindName("DesktopClockUse24HourFormatToggle"));
