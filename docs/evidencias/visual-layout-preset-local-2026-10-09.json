@@ -1,7 +1,7 @@
 {
   "evidenceType": "visual-layout-preset-persistence",
   "date": "2026-10-09",
-  "sourceCommit": "e02a72cdc7dc71dbefec61c79f8103c703aabc52",
+  "sourceCommit": "60b4e8c912d5f52eee09d6fb2e04198f94ce2752",
   "sourceDirty": false,
   "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
   "tests": [
@@ -9,21 +9,27 @@
     "LegacyJsonHistoryAndPreferencesAreImportedWithoutRemovingSourceFiles",
     "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme"
   ],
-  "result": { "passed": 3, "failed": 0, "skipped": 0, "durationSeconds": 25 },
+  "result": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "durationSeconds": 32
+  },
   "verified": [
     "SQLite preferences retain the selected visual layout preset identifier.",
     "Legacy preferences without a preset identifier remain readable and return null for that field.",
-    "The WPF acceptance applies Aurora and confirms that its identifier survives window close and storage reload."
+    "The WPF acceptance applies Aurora and confirms that its identifier survives window close and storage reload.",
+    "A segunda janela WPF foi reaberta com o mesmo banco e restaurou Aurora no seletor após concluir o diagnóstico."
   ],
   "portableExecutableSmoke": {
     "result": "passed",
     "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
     "runtime": "win-x64",
-    "packageDirectory": "artifacts/visual-layout-preset-exe/zeus-win-x64-e02a72cdc7dc-20261009T081407190Z-e0bb8c56",
+    "packageDirectory": "artifacts/visual-layout-preset-exe/zeus-win-x64-60b4e8c912d5-20261009T081632054Z-30fdd637",
     "zipPath": "artifacts/visual-layout-preset-exe/zeus-win-x64.zip",
-    "sourceCommit": "e02a72cdc7dc71dbefec61c79f8103c703aabc52",
+    "sourceCommit": "60b4e8c912d5f52eee09d6fb2e04198f94ce2752",
     "sourceDirty": false,
-    "zipSha256": "8d31a6cfb6530d6015593a0b17bc0f2217085415c6ccbc11c060461a38fd96a2"
+    "zipSha256": "10773caed520c7afd52e5cfd01ea1bdc9516ca9533e4dc6926ac6bc33b930309"
   },
   "limitations": [
     "This is a portable development build, not a signed production release."
