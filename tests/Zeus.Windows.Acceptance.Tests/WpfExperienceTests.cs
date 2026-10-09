@@ -67,6 +67,9 @@ public sealed class WpfExperienceTests
         Assert.False(FullscreenWindowDetector.CoversMonitor(new Rect(-1920, 0, 1920, 1040), monitor),
             "A normal maximized window that leaves the taskbar area visible is not fullscreen.");
         Assert.False(FullscreenWindowDetector.CoversMonitor(new Rect(-1700, 40, 1600, 900), monitor));
+        Assert.True(FullscreenWindowDetector.CoversMonitorOnClockDisplay(true, monitor, monitor));
+        Assert.False(FullscreenWindowDetector.CoversMonitorOnClockDisplay(false, monitor, monitor),
+            "Fullscreen on a different monitor must not hide the desktop clock.");
         Assert.Equal(Visibility.Hidden, DesktopClockWindow.ResolveFullscreenVisibility(true, true, true));
         Assert.Equal(Visibility.Visible, DesktopClockWindow.ResolveFullscreenVisibility(false, true, true));
         Assert.Equal(Visibility.Visible, DesktopClockWindow.ResolveFullscreenVisibility(true, false, true));

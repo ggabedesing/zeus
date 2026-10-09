@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -71,7 +72,8 @@ internal sealed class DesktopClockWindow : Window
 
     internal void RefreshFullscreenVisibility()
     {
-        if (IsLoaded) Visibility = ResolveFullscreenVisibility(_alwaysOnTop, _hideDuringFullscreen, FullscreenWindowDetector.IsForegroundFullscreen());
+        if (IsLoaded) Visibility = ResolveFullscreenVisibility(_alwaysOnTop, _hideDuringFullscreen,
+            FullscreenWindowDetector.IsForegroundFullscreenOnClockMonitor(new WindowInteropHelper(this).Handle));
     }
 
     internal static Visibility ResolveFullscreenVisibility(bool alwaysOnTop, bool hideDuringFullscreen, bool foregroundIsFullscreen) =>

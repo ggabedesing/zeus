@@ -7,7 +7,7 @@ internal static class FullscreenWindowDetector
 {
     private const uint MonitorDefaultToNearest = 2;
 
-    public static bool IsForegroundFullscreen()
+    public static bool IsForegroundFullscreenOnClockMonitor(IntPtr clockWindow)
     {
         if (!OperatingSystem.IsWindows()) return false;
         var window = GetForegroundWindow();
@@ -16,16 +16,20 @@ internal static class FullscreenWindowDetector
         if (processId == Environment.ProcessId) return false;
         if (!GetWindowRect(window, out var bounds)) return false;
         var monitor = MonitorFromWindow(window, MonitorDefaultToNearest);
-        if (monitor == IntPtr.Zero) return false;
+        var clockMonitor = MonitorFromWindow(clockWindow, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero || clockMonitor == IntPtr.Zero || monitor != clockMonitor) return false;
         var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
         if (!GetMonitorInfo(monitor, ref info)) return false;
-        return CoversMonitor(ToRect(bounds), ToRect(info.MonitorBounds));
+        return CoversMonitorOnClockDisplay(true, ToRect(bounds), ToRect(info.MonitorBounds));
     }
 
     internal static bool CoversMonitor(Rect window, Rect monitor, double tolerance = 2) =>
         !window.IsEmpty && !monitor.IsEmpty && monitor.Width > 0 && monitor.Height > 0 &&
         window.Left <= monitor.Left + tolerance && window.Top <= monitor.Top + tolerance &&
         window.Right >= monitor.Right - tolerance && window.Bottom >= monitor.Bottom - tolerance;
+
+    internal static bool CoversMonitorOnClockDisplay(bool sameMonitor, Rect foregroundWindow, Rect foregroundMonitor) =>
+        sameMonitor && CoversMonitor(foregroundWindow, foregroundMonitor);
 
     private static Rect ToRect(NativeRect rect) => new(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
 
