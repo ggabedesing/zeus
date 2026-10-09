@@ -74,12 +74,14 @@ public sealed class PerformanceCounterTests
             Sample(20) with
             {
                 Processes = [new(42, "old-game", 10, 1024, 100), new(7, "editor", 10, 1024, 300)],
+                GpuMemory = [new(adapter, 3000, 0, 3000, 4000)],
                 GpuProcessMemory = [new("old", adapter, 42, "old-game", 100, 1000, 0, 0, 1000, 1000),
                     new("editor", adapter, 7, "editor", 300, 2000, 0, 0, 2000, 2000)]
             },
             Sample(30) with
             {
                 Processes = [new(7, "editor", 10, 1024, 300)],
+                GpuMemory = [new(adapter, 5000, 0, 5000, 8000)],
                 GpuProcessMemory = [new("editor", adapter, 7, "editor", 300, 4000, 0, 0, 4000, 4000)]
             }
         };
@@ -88,6 +90,7 @@ public sealed class PerformanceCounterTests
             Sample(40) with
             {
                 Processes = [new(42, "new-game", 10, 1024, 200), new(7, "editor", 10, 1024, 300)],
+                GpuMemory = [new(adapter, 12000, 0, 12000, 24000)],
                 GpuProcessMemory = [new("new", adapter, 42, "new-game", 200, 9000, 0, 0, 9000, 9000),
                     new("editor", adapter, 7, "editor", 300, 6000, 0, 0, 6000, 6000)]
             }
@@ -103,10 +106,38 @@ public sealed class PerformanceCounterTests
         Assert.Equal(6000, editor.LaterDedicatedBytes);
         Assert.Equal(2, editor.ReferenceAvailableSamples);
         Assert.Equal(1, editor.LaterAvailableSamples);
+        Assert.Equal(50, editor.ReferenceCapacitySharePercent);
+        Assert.Equal(25, editor.LaterCapacitySharePercent);
+        Assert.Equal(2, editor.ReferenceCapacityShareSamples);
+        Assert.Equal(1, editor.LaterCapacityShareSamples);
         Assert.Equal(1000, oldGame.ReferenceDedicatedBytes);
         Assert.Null(oldGame.LaterDedicatedBytes);
         Assert.Null(newGame.ReferenceDedicatedBytes);
         Assert.Equal(9000, newGame.LaterDedicatedBytes);
+    }
+
+    [Fact]
+    public void GpuProcessCapacityShareComparisonRemainsUnavailableWithoutUniqueCapacity()
+    {
+        const string adapter = "luid_unmatched";
+        var reference = new[]
+        {
+            Sample(20) with { GpuProcessMemory = [new("one", adapter, 42, "game", 100, 1000, 0, 0, 1000, 1000)] }
+        };
+        var later = new[]
+        {
+            Sample(30) with { GpuProcessMemory = [new("two", adapter, 42, "game", 100, 2000, 0, 0, 2000, 2000)] }
+        };
+
+        var comparison = PerformanceComparisonBuilder.Compare(reference, later);
+        var process = Assert.Single(comparison.GpuProcessMemoryUsage!);
+
+        Assert.Equal(1000, process.ReferenceDedicatedBytes);
+        Assert.Equal(2000, process.LaterDedicatedBytes);
+        Assert.Null(process.ReferenceCapacitySharePercent);
+        Assert.Null(process.LaterCapacitySharePercent);
+        Assert.Equal(0, process.ReferenceCapacityShareSamples);
+        Assert.Equal(0, process.LaterCapacityShareSamples);
     }
 
     [Fact]

@@ -72,7 +72,11 @@ public sealed record PerformanceGpuProcessMemoryComparison(
     double? ReferenceDedicatedBytes,
     double? LaterDedicatedBytes,
     int ReferenceAvailableSamples,
-    int LaterAvailableSamples);
+    int LaterAvailableSamples,
+    double? ReferenceCapacitySharePercent = null,
+    double? LaterCapacitySharePercent = null,
+    int ReferenceCapacityShareSamples = 0,
+    int LaterCapacityShareSamples = 0);
 
 public sealed record PerformanceNetworkComparison(
     string Adapter,
@@ -374,25 +378,33 @@ public static class PerformanceComparisonBuilder
             .Distinct().ToArray();
         var gpuProcessMemoryUsage = gpuProcessKeys.Select(key =>
         {
-            static (double? Average, int Count, string? Name) Summarize(
+            static (double? Average, int Count, string? Name, double? CapacityShareAverage, int CapacityShareCount) Summarize(
                 IReadOnlyList<PerformanceObservation> samples, (int ProcessId, long ProcessStart, string AdapterInstance) identity)
             {
-                var values = samples.SelectMany(sample => sample.GpuProcessMemory ?? [])
-                    .Where(memory => memory.ProcessId == identity.ProcessId &&
+                var values = samples.SelectMany(sample => (sample.GpuProcessMemory ?? [])
+                        .Where(memory => memory.ProcessId == identity.ProcessId &&
                         memory.ProcessStartTimeUtcTicks == identity.ProcessStart &&
                         string.Equals(memory.AdapterInstance, identity.AdapterInstance, StringComparison.OrdinalIgnoreCase))
+                        .Select(memory => (Sample: sample, Memory: memory)))
                     .ToArray();
-                var dedicated = values.Select(memory => memory.DedicatedUsageBytes)
+                var dedicated = values.Select(value => value.Memory.DedicatedUsageBytes)
                     .Where(value => value.HasValue).Select(value => (double)value!.Value).ToArray();
+                var capacityShares = values.Select(value => GpuProcessMemoryShare.GetDedicatedCapacityPercent(
+                        value.Memory, value.Sample.GpuMemory ?? []))
+                    .Where(percent => percent is { } value && double.IsFinite(value) && value >= 0)
+                    .Select(percent => percent!.Value).ToArray();
                 return (dedicated.Length == 0 ? null : dedicated.Average(), dedicated.Length,
-                    values.LastOrDefault()?.ProcessName);
+                    values.LastOrDefault().Memory?.ProcessName,
+                    capacityShares.Length == 0 ? null : capacityShares.Average(), capacityShares.Length);
             }
 
             var left = Summarize(reference, key);
             var right = Summarize(later, key);
             return new PerformanceGpuProcessMemoryComparison(key.ProcessId,
                 right.Name ?? left.Name ?? "processo desconhecido", key.ProcessStart, key.AdapterInstance,
-                left.Average, right.Average, left.Count, right.Count);
+                left.Average, right.Average, left.Count, right.Count,
+                left.CapacityShareAverage, right.CapacityShareAverage,
+                left.CapacityShareCount, right.CapacityShareCount);
         }).ToArray();
 
         return new(reference.Count, later.Count,
