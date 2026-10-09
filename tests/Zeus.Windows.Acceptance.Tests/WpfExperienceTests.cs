@@ -341,6 +341,17 @@ public sealed class WpfExperienceTests
 
         window.SelectedTheme = DesktopTheme.Complete;
         window.IsMinimal = false;
+        window.ReduceAnimations = true;
+        tabs.SelectedIndex = 1;
+        Assert.False(Assert.IsAssignableFrom<FrameworkElement>(tabs.SelectedContent).HasAnimatedProperties,
+            "The reduced-motion preference must disable ZEUS workspace transitions.");
+        window.ReduceAnimations = false;
+        if (!SystemParameters.HighContrast && SystemParameters.ClientAreaAnimation)
+        {
+            tabs.SelectedIndex = 0;
+            Assert.True(Assert.IsAssignableFrom<FrameworkElement>(tabs.SelectedContent).HasAnimatedProperties,
+                "Workspace navigation should use the brief transition when motion is allowed.");
+        }
         tabs.SelectedIndex = 0;
         await RenderAsync(window, "zeus-complete-overview.png");
         window.Width = 900;
