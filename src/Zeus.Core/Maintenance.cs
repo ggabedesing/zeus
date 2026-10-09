@@ -81,7 +81,8 @@ public sealed record MaintenanceRequest(
     string? TargetId = null,
     bool EulaAccepted = false,
     int? UpdateServerSelection = null,
-    string? UpdateServiceId = null);
+    string? UpdateServiceId = null,
+    string? EulaTextSha256 = null);
 
 public interface IAdvancedMaintenanceExecutor
 {

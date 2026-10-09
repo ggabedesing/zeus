@@ -40,7 +40,7 @@ public sealed class MaintenanceRequestProtocolTests
     public void DriverInstallationIsExclusiveAndCannotContainMultipleCandidates()
     {
         MaintenanceRequest[] selected = [
-            new(MaintenanceActionId.InstallDriverUpdate, DriverId, true, 2),
+            new(MaintenanceActionId.InstallDriverUpdate, DriverId, true, 2, EulaTextSha256: new string('a', 64)),
             new(MaintenanceActionId.InstallDriverUpdate, SessionId + ":2", false, 2)];
         Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateRequests(selected));
         Assert.Throws<ArgumentException>(() => MaintenancePolicy.ValidateRequests([
@@ -77,6 +77,34 @@ public sealed class MaintenanceRequestProtocolTests
         Assert.Equal(selected, requests);
     }
 
+    [Fact]
+    public void DriverLicenseAcceptanceRoundTripsOnlyWithTheReviewedTextHash()
+    {
+        var hash = new string('a', 64);
+        var selected = new[] { new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate,
+            DriverId, true, 2, EulaTextSha256: hash) };
+        var encoded = MaintenanceRequestProtocol.Encode(selected);
+
+        Assert.True(MaintenanceRequestProtocol.TryReadArguments(
+            ["--session", SessionId, "--requests", encoded], out _, out var requests));
+        Assert.Equal(selected, requests);
+        Assert.Throws<ArgumentException>(() => MaintenanceRequestProtocol.Encode([
+            selected[0] with { EulaTextSha256 = null }]));
+        Assert.Throws<ArgumentException>(() => MaintenanceRequestProtocol.Encode([
+            selected[0] with { EulaAccepted = false }]));
+        Assert.Throws<ArgumentException>(() => MaintenanceRequestProtocol.Encode([
+            selected[0] with { EulaTextSha256 = "not-a-hash" }]));
+        Assert.Throws<ArgumentException>(() => MaintenanceRequestProtocol.Encode([
+            selected[0] with { EulaAccepted = false, EulaTextSha256 = "not-a-hash" }]));
+    }
+
+    [Fact]
+    public void LicenseTextHashUsesUtf8Sha256()
+    {
+        Assert.Equal("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD",
+            MaintenanceRequestProtocol.ComputeTextSha256("abc"));
+    }
+
     [Theory]
     [InlineData(0, null, true, "origem efetiva desconhecida")]
     [InlineData(1, null, true, "servidor gerenciado")]
@@ -102,6 +130,7 @@ public sealed class MaintenanceRequestProtocolTests
     [InlineData("[{\"Action\":\"DefenderQuickScan\",\"EulaAccepted\":true}]")]
     [InlineData("[{\"Action\":\"DefenderQuickScan\",\"EulaAccepted\":\"true\"}]")]
     [InlineData("[{\"Action\":\"InstallDriverUpdate\"}]")]
+    [InlineData("[{\"Action\":\"InstallDriverUpdate\",\"TargetId\":\"12345678-1234-1234-1234-123456789abc:1\",\"EulaAccepted\":true,\"UpdateServerSelection\":2}]")]
     [InlineData("[{\"Action\":\"DefenderQuickScan\"},{\"Action\":\"DefenderQuickScan\"}]")]
     [InlineData("{\"Action\":\"DefenderQuickScan\"}")]
     [InlineData("[null]")]

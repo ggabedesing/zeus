@@ -132,7 +132,8 @@ public sealed class MaintenancePolicyTests
     public void DriverRetryWarningRequiresTheSameCandidateAndUpdateSource()
     {
         const string candidate = "12345678-1234-1234-1234-123456789abc:2";
-        var request = new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, candidate, true, 2);
+        var request = new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, candidate, true, 2,
+            EulaTextSha256: new string('a', 64));
         var started = DateTimeOffset.UtcNow;
         var report = new MaintenanceReport(Guid.NewGuid(), started, started, true,
             [new(MaintenanceActionId.InstallDriverUpdate, StepOutcome.Skipped, "Pendente",

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -16,7 +17,7 @@ public static class MaintenanceRequestProtocol
         var payload = JsonSerializer.SerializeToUtf8Bytes(validated.Select(request => new
         {
             Action = request.Action.ToString(), request.TargetId, request.EulaAccepted,
-            request.UpdateServerSelection, request.UpdateServiceId
+            request.UpdateServerSelection, request.UpdateServiceId, request.EulaTextSha256
         }));
         if (payload.Length > MaximumPayloadBytes)
             throw new ArgumentException("O plano excede o tamanho permitido.", nameof(requests));
@@ -51,6 +52,7 @@ public static class MaintenanceRequestProtocol
                 string? target = null;
                 int? serverSelection = null;
                 string? serviceId = null;
+                string? eulaTextSha256 = null;
                 var accepted = false;
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in element.EnumerateObject())
@@ -75,12 +77,15 @@ public static class MaintenanceRequestProtocol
                         case "UpdateServiceId" when property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Null:
                             serviceId = property.Value.GetString();
                             break;
+                        case "EulaTextSha256" when property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Null:
+                            eulaTextSha256 = property.Value.GetString();
+                            break;
                         default:
                             return false;
                     }
                 }
                 if (!TryParseAction(actionName, out var action)) return false;
-                selected.Add(new MaintenanceRequest(action, target, accepted, serverSelection, serviceId));
+                selected.Add(new MaintenanceRequest(action, target, accepted, serverSelection, serviceId, eulaTextSha256));
             }
             requests = MaintenancePolicy.ValidateRequests(selected);
             return true;
@@ -106,6 +111,14 @@ public static class MaintenanceRequestProtocol
 
     public static bool TryParseUpdateServiceId(string? serviceId) =>
         serviceId is not null && Guid.TryParseExact(serviceId, "D", out var id) && id != Guid.Empty;
+
+    public static bool IsSha256(string? value) => value is { Length: 64 } && value.All(char.IsAsciiHexDigit);
+
+    public static string ComputeTextSha256(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return Convert.ToHexString(SHA256.HashData(StrictUtf8.GetBytes(value)));
+    }
 
     public static bool TryParsePnpInstanceId(string? target)
     {

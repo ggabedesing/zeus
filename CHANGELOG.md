@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O aceite explícito da licença de um driver agora acompanha o SHA-256 do texto exibido; antes de aceitar os termos, o auxiliar compara o texto atual do Windows Update e interrompe a transação se ele mudou.
 - Antes de repetir uma manutenção, a revisão do plano agora destaca a mesma ação e alvo quando a tentativa anterior está pendente ou exige revisão manual; drivers também precisam corresponder à origem registrada. A nova tentativa continua exigindo confirmação explícita.
 - As regras formais do motor de otimização agora são obrigatoriamente somente para revisão; o plano nunca propaga ações executáveis, que permanecem nos fluxos separados de consentimento e transação.
 - Comparações de desempenho usam até cinco amostras de uma única sessão por período, exigem pelo menos três e mostram os horários das sessões; amostras de sessões distintas não são combinadas.

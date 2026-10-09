@@ -940,8 +940,11 @@ public partial class MainWindow
         var selected = DriverCandidates.Where(d => d.IsSelected).ToArray();
         var candidate = selected[0];
         if (!Confirm($"Instalar este candidato de driver?\n\n{candidate.Title}\nDispositivo: {Available(candidate.DeviceName)} · Fabricante: {Available(candidate.Manufacturer)}\nFornecedor declarado: {candidate.DriverProvider} · Categoria inferida: {candidate.ProviderCategory}\nClasse: {candidate.DriverClass} · Data do driver: {candidate.DriverDate}\nVersão: {Available(candidate.DriverVersion)}\nOrigem: {candidate.DriverSource}\nIdentidade: {candidate.Id}\n\n{candidate.PackageIntegritySummary} Pode haver reinicialização e incompatibilidade; o auxiliar exigirá proteção e exportará os drivers atuais antes desta instalação.", "Revisar candidato de driver")) return;
+        var acceptedEulaHash = candidate.RequiresEula && candidate.EulaAccepted && !string.IsNullOrWhiteSpace(candidate.EulaText)
+            ? MaintenanceRequestProtocol.ComputeTextSha256(candidate.EulaText)
+            : null;
         await ReviewAndExecuteAsync([new MaintenanceRequest(MaintenanceActionId.InstallDriverUpdate, candidate.Id,
-            candidate.RequiresEula && candidate.EulaAccepted, candidate.Candidate.UpdateServerSelection, candidate.Candidate.UpdateServiceId)]);
+            acceptedEulaHash is not null, candidate.Candidate.UpdateServerSelection, candidate.Candidate.UpdateServiceId, acceptedEulaHash)]);
     }
 
     private async void RollbackDriver_Click(object sender, RoutedEventArgs e)

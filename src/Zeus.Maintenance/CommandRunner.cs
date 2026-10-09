@@ -210,7 +210,8 @@ internal static class CommandRunner
         var expectedServerSelection = request.UpdateServerSelection!.Value;
         var expectedServiceId = request.UpdateServiceId is null ? string.Empty : Guid.Parse(request.UpdateServiceId).ToString("D");
         var script = $"$expectedId = '{updateId:D}'; $expectedRevision = {revision}; $expectedServerSelection = {expectedServerSelection}; $expectedServiceId = '{expectedServiceId}'; $acceptEula = " +
-            (request.EulaAccepted ? "$true; " : "$false; ") + DriverInstallScript;
+            (request.EulaAccepted ? "$true; " : "$false; ") +
+            "$expectedEulaTextSha256 = '" + (request.EulaTextSha256 ?? string.Empty) + "'; " + DriverInstallScript;
         var result = await RunAsync(sessionId, $"driver-{updateId:N}-{revision}.log",
             TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility), Timeout.InfiniteTimeSpan);
         if (result.LogError is not null)
@@ -306,6 +307,12 @@ internal static class CommandRunner
             if (-not $acceptEula -or [string]::IsNullOrWhiteSpace([string]$update.EulaText)) {
                 throw 'A licença ainda não foi explicitamente aceita após exibição na interface. Use uma nova busca ou o Windows Update.';
             };
+            $eulaBytes = [System.Text.Encoding]::UTF8.GetBytes([string]$update.EulaText);
+            $actualEulaTextSha256 = [System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($eulaBytes));
+            if (-not [string]::Equals($actualEulaTextSha256, $expectedEulaTextSha256, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw 'O texto da licença mudou desde a revisão. Nenhum aceite ou instalação foi solicitado; faça uma nova busca e revise os termos atuais.';
+            };
+            [Console]::WriteLine('ZEUS_DRIVER_EULA_TEXT_SHA256 ' + $actualEulaTextSha256);
             $update.AcceptEula();
         };
         $updates = [System.Activator]::CreateInstance([System.Type]::GetTypeFromProgID('Microsoft.Update.UpdateColl'));
