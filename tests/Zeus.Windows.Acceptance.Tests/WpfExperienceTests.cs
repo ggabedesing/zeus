@@ -51,6 +51,23 @@ public sealed class WpfExperienceTests
             MainWindow.FormatMemoryInterleave(new MemoryModuleInfo("DIMM 1", 8UL * 1024 * 1024 * 1024, null, "Fabricante")));
     }
 
+    [Theory]
+    [InlineData("#1D4ED8", "#080D19")]
+    [InlineData("#176B87", "#141C27")]
+    [InlineData("#000000", "#080D19")]
+    [InlineData("#FFFFFF", "#231F1B")]
+    [InlineData("#00FFFF", "#080D19")]
+    public void DesktopClockForegroundKeepsAccessibleContrastAgainstDarkStyles(string accentHex, string backgroundHex)
+    {
+        var accent = (Color)ColorConverter.ConvertFromString(accentHex);
+        var background = (Color)ColorConverter.ConvertFromString(backgroundHex);
+        var foreground = DesktopClockWindow.ResolveClockAccentForeground(accent, background);
+        var foregroundHex = $"#{foreground.R:X2}{foreground.G:X2}{foreground.B:X2}";
+
+        Assert.True(AccentColorAccessibility.MeetsContrast(foregroundHex, backgroundHex),
+            $"Clock text {foregroundHex} must keep at least 4.5:1 contrast on {backgroundHex}.");
+    }
+
     [Fact]
     public void DriverSearchSummaryDistinguishesCompleteEmptyResultsFromPartialResultsAndUnknownSource()
     {

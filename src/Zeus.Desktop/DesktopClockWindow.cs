@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Zeus.Core;
 
 namespace Zeus.Desktop;
 
@@ -63,7 +64,8 @@ internal sealed class DesktopClockWindow : Window
             DesktopClockStyle.Classic => (Background: Color.FromArgb(248, 35, 31, 27), Border: Color.FromArgb(180, 203, 178, 132), Radius: new CornerRadius(3), BorderThickness: new Thickness(1), TimeForeground: (Brush)Brushes.WhiteSmoke),
             _ => (Background: Color.FromArgb(225, 20, 28, 39), Border: Color.FromArgb(100, 130, 160, 185), Radius: new CornerRadius(14), BorderThickness: new Thickness(1), TimeForeground: accentBrush)
         };
-        _time.Foreground = highContrast ? SystemColors.WindowTextBrush : appearance.TimeForeground;
+        _time.Foreground = highContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(
+            ResolveClockAccentForeground(GetBrushColor(appearance.TimeForeground), appearance.Background));
         _date.Foreground = highContrast ? SystemColors.WindowTextBrush : style == DesktopClockStyle.Classic
             ? new SolidColorBrush(Color.FromRgb(0xDE, 0xD4, 0xC2))
             : new SolidColorBrush(Color.FromRgb(0xC8, 0xD4, 0xE0));
@@ -84,6 +86,19 @@ internal sealed class DesktopClockWindow : Window
     }
 
     private static Color GetBrushColor(Brush brush) => brush is SolidColorBrush solid ? solid.Color : Colors.DeepSkyBlue;
+
+    internal static Color ResolveClockAccentForeground(Color accent, Color background)
+    {
+        var accentHex = ToRgbHex(accent);
+        var backgroundHex = ToRgbHex(background);
+        if (AccentColorAccessibility.MeetsContrast(accentHex, backgroundHex)) return accent;
+
+        var whiteContrast = AccentColorAccessibility.ContrastRatio("#FFFFFF", backgroundHex);
+        var blackContrast = AccentColorAccessibility.ContrastRatio("#000000", backgroundHex);
+        return whiteContrast >= blackContrast ? Colors.White : Colors.Black;
+    }
+
+    private static string ToRgbHex(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 
     internal void RefreshFullscreenVisibility()
     {
