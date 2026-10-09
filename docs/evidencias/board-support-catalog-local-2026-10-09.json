@@ -1,8 +1,8 @@
 {
   "evidenceType": "official-board-and-oem-support-links",
   "date": "2026-10-09",
-  "sourceBaseCommit": "c2f6262c19d211c182c2b790d52e6c6ac808e4b7",
-  "sourceIncludesWorkingTreeChanges": true,
+  "sourceCommit": "f0d0f62a3e93ee3094ed8e64b13c03c5f625e772",
+  "sourceDirty": false,
   "tests": [
     {
       "project": "tests/Zeus.Hardware.Tests/Zeus.Hardware.Tests.csproj",
@@ -25,6 +25,15 @@
     "The WPF test routes the selected link through an injected callback and checks the target without opening a browser.",
     "The real WPF experience test completed with no binding errors."
   ],
+  "portableExecutableSmoke": {
+    "result": "passed",
+    "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
+    "runtime": "win-x64",
+    "sourceCommit": "f0d0f62a3e93ee3094ed8e64b13c03c5f625e772",
+    "sourceDirty": false,
+    "zipPath": "artifacts/board-support-clean-package/zeus-win-x64.zip",
+    "zipSha256": "7ce1c896ce03cde944c0d5aaa2bba53ed8485115155d0519eecff7da853419f4"
+  },
   "officialSourcesReviewed": [
     "https://www.gigabyte.com/br/Support/Consumer/Download",
     "https://www.asrock.com/support/index.asp?cat=Drivers",
