@@ -119,6 +119,28 @@ public sealed class DesktopStorageTests : IDisposable
     }
 
     [Fact]
+    public void ReportExportRetainsPerProcessEquivalentCoresAndCoverage()
+    {
+        var process = new PerformanceProcessComparison(42, "game", 123,
+            2, 3, 2, 3, 2_000, 3_000, 2, 3,
+            ReferenceCpuCoresUsed: 0.5, LaterCpuCoresUsed: 1.25,
+            ReferenceCpuCoresSamples: 2, LaterCpuCoresSamples: 3);
+        var comparison = new PerformanceComparison(3, 3, null, null, null, null,
+            DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddMinutes(1),
+            ProcessUsage: [process]);
+        var report = new ExportDocument(8, DateTimeOffset.UnixEpoch, null, [], PerformanceComparison: comparison);
+
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(report, DesktopStorage.JsonOptions));
+        var exported = json.RootElement.GetProperty("PerformanceComparison")
+            .GetProperty("ProcessUsage").EnumerateArray().Single();
+
+        Assert.Equal(0.5, exported.GetProperty("ReferenceCpuCoresUsed").GetDouble());
+        Assert.Equal(1.25, exported.GetProperty("LaterCpuCoresUsed").GetDouble());
+        Assert.Equal(2, exported.GetProperty("ReferenceCpuCoresSamples").GetInt32());
+        Assert.Equal(3, exported.GetProperty("LaterCpuCoresSamples").GetInt32());
+    }
+
+    [Fact]
     public async Task LargePerformanceObservationIsSummarizedBeforeTheSqliteSampleLimit()
     {
         Directory.CreateDirectory(_root);

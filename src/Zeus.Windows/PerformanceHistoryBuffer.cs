@@ -119,7 +119,11 @@ public sealed record PerformanceProcessComparison(
     double? ReferenceWorkingSetBytes,
     double? LaterWorkingSetBytes,
     int ReferenceWorkingSetSamples,
-    int LaterWorkingSetSamples);
+    int LaterWorkingSetSamples,
+    double? ReferenceCpuCoresUsed = null,
+    double? LaterCpuCoresUsed = null,
+    int ReferenceCpuCoresSamples = 0,
+    int LaterCpuCoresSamples = 0);
 
 /// <summary>A process-local, bounded history that preserves observations until exported.</summary>
 public sealed class PerformanceHistoryBuffer
@@ -353,7 +357,8 @@ public static class PerformanceComparisonBuilder
             .Distinct().ToArray();
         var processUsage = processKeys.Select(key =>
         {
-            static (double? Cpu, int CpuCount, double? WorkingSet, int WorkingSetCount, string? Name)
+            static (double? Cpu, int CpuCount, double? Cores, int CoresCount,
+                double? WorkingSet, int WorkingSetCount, string? Name)
                 Summarize(IReadOnlyList<PerformanceObservation> samples, (int Id, long StartTime) identity)
             {
                 var values = samples.SelectMany(sample => sample.Processes)
@@ -362,8 +367,12 @@ public static class PerformanceComparisonBuilder
                 var cpu = values.Select(process => process.CpuPercent)
                     .Where(value => value is { } percent && double.IsFinite(percent) && percent is >= 0 and <= 100)
                     .Select(value => value!.Value).ToArray();
+                var cores = values.Select(process => process.CpuCoresUsed)
+                    .Where(value => value is { } coresUsed && double.IsFinite(coresUsed) && coresUsed >= 0)
+                    .Select(value => value!.Value).ToArray();
                 var workingSet = values.Select(process => (double)process.WorkingSetBytes).ToArray();
                 return (cpu.Length == 0 ? null : cpu.Average(), cpu.Length,
+                    cores.Length == 0 ? null : cores.Average(), cores.Length,
                     workingSet.Length == 0 ? null : workingSet.Average(), workingSet.Length,
                     values.LastOrDefault()?.Name);
             }
@@ -372,7 +381,8 @@ public static class PerformanceComparisonBuilder
             var right = Summarize(later, key);
             return new PerformanceProcessComparison(key.Id, right.Name ?? left.Name ?? "processo desconhecido", key.StartTime,
                 left.Cpu, right.Cpu, left.CpuCount, right.CpuCount,
-                left.WorkingSet, right.WorkingSet, left.WorkingSetCount, right.WorkingSetCount);
+                left.WorkingSet, right.WorkingSet, left.WorkingSetCount, right.WorkingSetCount,
+                left.Cores, right.Cores, left.CoresCount, right.CoresCount);
         }).ToArray();
 
         var gpuProcessKeys = reference.Concat(later).SelectMany(sample => sample.GpuProcessMemory ?? [])

@@ -588,13 +588,13 @@ public sealed class PerformanceCounterTests
         const long reusedPidStartTime = firstStartTime + 10_000_000;
         var reference = new[]
         {
-            Sample(20) with { Processes = [new(42, "game", 20, 1_000, firstStartTime)] },
-            Sample(30) with { Processes = [new(42, "game", 40, 3_000, firstStartTime)] }
+            Sample(20) with { Processes = [new(42, "game", 20, 1_000, firstStartTime, 0.25)] },
+            Sample(30) with { Processes = [new(42, "game", 40, 3_000, firstStartTime, 0.75)] }
         };
         var later = new[]
         {
-            Sample(40) with { Processes = [new(42, "game", 50, 5_000, firstStartTime), new(42, "game", 99, 9_000, reusedPidStartTime)] },
-            Sample(50) with { Processes = [new(42, "game", null, 7_000, firstStartTime)] }
+            Sample(40) with { Processes = [new(42, "game", 50, 5_000, firstStartTime, 1.25), new(42, "game", 99, 9_000, reusedPidStartTime, 2)] },
+            Sample(50) with { Processes = [new(42, "game", null, 7_000, firstStartTime, null)] }
         };
 
         var comparison = PerformanceComparisonBuilder.Compare(reference, later);
@@ -604,11 +604,17 @@ public sealed class PerformanceCounterTests
         Assert.Equal(50, continued.LaterCpuPercent);
         Assert.Equal(2, continued.ReferenceCpuSamples);
         Assert.Equal(1, continued.LaterCpuSamples);
+        Assert.Equal(0.5, continued.ReferenceCpuCoresUsed);
+        Assert.Equal(1.25, continued.LaterCpuCoresUsed);
+        Assert.Equal(2, continued.ReferenceCpuCoresSamples);
+        Assert.Equal(1, continued.LaterCpuCoresSamples);
         Assert.Equal(2_000, continued.ReferenceWorkingSetBytes);
         Assert.Equal(6_000, continued.LaterWorkingSetBytes);
         var reused = Assert.Single(comparison.ProcessUsage!, process => process.StartTimeUtcTicks == reusedPidStartTime);
         Assert.Null(reused.ReferenceCpuPercent);
         Assert.Equal(99, reused.LaterCpuPercent);
+        Assert.Null(reused.ReferenceCpuCoresUsed);
+        Assert.Equal(2, reused.LaterCpuCoresUsed);
     }
 
     [Fact]
