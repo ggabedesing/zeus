@@ -932,6 +932,7 @@ public sealed class WpfExperienceTests
                 profile.ScrollToTop();
             }
         }
+        var clockPreferencesBeforePreview = await new DesktopStorage(fixture).ReadPreferencesAsync();
         window.DesktopClockShowDate = false;
         window.DesktopClockShowSeconds = true;
         window.DesktopClockUse24HourFormat = false;
@@ -939,6 +940,28 @@ public sealed class WpfExperienceTests
         window.DesktopClockOpacity = 0.72;
         window.SelectedDesktopClockSize = DesktopClockSize.Large;
         window.DesktopClockEnabled = true;
+        Assert.True(window.IsDesktopClockSettingsPreviewing);
+        Assert.False((await new DesktopStorage(fixture).ReadPreferencesAsync()).Clock!.Enabled,
+            "Changing clock controls must not save before explicit confirmation.");
+        var cancelClockPreviewButton = Assert.IsType<Button>(window.FindName("CancelDesktopClockSettingsPreviewButton"));
+        Assert.Equal("cancel-desktop-clock-preview", AutomationProperties.GetAutomationId(cancelClockPreviewButton));
+        cancelClockPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, cancelClockPreviewButton));
+        Assert.False(window.IsDesktopClockSettingsPreviewing);
+        Assert.False(window.DesktopClockEnabled);
+        Assert.Equal(clockPreferencesBeforePreview.Clock, (await new DesktopStorage(fixture).ReadPreferencesAsync()).Clock);
+
+        window.DesktopClockShowDate = false;
+        window.DesktopClockShowSeconds = true;
+        window.DesktopClockUse24HourFormat = false;
+        window.DesktopClockAlwaysOnTop = true;
+        window.DesktopClockOpacity = 0.72;
+        window.SelectedDesktopClockSize = DesktopClockSize.Large;
+        window.DesktopClockEnabled = true;
+        Assert.True(window.IsDesktopClockSettingsPreviewing);
+        var confirmClockPreviewButton = Assert.IsType<Button>(window.FindName("ConfirmDesktopClockSettingsButton"));
+        Assert.Equal("confirm-desktop-clock-settings", AutomationProperties.GetAutomationId(confirmClockPreviewButton));
+        confirmClockPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, confirmClockPreviewButton));
+        Assert.False(window.IsDesktopClockSettingsPreviewing);
         var clockDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
         DesktopPreferences clockPreferences;
         do
@@ -958,6 +981,18 @@ public sealed class WpfExperienceTests
         Assert.True(desktopClock.IsVisible);
         Assert.True(desktopClock.Topmost);
         Assert.Equal(0.72, desktopClock.Opacity);
+        var clockCustomAccentInput = Assert.IsType<TextBox>(window.FindName("CustomAccentHexTextBox"));
+        var clockPreviewCustomAccentButton = Assert.IsType<Button>(window.FindName("PreviewCustomAccentButton"));
+        var clockCancelCustomAccentPreviewButton = Assert.IsType<Button>(window.FindName("CancelCustomAccentPreviewButton"));
+        clockCustomAccentInput.Text = "#00FFFF";
+        Assert.True(clockPreviewCustomAccentButton.IsEnabled, window.CustomAccentValidationSummary);
+        clockPreviewCustomAccentButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, clockPreviewCustomAccentButton));
+        var clockTimeText = FindVisualDescendants<TextBlock>(desktopClock).First();
+        Assert.Equal(Color.FromRgb(0x00, 0xFF, 0xFF), Assert.IsType<SolidColorBrush>(clockTimeText.Foreground).Color);
+        Assert.Equal(Color.FromRgb(0x00, 0xFF, 0xFF), Assert.IsType<SolidColorBrush>(Application.Current.Resources["AccentBrush"]).Color);
+        clockCancelCustomAccentPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, clockCancelCustomAccentPreviewButton));
+        Assert.Equal(Color.FromRgb(0xFF, 0x63, 0xD8), Assert.IsType<SolidColorBrush>(clockTimeText.Foreground).Color);
+        Assert.Equal(Color.FromRgb(0xFF, 0x63, 0xD8), Assert.IsType<SolidColorBrush>(Application.Current.Resources["AccentBrush"]).Color);
         var simulatedFullscreen = true;
         var transitionClock = new DesktopClockWindow(() => { }, () => simulatedFullscreen) { Left = 360, Top = 260 };
         transitionClock.Configure(false, false, true, true, 1, DesktopClockSize.Compact,
@@ -986,7 +1021,20 @@ public sealed class WpfExperienceTests
         var resetClockPositionButton = Assert.IsType<Button>(window.FindName("ResetDesktopClockPositionButton"));
         Assert.Equal("reset-desktop-clock-position", AutomationProperties.GetAutomationId(resetClockPositionButton));
         Assert.True(resetClockPositionButton.IsEnabled);
+        var committedClockLeft = clockPreferences.Clock!.Left;
+        var committedClockTop = clockPreferences.Clock.Top;
         resetClockPositionButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, resetClockPositionButton));
+        Assert.True(window.IsDesktopClockSettingsPreviewing);
+        cancelClockPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, cancelClockPreviewButton));
+        Assert.Equal(committedClockLeft, desktopClock.Left);
+        Assert.Equal(committedClockTop, desktopClock.Top);
+        Assert.False(window.IsDesktopClockSettingsPreviewing);
+        desktopClock.Left = 100000;
+        desktopClock.Top = 100000;
+        resetClockPositionButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, resetClockPositionButton));
+        Assert.True(window.IsDesktopClockSettingsPreviewing);
+        confirmClockPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, confirmClockPreviewButton));
+        Assert.False(window.IsDesktopClockSettingsPreviewing);
         var clockWorkArea = SystemParameters.WorkArea;
         Assert.InRange(desktopClock.Left, clockWorkArea.Left, clockWorkArea.Right - desktopClock.Width);
         Assert.InRange(desktopClock.Top, clockWorkArea.Top, clockWorkArea.Bottom - desktopClock.Height);
@@ -1013,6 +1061,9 @@ public sealed class WpfExperienceTests
         Assert.Equal(0.72, desktopClock.Opacity);
         window.DesktopClockEnabled = false;
         window.SelectedDesktopClockSize = DesktopClockSize.Medium;
+        Assert.True(window.IsDesktopClockSettingsPreviewing);
+        confirmClockPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, confirmClockPreviewButton));
+        Assert.False(window.IsDesktopClockSettingsPreviewing);
         performanceLabel.Text = "Jogo teste + OBS";
         var measureButton = Assert.IsType<Button>(window.FindName("MeasurePerformanceButton"));
         Assert.Equal("measure-performance", AutomationProperties.GetAutomationId(measureButton));

@@ -1390,7 +1390,50 @@ public partial class MainWindow
         _desktopClock.Top = area.Top + Math.Max(0, (area.Height - _desktopClock.Height) / 2);
         _desktopClockLeft = _desktopClock.Left;
         _desktopClockTop = _desktopClock.Top;
+        ClockChanged();
+    }
+
+    private void ConfirmDesktopClockSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanConfirmDesktopClockSettings) return;
+        _savedClockPreferences = CaptureDesktopClockPreferences();
+        _desktopClockSettingsPreviewing = false;
+        RefreshDesktopClockPreviewState();
         QueuePreferencesSave();
+        StatusTitle = "Configurações do relógio salvas";
+        StatusDetail = "As opções e a posição atuais do relógio foram salvas localmente.";
+    }
+
+    private void CancelDesktopClockSettingsPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanCancelDesktopClockSettingsPreview) return;
+        var saved = _savedClockPreferences;
+        _desktopClockEnabled = saved.Enabled;
+        _desktopClockShowDate = saved.ShowDate;
+        _desktopClockShowSeconds = saved.ShowSeconds;
+        _desktopClockUse24HourFormat = saved.Use24HourFormat;
+        _desktopClockHideDuringFullscreen = saved.HideDuringFullscreen;
+        _desktopClockAlwaysOnTop = saved.AlwaysOnTop;
+        _desktopClockOpacity = Math.Clamp(saved.Opacity, 0.45, 1);
+        _desktopClockSize = ResolveClockSize(saved.Size);
+        _desktopClockLeft = saved.Left;
+        _desktopClockTop = saved.Top;
+        _desktopClockSettingsPreviewing = false;
+        if (_desktopClock is not null)
+        {
+            _desktopClock.Left = saved.Left;
+            _desktopClock.Top = saved.Top;
+        }
+        foreach (var property in new[]
+        {
+            nameof(DesktopClockEnabled), nameof(DesktopClockShowDate), nameof(DesktopClockShowSeconds),
+            nameof(DesktopClockUse24HourFormat), nameof(DesktopClockHideDuringFullscreen), nameof(DesktopClockAlwaysOnTop),
+            nameof(DesktopClockOpacity), nameof(SelectedDesktopClockSize)
+        }) Notify(property);
+        SyncDesktopClock();
+        RefreshDesktopClockPreviewState();
+        StatusTitle = "Prévia do relógio cancelada";
+        StatusDetail = "As preferências salvas do relógio e a posição anterior foram restauradas.";
     }
     private void OpenWindowsPersonalizationSettings(string uri, string settingName)
     {

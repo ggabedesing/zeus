@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- As opções do relógio flutuante agora entram em prévia temporária; confirmar salva aparência e posição, enquanto cancelar restaura o estado anterior, inclusive depois de mover ou recentralizar o relógio.
 - A aba de atualizações agora pode ler, sob solicitação, o histórico local do Windows Update: somente leitura, sem rede, limitada aos 50 eventos recentes e sem inferir saúde atual ou instalação presente.
 - O validador do histórico do Windows Update rejeita registros malformados, preserva resultados desconhecidos e sinaliza quando a resposta ultrapassa o limite.
 - A documentação de recursos agora inclui cor hexadecimal personalizada na interface do ZEUS, com prévia, confirmação/cancelamento, contraste mínimo e precedência do alto contraste do Windows.

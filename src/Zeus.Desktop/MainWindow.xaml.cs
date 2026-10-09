@@ -74,6 +74,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop, _desktopClockHideDuringFullscreen = true, _desktopClockUse24HourFormat = true;
     private DesktopClockSize _desktopClockSize = DesktopClockSize.Medium;
     private double _desktopClockOpacity = 0.88, _desktopClockLeft = 40, _desktopClockTop = 80;
+    private DesktopClockPreferences _savedClockPreferences = new();
+    private bool _desktopClockSettingsPreviewing;
     private DesktopClockWindow? _desktopClock;
     private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
     private bool _networkResetReviewed, _networkResetRecoveryReady;
@@ -491,6 +493,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     [new("Pequeno", DesktopClockSize.Compact), new("Médio", DesktopClockSize.Medium), new("Grande", DesktopClockSize.Large)];
     public bool DesktopClockAlwaysOnTop { get => _desktopClockAlwaysOnTop; set { if (Set(ref _desktopClockAlwaysOnTop, value)) ClockChanged(); } }
     public double DesktopClockOpacity { get => _desktopClockOpacity; set { if (Set(ref _desktopClockOpacity, Math.Clamp(value, 0.45, 1))) ClockChanged(); } }
+    public bool IsDesktopClockSettingsPreviewing => _desktopClockSettingsPreviewing;
+    public bool CanConfirmDesktopClockSettings => CanChooseActions && _desktopClockSettingsPreviewing;
+    public bool CanCancelDesktopClockSettingsPreview => CanConfirmDesktopClockSettings;
+    public string DesktopClockSettingsPreviewSummary => _desktopClockSettingsPreviewing
+        ? "Prévia temporária ativa. Confirme para salvar as opções do relógio ou cancele para restaurar as preferências salvas."
+        : "As opções do relógio só serão salvas depois de confirmar a prévia.";
     public bool FirstRunSetupComplete { get => _firstRunSetupComplete; private set { if (Set(ref _firstRunSetupComplete, value)) Notify(nameof(FirstRunSetupVisibility)); } }
     public Visibility FirstRunSetupVisibility => FirstRunSetupComplete ? Visibility.Collapsed : Visibility.Visible;
     public bool NeedsBluetooth { get => _needsBluetooth; set { if (Set(ref _needsBluetooth, value)) ProfileChanged(); } }
@@ -624,6 +632,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ApplyTheme();
             _loaded = true;
             SyncDesktopClock();
+            _savedClockPreferences = CaptureDesktopClockPreferences();
+            RefreshDesktopClockPreviewState();
             QueueActivity(new(DateTimeOffset.UtcNow, "application", "started", "info", "ZEUS iniciado."));
         }
         finally { SetBusy(false); }
@@ -947,12 +957,30 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
-        new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop, SelectedDesktopClockSize, DesktopClockHideDuringFullscreen) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson, _customAccentHex);
+        _desktopClockSettingsPreviewing ? _savedClockPreferences : CaptureDesktopClockPreferences(), SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson, _customAccentHex);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
     internal static Point ResolveInitialClockPosition(double left, double top, double width, double height, Rect virtualScreen) =>
         DesktopClockWindow.ClampPosition(left, top, width, height, virtualScreen);
-    private void ClockChanged() { if (_loaded) { SyncDesktopClock(); QueuePreferencesSave(); } }
+    private DesktopClockPreferences CaptureDesktopClockPreferences() => new(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds,
+        DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop,
+        SelectedDesktopClockSize, DesktopClockHideDuringFullscreen) { Use24HourFormat = DesktopClockUse24HourFormat };
+
+    private void ClockChanged()
+    {
+        if (!_loaded) return;
+        SyncDesktopClock();
+        RefreshDesktopClockPreviewState();
+    }
+
+    private void RefreshDesktopClockPreviewState()
+    {
+        _desktopClockSettingsPreviewing = CaptureDesktopClockPreferences() != _savedClockPreferences;
+        Notify(nameof(IsDesktopClockSettingsPreviewing));
+        Notify(nameof(CanConfirmDesktopClockSettings));
+        Notify(nameof(CanCancelDesktopClockSettingsPreview));
+        Notify(nameof(DesktopClockSettingsPreviewSummary));
+    }
     private void SyncDesktopClock(bool? highContrastOverride = null)
     {
         if (!DesktopClockEnabled) { _desktopClock?.Close(); _desktopClock = null; return; }
@@ -961,9 +989,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _desktopClock = new DesktopClockWindow(() =>
             {
                 if (_desktopClock is null) return;
-                _desktopClockLeft = _desktopClock.Left; _desktopClockTop = _desktopClock.Top; QueuePreferencesSave();
+                _desktopClockLeft = _desktopClock.Left; _desktopClockTop = _desktopClock.Top; RefreshDesktopClockPreviewState();
             });
-            _desktopClock.Closed += (_, _) => { if (DesktopClockEnabled && !_isClosing) { _desktopClockEnabled = false; Notify(nameof(DesktopClockEnabled)); QueuePreferencesSave(); } _desktopClock = null; };
+            _desktopClock.Closed += (_, _) =>
+            {
+                if (DesktopClockEnabled && !_isClosing)
+                {
+                    _desktopClockEnabled = false;
+                    Notify(nameof(DesktopClockEnabled));
+                    RefreshDesktopClockPreviewState();
+                }
+                _desktopClock = null;
+            };
             var virtualScreen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
                 SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
             var position = ResolveInitialClockPosition(_desktopClockLeft, _desktopClockTop, 220, 90, virtualScreen);
@@ -1255,7 +1292,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SetBusy(bool busy)
     {
         _isBusy = busy;
-        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanConfirmVisualLayout), nameof(CanPreviewCustomAccent), nameof(CanConfirmCustomAccent), nameof(CanCancelCustomAccentPreview), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanVerifyPendingDriverUpdates), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
+        foreach (var p in new[] { nameof(CanRefresh), nameof(CanChooseActions), nameof(CanConfirmVisualLayout), nameof(CanPreviewCustomAccent), nameof(CanConfirmCustomAccent), nameof(CanCancelCustomAccentPreview), nameof(CanConfirmDesktopClockSettings), nameof(CanCancelDesktopClockSettingsPreview), nameof(CanAnalyzeServiceDependencies), nameof(CanOpenNetworkResetSettings), nameof(CanSaveNetworkResetReference), nameof(CanExport), nameof(CanCancel), nameof(CanQuarantine), nameof(CanDisableStartup), nameof(CanSetPowerPlan), nameof(CanInstallDriver), nameof(CanVerifyPendingDriverUpdates), nameof(CanOfflineScan), nameof(CanSetPerformanceBaseline), nameof(CanComparePerformance) }) Notify(p);
         NotifyActionState();
     }
     private void NotifyActionState() { Notify(nameof(CanExecute)); Notify(nameof(SelectedActionsText)); Notify(nameof(CanQuarantine)); Notify(nameof(CleanupSelectedText)); Notify(nameof(CanDisableStartup)); Notify(nameof(CanInstallDriver)); Notify(nameof(CanRollbackDriver)); Notify(nameof(CanApplyWallpaper)); Notify(nameof(CanApplyDesktopOrganization)); Notify(nameof(CanGeneralOptimize)); Notify(nameof(GeneralPlanSummary)); Notify(nameof(CanOpenNetworkResetSettings)); }

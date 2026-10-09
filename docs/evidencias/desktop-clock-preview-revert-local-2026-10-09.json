@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-09",
+  "feature": "desktop-clock-preview-and-revert",
+  "repository": "ggabedesing/zeus",
+  "branch": "feat/zeus-windows-mvp",
+  "sourceCommit": "ef08855d908e2efdb11f54ec1c40c441050bf770",
+  "sourceTreeDirtyAtBuild": true,
+  "runtime": "win-x64",
+  "behavior": {
+    "clockSettingsArePersistedBeforeConfirmation": false,
+    "cancelRestoresClockVisibilityAndAppearance": true,
+    "cancelRestoresClockPosition": true,
+    "confirmPersistsSettingsAndPosition": true,
+    "appliesToWindowsSystemSettings": false
+  },
+  "validation": {
+    "focusedWpfAcceptance": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "fullReleaseSuite": {
+      "passed": 512,
+      "failed": 0,
+      "skipped": 10,
+      "total": 522
+    },
+    "releaseBuild": "passed with 0 warnings and 0 errors",
+    "portableExeSmoke": "passed: main window opened, responded, and closed cleanly",
+    "diffCheck": "passed"
+  },
+  "package": {
+    "zip": "artifacts/desktop-clock-preview-package/zeus-win-x64.zip",
+    "zipSha256": "05695C161A5B1D336492E84C54278B22C6B77603106E42F043B13350A94B4FC5",
+    "executable": "artifacts/desktop-clock-preview-package/zeus-win-x64-ef08855d908e-20261009T120051333Z-780782c7/Zeus.Desktop.exe",
+    "executableSha256": "3798B7A445B66A2555FB221AC68483BEE75306D64ED1412AC99278ACB256AB0B",
+    "developmentBuild": true,
+    "authenticodeProductionSignature": false
+  },
+  "limitations": [
+    "Clock window placement and opacity were verified on this Windows desktop; multiple physical monitors and mixed-DPI monitors were not simulated in this change.",
+    "The portable development executable is unsigned for production distribution."
+  ]
+}
