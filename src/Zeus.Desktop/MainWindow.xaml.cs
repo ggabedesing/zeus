@@ -75,6 +75,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private DatabaseHealth? _storageHealth;
     private PowerPlanInfo? _selectedPowerPlan;
     private string? _selectedWallpaperPath;
+    private WallpaperMonitorChoice? _selectedWallpaperMonitor;
+    private bool _wallpaperSlideshowDetected;
     private ImageSource? _wallpaperPreview;
     private DesktopOrganizationPreview? _desktopOrganizationPreview;
     private string _desktopOrganizationSummary = "Gere uma prévia para ver quais arquivos comuns seriam movidos. Pastas, atalhos e itens não reconhecidos ficam onde estão.";
@@ -202,6 +204,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<ChangeRow> UserChanges { get; } = [];
     public ObservableCollection<DesktopOrganizationSession> DesktopOrganizationSessions { get; } = [];
     public ObservableCollection<PowerPlanInfo> PowerPlans { get; } = [];
+    public ObservableCollection<WallpaperMonitorChoice> WallpaperMonitorChoices { get; } = [];
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
     public ObservableCollection<DriverInventoryRow> InstalledDriverRows { get; } = [];
     public ObservableCollection<DriverRollbackChoice> RollbackDriverChoices { get; } = [];
@@ -246,7 +249,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanQuarantine => !_isBusy && _cleanupScan is not null && CleanupFiles.Any(f => f.IsSelected);
     public bool CanDisableStartup => !_isBusy && StartupChoices.Any(f => f.IsSelected && f.CanSelect);
     public bool CanSetPowerPlan => !_isBusy && SelectedPowerPlan is { IsActive: false };
-    public bool CanApplyWallpaper => !_isBusy && !string.IsNullOrWhiteSpace(SelectedWallpaperPath);
+    public bool CanApplyWallpaper => !_isBusy && !_wallpaperSlideshowDetected && !string.IsNullOrWhiteSpace(SelectedWallpaperPath) && SelectedWallpaperMonitor is not null;
     public DesktopOrganizationPreview? DesktopOrganizationPreview { get => _desktopOrganizationPreview; private set { if (Set(ref _desktopOrganizationPreview, value)) Notify(nameof(CanApplyDesktopOrganization)); } }
     public string DesktopOrganizationSummary { get => _desktopOrganizationSummary; private set => Set(ref _desktopOrganizationSummary, value); }
     public bool CanApplyDesktopOrganization => !_isBusy && DesktopOrganizationPreview is { Items.Count: > 0 };
@@ -361,6 +364,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool OfflineRestartConfirmed { get => _offlineRestartConfirmed; set { if (Set(ref _offlineRestartConfirmed, value)) Notify(nameof(CanOfflineScan)); } }
     public bool OfflineRecoveryConfirmed { get => _offlineRecoveryConfirmed; set { if (Set(ref _offlineRecoveryConfirmed, value)) Notify(nameof(CanOfflineScan)); } }
     public PowerPlanInfo? SelectedPowerPlan { get => _selectedPowerPlan; set { if (Set(ref _selectedPowerPlan, value)) Notify(nameof(CanSetPowerPlan)); } }
+    public WallpaperMonitorChoice? SelectedWallpaperMonitor { get => _selectedWallpaperMonitor; set { if (Set(ref _selectedWallpaperMonitor, value)) Notify(nameof(CanApplyWallpaper)); } }
     public string? SelectedWallpaperPath { get => _selectedWallpaperPath; private set { if (Set(ref _selectedWallpaperPath, value)) Notify(nameof(CanApplyWallpaper)); } }
     public ImageSource? WallpaperPreview { get => _wallpaperPreview; private set => Set(ref _wallpaperPreview, value); }
 
@@ -424,6 +428,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _storageHealth = new(false, 0, "unavailable", "unavailable", 0, 0, 0, error.GetType().Name);
             }
             await LoadLocalSessionsAsync();
+            await RefreshWallpaperMonitorChoicesAsync();
             try { await RefreshDesktopOrganizationSessionsAsync(); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
             { _startupWarnings.Add("O histórico de organização da Área de Trabalho não pôde ser lido; nenhum arquivo foi alterado."); }

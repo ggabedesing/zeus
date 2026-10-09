@@ -755,14 +755,47 @@ public partial class MainWindow
         }
     }
 
+    private async Task RefreshWallpaperMonitorChoicesAsync()
+    {
+        WallpaperMonitorChoices.Clear();
+        try
+        {
+            var discovery = await _userOptimization.ReadWallpaperMonitorDiscoveryAsync(_lifetime.Token);
+            _wallpaperSlideshowDetected = discovery.IsSlideshowConfigured;
+            Notify(nameof(CanApplyWallpaper));
+            if (discovery.IsSlideshowConfigured)
+            {
+                WallpaperMonitorChoices.Add(new(null, "Apresentação de slides detectada", "O ZEUS preserva apresentações de slides."));
+                SelectedWallpaperMonitor = WallpaperMonitorChoices[0];
+                return;
+            }
+            WallpaperMonitorChoices.Add(new(null, "Todos os monitores conectados", "Aplica a imagem escolhida em cada monitor detectado."));
+            foreach (var monitor in discovery.Monitors)
+            {
+                var bounds = monitor.Bounds;
+                var description = bounds is null ? "Posição e resolução indisponíveis" : $"x={bounds.Left}, y={bounds.Top} · {bounds.Width} × {bounds.Height}";
+                WallpaperMonitorChoices.Add(new(monitor.MonitorId, $"Monitor · {description}", $"Identificador técnico: {monitor.MonitorId}"));
+            }
+            SelectedWallpaperMonitor = WallpaperMonitorChoices[0];
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException or Win32Exception or UnauthorizedAccessException)
+        {
+            _wallpaperSlideshowDetected = false;
+            WallpaperMonitorChoices.Add(new(null, "Todos os monitores (seleção individual indisponível)", "A leitura dos monitores falhou; a seleção será revalidada ao aplicar."));
+            SelectedWallpaperMonitor = WallpaperMonitorChoices[0];
+            StatusDetail = "Não foi possível identificar cada monitor. A opção geral continua disponível.";
+        }
+    }
+
     private async void ApplyWallpaper_Click(object sender, RoutedEventArgs e)
     {
-        if (!CanApplyWallpaper || SelectedWallpaperPath is not { } imagePath) return;
+        if (!CanApplyWallpaper || SelectedWallpaperPath is not { } imagePath || SelectedWallpaperMonitor is not { } target) return;
         var fileName = Path.GetFileName(imagePath);
-        if (!Confirm($"Aplicar “{fileName}” a todos os monitores conectados?\n\nO ZEUS guardará a imagem anterior de cada monitor no histórico e verificará o resultado. Apresentações de slides ficam intactas. Se algum monitor ou papel de parede mudar depois fora do ZEUS, a restauração será bloqueada para preservar a escolha mais recente.", "Revisar papel de parede")) return;
+        if (target.Name.Contains("slides", StringComparison.OrdinalIgnoreCase)) return;
+        if (!Confirm($"Aplicar “{fileName}” em {target.Name}?\n\nO ZEUS guardará a imagem anterior de cada monitor no histórico e verificará o resultado. Apresentações de slides ficam intactas. Se algum monitor ou papel de parede mudar depois fora do ZEUS, a restauração será bloqueada para preservar a escolha mais recente.", "Revisar papel de parede")) return;
         await RunOperationAsync("Aplicando papel de parede", "Guardando e verificando o estado por monitor antes de alterar o Windows.", async token =>
         {
-            var result = await _userOptimization.ApplyWallpaperAsync(imagePath, token);
+            var result = await _userOptimization.ApplyWallpaperAsync(imagePath, target.MonitorId, token);
             await RefreshUserChangesAsync();
             ProfileSummary = result.Message;
             StatusTitle = result.Succeeded ? "Papel de parede aplicado" : "Papel de parede não alterado";

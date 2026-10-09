@@ -36,7 +36,8 @@ public sealed class WindowsWallpaperPlatform : IWallpaperPlatform
             if (wallpaperResult < 0) Marshal.ThrowExceptionForHR(wallpaperResult);
             if (wallpaperResult != 0 || string.IsNullOrWhiteSpace(path))
                 throw new InvalidDataException("Um monitor não tem uma imagem estática que possa ser salva para reversão; nenhuma alteração deve ser feita.");
-            result.Add(new WallpaperMonitorState(monitorId, path));
+            result.Add(new WallpaperMonitorState(monitorId, path,
+                new WallpaperMonitorBounds(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom)));
         }
         if (result.Count == 0) throw new InvalidDataException("O Windows não informou monitores conectados para o papel de parede.");
         return result;

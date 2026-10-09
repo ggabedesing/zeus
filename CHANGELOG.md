@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- A aplicação de papel de parede permite escolher um monitor ou todos; a restauração valida cada alvo separadamente e bloqueia sem alterar outras telas quando detecta mudança externa.
 - A personalização agora inclui prévia de cores e quatro perfis visuais rápidos — Windows Moderno, Minimalista, Produtividade e Aurora — num manifesto de dados versionado e estrito; eles mudam apenas o tema e a cor de destaque do ZEUS, mantendo papel de parede, relógio e configurações do Windows separados.
 - O diagnóstico de rede agora mostra tentativas sem resposta ICMP e timeouts separadamente; a taxa não é apresentada como perda de pacotes da conexão inteira.
 - As heurísticas do Observador agora reconhecem processos de Genshin Impact, Warframe, Minecraft Bedrock e OBS 32-bit; continuam descrevendo presença de processo e não inferem partida ou transmissão ao vivo.

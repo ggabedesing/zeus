@@ -232,13 +232,68 @@ public sealed class WallpaperChangeTests
 
             Assert.True(applied.Succeeded, applied.Message);
             Assert.All(platform.MonitorPaths.Values, path => Assert.Equal(Path.GetFullPath(selected), path));
-            Assert.Contains("todos os monitores conectados", applied.Message, StringComparison.Ordinal);
+            Assert.Contains("2 de 2 monitor(es)", applied.Message, StringComparison.Ordinal);
 
             var restored = await service.RestoreAsync(applied.SessionId);
 
             Assert.True(restored.Succeeded, restored.Message);
             Assert.Equal(Bmp(1, 2, 3), await File.ReadAllBytesAsync(platform.MonitorPaths["DISPLAY-1"]));
             Assert.Equal(Bmp(2, 3, 4), await File.ReadAllBytesAsync(platform.MonitorPaths["DISPLAY-2"]));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [WindowsFact]
+    public async Task WallpaperChangeCanTargetOneMonitorAndRestoreOnlyThatMonitor()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "first.bmp");
+        var second = Path.Combine(root, "second.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(first, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(second, Bmp(2, 3, 4));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        var platform = new FixtureWallpaperPlatform(new Dictionary<string, string> { ["DISPLAY-1"] = first, ["DISPLAY-2"] = second });
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var applied = await service.ApplyWallpaperAsync(selected, "DISPLAY-1");
+            Assert.True(applied.Succeeded, applied.Message);
+            Assert.Equal(Path.GetFullPath(selected), platform.MonitorPaths["DISPLAY-1"]);
+            Assert.Equal(Path.GetFullPath(second), platform.MonitorPaths["DISPLAY-2"]);
+            var restored = await service.RestoreAsync(applied.SessionId);
+            Assert.True(restored.Succeeded, restored.Message);
+            Assert.Equal(Bmp(1, 2, 3), await File.ReadAllBytesAsync(platform.MonitorPaths["DISPLAY-1"]));
+            Assert.Equal(Bmp(2, 3, 4), await File.ReadAllBytesAsync(platform.MonitorPaths["DISPLAY-2"]));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [WindowsFact]
+    public async Task WallpaperRestoreBlocksExternalChangeOnUntargetedMonitor()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "first.bmp");
+        var second = Path.Combine(root, "second.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        var external = Path.Combine(root, "external.bmp");
+        await File.WriteAllBytesAsync(first, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(second, Bmp(2, 3, 4));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        await File.WriteAllBytesAsync(external, Bmp(6, 5, 4));
+        var platform = new FixtureWallpaperPlatform(new Dictionary<string, string> { ["DISPLAY-1"] = first, ["DISPLAY-2"] = second });
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var applied = await service.ApplyWallpaperAsync(selected, "DISPLAY-1");
+            Assert.True(applied.Succeeded, applied.Message);
+            platform.MonitorPaths["DISPLAY-2"] = Path.GetFullPath(external);
+            var restored = await service.RestoreAsync(applied.SessionId);
+            Assert.False(restored.Succeeded);
+            Assert.Equal(Path.GetFullPath(selected), platform.MonitorPaths["DISPLAY-1"]);
+            Assert.Equal(Path.GetFullPath(external), platform.MonitorPaths["DISPLAY-2"]);
         }
         finally { Directory.Delete(root, recursive: true); }
     }

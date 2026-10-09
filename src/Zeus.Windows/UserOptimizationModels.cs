@@ -24,9 +24,19 @@ public sealed record UserChangeSession(Guid Id, DateTimeOffset CreatedAt, string
 }
 public sealed record UserChangeResult(Guid SessionId, bool Succeeded, string Message);
 public sealed record PowerPlanInfo(Guid Id, string Name, bool IsActive);
+public sealed record WallpaperMonitorBounds(int Left, int Top, int Right, int Bottom)
+{
+    public int Width => Right - Left;
+    public int Height => Bottom - Top;
+}
+public sealed record WallpaperMonitorDiscovery(bool IsSlideshowConfigured, IReadOnlyList<WallpaperMonitorState> Monitors);
+public sealed record WallpaperMonitorChoice(string? MonitorId, string Name, string TechnicalDetails)
+{
+    public override string ToString() => Name;
+}
 
 /// <summary>Current-user desktop wallpaper access; kept injectable so rollback can be tested without changing the desktop.</summary>
-public sealed record WallpaperMonitorState(string MonitorId, string Path);
+public sealed record WallpaperMonitorState(string MonitorId, string Path, WallpaperMonitorBounds? Bounds = null);
 
 public interface IWallpaperPlatform
 {
