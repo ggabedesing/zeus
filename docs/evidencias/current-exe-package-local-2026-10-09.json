@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "collectedAtUtc": "2026-10-09T13:43:38.7675705+00:00",
+  "sourceCommit": "4301e6db2d6228493e27a38b8fbb2f8bf9d5d382",
+  "sourceDirty": false,
+  "change": "Rebuilt the portable win-x64 development package from the current branch tip and verified the real WPF acceptance plus application launch.",
+  "verification": {
+    "focusedWpfAcceptance": {
+      "test": "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "portablePackage": {
+      "runtime": "win-x64",
+      "developmentBuild": true,
+      "opened": true,
+      "responsive": true,
+      "closedCleanly": true,
+      "zipSha256": "CBA14365CD5DA40003377293F5649B80C07C93FE878129B6CC08826ABCB50534",
+      "exeSha256": "8AB5ECCD4C0F0C8EEB4B1C21D5253F9B21AE0EC50BA52BDF87C1B2D6EDE7433F"
+    }
+  },
+  "systemChanges": {
+    "windowsPreferencesChanged": false,
+    "externalToolsInstalled": false,
+    "externalToolsConfigured": false,
+    "productionAuthenticodeSigned": false
+  }
+}
