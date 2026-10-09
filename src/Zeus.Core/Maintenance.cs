@@ -53,7 +53,8 @@ public sealed record MaintenanceReport(
     bool RestorePointConfirmed,
     IReadOnlyList<MaintenanceStepResult> Steps,
     string? Error = null,
-    bool IsComplete = true);
+    bool IsComplete = true,
+    int? RestorePointSequenceNumber = null);
 
 public interface IMaintenanceExecutor
 {

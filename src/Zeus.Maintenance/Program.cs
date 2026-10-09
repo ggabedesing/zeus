@@ -16,6 +16,7 @@ internal static class Program
         var started = DateTimeOffset.UtcNow;
         var results = new List<MaintenanceStepResult>();
         var restoreConfirmed = false;
+        int? restorePointSequenceNumber = null;
         string? error = null;
         var sessionCreated = false;
         try
@@ -26,8 +27,9 @@ internal static class Program
             if (MaintenancePolicy.RequiresRestorePoint(requests.Select(request => request.Action).Distinct()))
             {
                 var restore = await CommandRunner.CreateRestorePointAsync(sessionId);
-                restoreConfirmed = RestorePointConfirmationParser.ParseSequenceNumber(
-                    restore.ExitCode, restore.Output, restore.LogError) is not null;
+                restorePointSequenceNumber = RestorePointConfirmationParser.ParseSequenceNumber(
+                    restore.ExitCode, restore.Output, restore.LogError);
+                restoreConfirmed = restorePointSequenceNumber is not null;
                 if (!restoreConfirmed)
                     error = restore.LogError is not null
                         ? $"Falha ao registrar a preparação de recuperação: {restore.LogError}. Reparos foram bloqueados."
@@ -54,10 +56,12 @@ internal static class Program
                         "Ação em andamento; ainda não existe confirmação de conclusão.", TargetId: request.TargetId,
                         Verification: MaintenanceVerificationStatus.Pending)]).ToArray();
                     await SessionStore.WriteProgressReportAsync(sessionId, new MaintenanceReport(sessionId, started,
-                        DateTimeOffset.UtcNow, restoreConfirmed, pending, IsComplete: false));
+                        DateTimeOffset.UtcNow, restoreConfirmed, pending, IsComplete: false,
+                        RestorePointSequenceNumber: restorePointSequenceNumber));
                     results.Add(await CommandRunner.ExecuteAsync(sessionId, request));
                     await SessionStore.WriteProgressReportAsync(sessionId, new MaintenanceReport(sessionId, started,
-                        DateTimeOffset.UtcNow, restoreConfirmed, results.ToArray(), error, IsComplete: false));
+                        DateTimeOffset.UtcNow, restoreConfirmed, results.ToArray(), error, IsComplete: false,
+                        RestorePointSequenceNumber: restorePointSequenceNumber));
                 }
                 catch (Exception exception)
                 {
@@ -83,7 +87,7 @@ internal static class Program
         try
         {
             var report = new MaintenanceReport(sessionId, started, DateTimeOffset.UtcNow,
-                restoreConfirmed, results, error);
+                restoreConfirmed, results, error, RestorePointSequenceNumber: restorePointSequenceNumber);
             await SessionStore.WriteReportAsync(sessionId, report);
         }
         catch { return 5; }

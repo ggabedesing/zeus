@@ -126,10 +126,11 @@ public sealed class DesktopStorageTests : IDisposable
     public async Task MaintenanceVerificationStatePersistsAndAppearsInHistory()
     {
         var storage = new DesktopStorage(_root);
-        var report = new MaintenanceReport(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, false,
+        var report = new MaintenanceReport(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, true,
             [new(MaintenanceActionId.InstallDriverUpdate, StepOutcome.Succeeded, "Provedor confirmou instalação.",
                 TargetId: "12345678-1234-1234-1234-123456789abc:1", Verification: MaintenanceVerificationStatus.ProviderConfirmed,
-                UpdateServerSelection: 3, UpdateServiceId: WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId)]);
+                UpdateServerSelection: 3, UpdateServiceId: WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId)],
+            RestorePointSequenceNumber: 1234);
 
         await storage.SaveHistoryAsync([report]);
         var restored = Assert.Single(await storage.ReadHistoryAsync());
@@ -139,6 +140,8 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(3, Assert.Single(restored.Steps).UpdateServerSelection);
         Assert.Equal(WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId, Assert.Single(restored.Steps).UpdateServiceId);
         Assert.Contains("resultado confirmado pelo provedor", Assert.Single(row.Steps));
+        Assert.Equal(1234, restored.RestorePointSequenceNumber);
+        Assert.Contains("#1234", row.Protection, StringComparison.Ordinal);
 
         var invalid = report with
         {
@@ -146,6 +149,8 @@ public sealed class DesktopStorageTests : IDisposable
             Steps = [report.Steps[0] with { UpdateServiceId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }]
         };
         Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([invalid]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with { SessionId = Guid.NewGuid(), RestorePointSequenceNumber = 0 }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with { SessionId = Guid.NewGuid(), RestorePointConfirmed = false }]));
     }
 
     [Fact]

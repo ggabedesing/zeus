@@ -196,8 +196,13 @@ public sealed record HistoryRow(Guid SessionId, string Title, string Summary, st
         var summary = $"{succeeded} concluída(s) · {failed} falha(s) · {skipped} não executada(s) · {cancelled} cancelada(s)";
         if (report.Steps.Count == 0) summary = "Nenhum resultado de ação recebido";
         if (!report.IsComplete) summary = "Conclusão não confirmada · " + summary;
+        var protection = report.RestorePointSequenceNumber is { } sequence
+            ? $"Ponto de restauração #{sequence} confirmado pelo auxiliar."
+            : report.RestorePointConfirmed
+                ? "Ponto de restauração confirmado; esta sessão antiga não registrou o número do ponto."
+                : "Esta sessão não confirmou um ponto de restauração.";
         return new(report.SessionId, report.StartedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss"), summary,
-            report.RestorePointConfirmed ? "Proteção de recuperação confirmada pelo auxiliar." : "Esta sessão não confirmou um ponto de restauração.",
+            protection,
             report.Steps.Select(step => $"{MaintenanceCatalog.Get(step.Action).Title}{(step.TargetId is null ? "" : $" [{step.TargetId}]")} — {OutcomeTitle(step.Outcome)} · {VerificationTitle(step.Verification)}: {step.Message}").ToArray(),
             report.Error ?? string.Empty, report.Steps.Any(step => !string.IsNullOrWhiteSpace(step.LogFile)));
     }

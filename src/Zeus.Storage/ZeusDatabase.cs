@@ -31,7 +31,8 @@ public sealed record StoredMaintenanceSession(
     bool RestorePointConfirmed,
     bool IsComplete,
     string? Error,
-    IReadOnlyList<StoredMaintenanceStep> Steps);
+    IReadOnlyList<StoredMaintenanceStep> Steps,
+    int? RestorePointSequenceNumber = null);
 
 public sealed record StoredPerformanceSample(int Sequence, DateTimeOffset CollectedAt, int SamplingMilliseconds,
     double? CpuPercent, ulong TotalMemoryBytes, ulong AvailableMemoryBytes, string DetailsJson);
@@ -54,7 +55,7 @@ public sealed record DatabaseHealth(
 /// <summary>Local, versioned SQLite storage for user configuration, activity and maintenance history.</summary>
 public sealed class ZeusDatabase
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
     private const int ActivityRetentionLimit = 10_000;
     private const int PerformanceSessionRetentionLimit = 200;
     private const int PerformanceSampleRetentionLimit = 4_000;
@@ -268,6 +269,11 @@ public sealed class ZeusDatabase
                 await UpgradeSchemaV4Async(connection, cancellationToken);
                 version = 4;
             }
+            if (version == 4)
+            {
+                await UpgradeSchemaV5Async(connection, cancellationToken);
+                version = 5;
+            }
             if (version != CurrentSchemaVersion) throw new InvalidDataException("A versão do esquema do banco não é reconhecida. O arquivo foi preservado.");
             await ValidateSchemaAsync(connection, cancellationToken);
             _initialized = true;
@@ -406,11 +412,11 @@ public sealed class ZeusDatabase
         var sessions = new List<StoredMaintenanceSession>();
         await using (var command = connection.CreateCommand())
         {
-            command.CommandText = "SELECT session_id,started_utc,finished_utc,restore_point_confirmed,is_complete,error FROM maintenance_sessions ORDER BY started_utc DESC;";
+            command.CommandText = "SELECT session_id,started_utc,finished_utc,restore_point_confirmed,is_complete,error,restore_point_sequence FROM maintenance_sessions ORDER BY started_utc DESC;";
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
                 sessions.Add(new(reader.GetString(0), ParseUtc(reader.GetString(1)), ParseUtc(reader.GetString(2)), reader.GetInt64(3) != 0,
-                    reader.GetInt64(4) != 0, reader.IsDBNull(5) ? null : reader.GetString(5), []));
+                    reader.GetInt64(4) != 0, reader.IsDBNull(5) ? null : reader.GetString(5), [], reader.IsDBNull(6) ? null : reader.GetInt32(6)));
         }
         for (var index = 0; index < sessions.Count; index++)
         {
@@ -716,6 +722,22 @@ public sealed class ZeusDatabase
         await transaction.CommitAsync(cancellationToken);
     }
 
+    private static async Task UpgradeSchemaV5Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        using var transaction = connection.BeginTransaction();
+        if (!await HasColumnAsync(connection, transaction, "maintenance_sessions", "restore_point_sequence", cancellationToken))
+            await ExecuteAsync(connection, transaction,
+                "ALTER TABLE maintenance_sessions ADD COLUMN restore_point_sequence INTEGER NULL CHECK(restore_point_sequence IS NULL OR (restore_point_sequence > 0 AND restore_point_confirmed = 1));", cancellationToken);
+        await using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "INSERT OR IGNORE INTO schema_migrations(version,applied_utc) VALUES(5,$applied); PRAGMA user_version=5;";
+            command.Parameters.AddWithValue("$applied", Utc(DateTimeOffset.UtcNow));
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static async Task<bool> HasColumnAsync(SqliteConnection connection, SqliteTransaction transaction,
         string table, string column, CancellationToken cancellationToken)
     {
@@ -732,9 +754,15 @@ public sealed class ZeusDatabase
         ValidateSchemaTablesAsync(connection, cancellationToken,
             "schema_migrations", "app_settings", "app_metadata", "activity_entries", "maintenance_sessions", "maintenance_steps");
 
-    private static Task ValidateSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken) =>
-        ValidateSchemaTablesAsync(connection, cancellationToken,
+    private static async Task ValidateSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await ValidateSchemaTablesAsync(connection, cancellationToken,
             "schema_migrations", "app_settings", "app_metadata", "activity_entries", "maintenance_sessions", "maintenance_steps", "performance_sessions", "performance_samples");
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('maintenance_sessions') WHERE name='restore_point_sequence';";
+        if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) != 1)
+            throw new InvalidDataException("A coluna do número do ponto de restauração está ausente. O arquivo foi preservado.");
+    }
 
     private static async Task ValidateSchemaTablesAsync(SqliteConnection connection, CancellationToken cancellationToken, params string[] tables)
     {
@@ -768,13 +796,14 @@ public sealed class ZeusDatabase
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = $"INSERT {(ignoreConflict ? "OR IGNORE " : string.Empty)}INTO maintenance_sessions(session_id,started_utc,finished_utc,restore_point_confirmed,is_complete,error) VALUES($id,$started,$finished,$restore,$complete,$error);";
+        command.CommandText = $"INSERT {(ignoreConflict ? "OR IGNORE " : string.Empty)}INTO maintenance_sessions(session_id,started_utc,finished_utc,restore_point_confirmed,is_complete,error,restore_point_sequence) VALUES($id,$started,$finished,$restore,$complete,$error,$restoreSequence);";
         command.Parameters.AddWithValue("$id", session.SessionId);
         command.Parameters.AddWithValue("$started", Utc(session.StartedAt));
         command.Parameters.AddWithValue("$finished", Utc(session.FinishedAt));
         command.Parameters.AddWithValue("$restore", session.RestorePointConfirmed ? 1 : 0);
         command.Parameters.AddWithValue("$complete", session.IsComplete ? 1 : 0);
         command.Parameters.AddWithValue("$error", (object?)session.Error ?? DBNull.Value);
+        command.Parameters.AddWithValue("$restoreSequence", (object?)session.RestorePointSequenceNumber ?? DBNull.Value);
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 

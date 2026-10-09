@@ -248,9 +248,12 @@ public sealed class MaintenanceRequestProtocolTests
     {
         var historical = new MaintenanceReport(Guid.Parse(SessionId), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, false, []);
         Assert.True(historical.IsComplete);
+        Assert.Null(historical.RestorePointSequenceNumber);
         Assert.False((historical with { IsComplete = false }).IsComplete);
         var oldJson = "{\"SessionId\":\"" + SessionId + "\",\"StartedAt\":\"2026-01-01T00:00:00Z\",\"FinishedAt\":\"2026-01-01T00:00:00Z\",\"RestorePointConfirmed\":false,\"Steps\":[]}";
-        Assert.True(System.Text.Json.JsonSerializer.Deserialize<MaintenanceReport>(oldJson)!.IsComplete);
+        var deserialized = System.Text.Json.JsonSerializer.Deserialize<MaintenanceReport>(oldJson)!;
+        Assert.True(deserialized.IsComplete);
+        Assert.Null(deserialized.RestorePointSequenceNumber);
     }
 
     [Fact]

@@ -53,7 +53,8 @@ internal sealed class DesktopStorage
         var sessionIds = new HashSet<Guid>();
         foreach (var report in reports)
         {
-            if (report is null || report.SessionId == Guid.Empty || !sessionIds.Add(report.SessionId) || report.Steps is null)
+            if (report is null || report.SessionId == Guid.Empty || !sessionIds.Add(report.SessionId) || report.Steps is null ||
+                report.RestorePointSequenceNumber is <= 0 || (report.RestorePointSequenceNumber is not null && !report.RestorePointConfirmed))
                 throw new InvalidDataException("O histórico contém uma sessão inválida ou repetida.");
             var actions = new HashSet<(MaintenanceActionId Action, string? Target)>();
             foreach (var step in report.Steps)
@@ -243,7 +244,8 @@ internal sealed class DesktopStorage
     private static StoredMaintenanceSession ToStored(MaintenanceReport report) => new(
         report.SessionId.ToString("D"), report.StartedAt, report.FinishedAt, report.RestorePointConfirmed, report.IsComplete, report.Error,
         report.Steps.Select((step, index) => new StoredMaintenanceStep(index, step.Action.ToString(), step.Outcome.ToString(), step.Message,
-            step.LogFile, step.TargetId, step.Verification.ToString(), step.UpdateServerSelection, step.UpdateServiceId)).ToArray());
+            step.LogFile, step.TargetId, step.Verification.ToString(), step.UpdateServerSelection, step.UpdateServiceId)).ToArray(),
+        report.RestorePointSequenceNumber);
 
     private static MaintenanceReport FromStored(StoredMaintenanceSession session)
     {
@@ -252,7 +254,8 @@ internal sealed class DesktopStorage
         var steps = session.Steps.OrderBy(step => step.Sequence).Select(step => new MaintenanceStepResult(
             ParseEnum<MaintenanceActionId>(step.Action), ParseEnum<StepOutcome>(step.Outcome), step.Message, step.LogFile, step.TargetId,
             ParseEnum<MaintenanceVerificationStatus>(step.Verification), step.UpdateServerSelection, step.UpdateServiceId)).ToArray();
-        return new(id, session.StartedAt, session.FinishedAt, session.RestorePointConfirmed, steps, session.Error, session.IsComplete);
+        return new(id, session.StartedAt, session.FinishedAt, session.RestorePointConfirmed, steps, session.Error, session.IsComplete,
+            session.RestorePointSequenceNumber);
     }
 
     private static T ParseEnum<T>(string value) where T : struct, Enum =>
