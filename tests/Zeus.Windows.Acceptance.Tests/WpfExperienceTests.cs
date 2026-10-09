@@ -21,6 +21,7 @@ public sealed class WpfExperienceTests
     {
         Assert.True(OperatingSystem.IsWindows(), "WPF acceptance requires an actual Windows desktop.");
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var openedUris = new List<string>();
         var thread = new Thread(() =>
         {
             using var bindingErrors = new BindingErrorListener();
@@ -44,9 +45,13 @@ public sealed class WpfExperienceTests
                 {
                     try
                     {
-                        window = new MainWindow(fixture) { Width = 1440, Height = 1024 };
+                        window = new MainWindow(fixture, uri =>
+                        {
+                            openedUris.Add(uri);
+                            if (uri == "ms-settings:personalization-colors") throw new InvalidOperationException("Falha de abertura simulada.");
+                        }) { Width = 1440, Height = 1024 };
                         window.Show();
-                        await VerifyExperienceAsync(window, fixture);
+                        await VerifyExperienceAsync(window, fixture, openedUris);
                         Assert.Empty(bindingErrors.Errors);
                         completion.TrySetResult();
                     }
@@ -69,7 +74,7 @@ public sealed class WpfExperienceTests
         Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "The WPF application must exit after acceptance.");
     }
 
-    private static async Task VerifyExperienceAsync(MainWindow window, string fixture)
+    private static async Task VerifyExperienceAsync(MainWindow window, string fixture, List<string> openedUris)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(120);
         while (window.StatusTitle != "Diagnóstico concluído" && DateTimeOffset.UtcNow < deadline)
@@ -160,6 +165,32 @@ public sealed class WpfExperienceTests
         Assert.True(chooseWallpaperButton.IsEnabled);
         var applyWallpaperButton = Assert.IsType<Button>(window.FindName("ApplyWallpaperButton"));
         Assert.False(applyWallpaperButton.IsEnabled, "A aplicação exige primeiro uma imagem escolhida e pré-visualizada.");
+        var windowsSettingsButtons = new[]
+        {
+            (Name: "OpenWindowsThemesButton", AutomationId: "open-windows-themes", Uri: "ms-settings:themes"),
+            (Name: "OpenWindowsColorsButton", AutomationId: "open-windows-colors", Uri: "ms-settings:personalization-colors"),
+            (Name: "OpenWindowsStartButton", AutomationId: "open-windows-start", Uri: "ms-settings:personalization-start"),
+            (Name: "OpenWindowsTaskbarButton", AutomationId: "open-windows-taskbar", Uri: "ms-settings:taskbar")
+        };
+        foreach (var entry in windowsSettingsButtons)
+        {
+            var button = Assert.IsType<Button>(window.FindName(entry.Name));
+            Assert.Equal(entry.AutomationId, AutomationProperties.GetAutomationId(button));
+            Assert.True(button.IsEnabled);
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, button));
+            Assert.Equal(entry.Uri, Assert.Single(openedUris));
+            if (entry.Uri == "ms-settings:personalization-colors")
+            {
+                Assert.Equal("Configurações do Windows não foram abertas", window.StatusTitle);
+                Assert.Contains("Falha de abertura simulada", window.StatusDetail, StringComparison.Ordinal);
+            }
+            else
+            {
+                Assert.Equal("Configurações oficiais do Windows abertas", window.StatusTitle);
+                Assert.Contains("não alterou nem guardou estado para reverter", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
+            }
+            openedUris.Clear();
+        }
         Assert.NotNull(window.Snapshot.Cpu);
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
@@ -324,6 +355,8 @@ public sealed class WpfExperienceTests
                 $"Workspace {AutomationProperties.GetAutomationId(tab)} must render its real content.");
             if (AutomationProperties.GetAutomationId(tab) == "ProfileTab")
             {
+                Assert.Contains("Mais opções oficiais de personalização", FindVisualDescendants<TextBlock>(window).Select(block => block.Text));
+                Assert.True(Assert.IsType<Button>(window.FindName("OpenWindowsTaskbarButton")).IsVisible);
                 var profile = Assert.IsType<ScrollViewer>(content);
                 profile.ScrollToEnd();
                 await RenderAsync(window, "zeus-general-plan-review.png");

@@ -29,6 +29,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly PendingMaintenanceSessions _pendingSessions = new();
     private readonly UserOptimizationService _userOptimization;
     private readonly TemporaryFileCleanup _cleanup;
+    private readonly Action<string> _openUri;
     private readonly bool _isFixture;
     private readonly OptimizationRuleEngine _ruleEngine = new();
     private readonly DesktopStorage _storage;
@@ -76,9 +77,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public MainWindow() : this(null) { }
 
-    public MainWindow(string? storageRoot)
+    public MainWindow(string? storageRoot, Action<string>? openUri = null)
     {
         _isFixture = storageRoot is not null;
+        _openUri = openUri ?? OpenSystemUri;
         _storage = new(storageRoot);
         _userOptimization = new(storageRoot is null ? null : Path.Combine(storageRoot, "Changes"));
         _cleanup = new(storageRoot is null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp") : Path.Combine(storageRoot, "Temporary"),
@@ -94,6 +96,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ShowPendingHardware();
         DataContext = this;
     }
+
+    private static void OpenSystemUri(string uri) =>
+        _ = Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true })
+            ?? throw new InvalidOperationException("O Windows não abriu o destino solicitado.");
 
     public HardwareSnapshot? Snapshot => _snapshot;
     public string BuildVersion { get; } = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Indisponível";

@@ -937,8 +937,27 @@ public partial class MainWindow
     private void OpenTrustedUri(string uri)
     {
         if (_isBusy) return;
-        try { Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); }
+        try { _openUri(uri); }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException) { StatusDetail = $"O Windows não conseguiu abrir este destino: {error.Message}"; }
     }
+    private void OpenWindowsPersonalizationSettings(string uri, string settingName)
+    {
+        if (_isBusy) return;
+        try
+        {
+            _openUri(uri);
+            StatusTitle = "Configurações oficiais do Windows abertas";
+            StatusDetail = $"O Windows abriu a página de {settingName}, se ela estiver disponível nesta versão e edição. O ZEUS só encaminhou você às Configurações; não alterou nem guardou estado para reverter essas opções.";
+        }
+        catch (Exception error) when (error is Win32Exception or InvalidOperationException)
+        {
+            StatusTitle = "Configurações do Windows não foram abertas";
+            StatusDetail = $"A página de {settingName} não pôde ser aberta: {error.Message}";
+        }
+    }
+    private void OpenWindowsThemes_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:themes", "temas");
+    private void OpenWindowsColors_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:personalization-colors", "cores");
+    private void OpenWindowsStart_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:personalization-start", "Iniciar");
+    private void OpenWindowsTaskbar_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:taskbar", "barra de tarefas");
     private bool Confirm(string text, string title) => MessageBox.Show(this, text, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 }
