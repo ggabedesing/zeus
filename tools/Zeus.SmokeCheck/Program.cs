@@ -26,6 +26,8 @@ try
     if (performance.Processes.Count == 0)
         throw new InvalidOperationException("No real Windows process observation was collected.");
     Console.WriteLine("PASS: real operating system, CPU, memory, volume and native performance data collected.");
+    var processIo = performance.IoProcesses ?? [];
+    Console.WriteLine($"Process I/O: ranked={processIo.Count}; maximum=30; read rates={processIo.Count(process => process.IoReadBytesPerSecond.HasValue)}; write rates={processIo.Count(process => process.IoWriteBytesPerSecond.HasValue)}; other rates={processIo.Count(process => process.IoOtherBytesPerSecond.HasValue)}; process intervals={processIo.Count(process => process.IoSamplingDurationSeconds.HasValue)}; names and PIDs omitted; accounting is not physical disk attribution.");
     var restartState = Zeus.Core.WindowsRestartStateParser.Evaluate(snapshot.WindowsInventory?.RestartIndicators);
     Console.WriteLine($"Pending restart indicators: {restartState.IsPending?.ToString() ?? "unknown"}; checked={restartState.CheckedSourceCount}/{restartState.TotalSourceCount}; positive sources={(restartState.Sources.Count == 0 ? "none" : string.Join(", ", restartState.Sources))}. This is registry evidence, not a complete Windows restart guarantee.");
     var winHttpProxy = snapshot.WindowsInventory?.WinHttpProxyConfiguration;

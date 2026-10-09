@@ -132,6 +132,7 @@ internal sealed class DesktopStorage
         var bounded = observation with
         {
             Processes = LimitPerformanceItems(observation.Processes, 50, "processos", omissions)!,
+            IoProcesses = LimitPerformanceItems(observation.IoProcesses, 30, "processos com I/O", omissions),
             GpuEngines = LimitPerformanceItems(observation.GpuEngines?.OrderByDescending(engine => engine.UtilizationPercent).ToArray(), 16, "engines GPU", omissions),
             Disks = LimitPerformanceItems(observation.Disks?.OrderByDescending(disk => disk.ActivePercent ?? -1).ToArray(), 16, "discos", omissions),
             Networks = LimitPerformanceItems(observation.Networks?.OrderByDescending(network => network.BytesPerSecond ?? 0).ToArray(), 16, "adaptadores de rede", omissions),
@@ -150,6 +151,7 @@ internal sealed class DesktopStorage
         var compact = bounded with
         {
             Processes = bounded.Processes.Take(20).ToArray(),
+            IoProcesses = bounded.IoProcesses?.Take(10).ToArray(),
             GpuEngines = [], Disks = [], Networks = [], GpuMemory = [], GpuProcessMemory = [],
             Warnings = [.. bounded.Warnings.Take(8), "Histórico local resumido adicionalmente para respeitar o limite de armazenamento; listas detalhadas foram omitidas desta amostra salva."]
         };

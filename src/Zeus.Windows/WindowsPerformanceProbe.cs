@@ -6,11 +6,14 @@ using System.Management;
 using System.Text.RegularExpressions;
 
 [assembly: InternalsVisibleTo("Zeus.Hardware.Tests")]
+[assembly: InternalsVisibleTo("Zeus.Windows.Acceptance.Tests")]
 
 namespace Zeus.Windows;
 
 public sealed record ProcessObservation(int Id, string Name, double? CpuPercent, ulong WorkingSetBytes,
-    long? StartTimeUtcTicks = null, double? CpuCoresUsed = null);
+    long? StartTimeUtcTicks = null, double? CpuCoresUsed = null,
+    double? IoReadBytesPerSecond = null, double? IoWriteBytesPerSecond = null, double? IoOtherBytesPerSecond = null,
+    double? IoSamplingDurationSeconds = null);
 public sealed record GpuEngineObservation(string InstanceName, int? ProcessId, string EngineType, double UtilizationPercent, string? ProcessName = null);
 public sealed record DiskPerformanceObservation(string InstanceName, ulong? BytesPerSecond, double? ActivePercent, double? AverageReadLatencyMilliseconds);
 public sealed record NetworkPerformanceObservation(string Adapter, ulong? BytesPerSecond, ulong? LinkBitsPerSecond, ulong? QueueLength, ulong? ErrorPackets);
@@ -47,7 +50,8 @@ public sealed record PerformanceObservation(
     ActivityContextInfo? ActivityContext = null,
     IReadOnlyList<GpuMemoryObservation>? GpuMemory = null,
     IReadOnlyList<GpuProcessMemoryObservation>? GpuProcessMemory = null,
-    MemoryPagingObservation? MemoryPaging = null);
+    MemoryPagingObservation? MemoryPaging = null,
+    IReadOnlyList<ProcessObservation>? IoProcesses = null);
 
 /// <summary>
 /// A bounded, read-only observation, not a benchmark or prediction of performance
@@ -99,6 +103,8 @@ public sealed class WindowsPerformanceProbe
             token.ThrowIfCancellationRequested();
             double? processCpu = null;
             double? processCoresUsed = null;
+            before.TryGetValue(last.Id, out var firstObservedProcess);
+            var io = ProcessIoReader.CalculateRates(firstObservedProcess?.IoCounters, last.IoCounters);
             if (last.CpuTicks is { } ticks && last.StartTicks is { } identity &&
                 before.TryGetValue(last.Id, out var firstProcess) && firstProcess.StartTicks == identity &&
                 firstProcess.CpuTicks is { } priorTicks)
@@ -108,12 +114,16 @@ public sealed class WindowsPerformanceProbe
                 processCpu = CalculateProcessCpuPercent(priorTicks, ticks, elapsed, logicalProcessors);
             }
             observations.Add(new ProcessObservation(last.Id, last.Name, processCpu, last.WorkingSetBytes,
-                last.StartTicks, processCoresUsed));
+                last.StartTicks, processCoresUsed, io.ReadBytesPerSecond, io.WriteBytesPerSecond, io.OtherBytesPerSecond, io.SamplingDurationSeconds));
         }
         var allObservedProcesses = observations.ToArray();
         var top = allObservedProcesses.OrderByDescending(process => process.CpuPercent.HasValue)
             .ThenByDescending(process => process.CpuPercent)
             .ThenByDescending(process => process.WorkingSetBytes).ThenBy(process => process.Id).Take(50).ToArray();
+        var topIo = allObservedProcesses.Where(process => process.StartTimeUtcTicks is > 0 &&
+                (process.IoReadBytesPerSecond.HasValue || process.IoWriteBytesPerSecond.HasValue || process.IoOtherBytesPerSecond.HasValue))
+            .OrderByDescending(process => (process.IoReadBytesPerSecond ?? 0) + (process.IoWriteBytesPerSecond ?? 0) + (process.IoOtherBytesPerSecond ?? 0))
+            .ThenBy(process => process.Id).Take(30).ToArray();
 
         var gpuEngines = MapGpuEnginesToProcesses(ReadGpuCounters(token, warnings), allObservedProcesses);
         var gpuMemory = ReadGpuMemoryCounters(token, warnings);
@@ -139,8 +149,9 @@ public sealed class WindowsPerformanceProbe
         warnings.Add("Disco e rede: contadores são taxas locais; tráfego não mede latência ou qualidade da Internet e erros são contagens reportadas pelo adaptador.");
         warnings.Add("A lista de processos exibida é limitada aos 50 maiores por CPU/RAM. Heurísticas de jogo/OBS consultam todos os processos acessíveis nesta amostra; processos inacessíveis e engines GPU não informadas permanecem desconhecidos. VideoEncode associado ao PID do OBS não confirma transmissão ao vivo.");
         warnings.Add("A amostra reflete a carga atual. Compare tarefas e condições equivalentes; CPU/RAM livres não medem FPS ou garantem melhorias.");
+        warnings.Add($"I/O por processo: até 30 entradas com taxas disponíveis, ordenadas pela soma dos campos disponíveis de leitura, escrita e outras transferências. Taxas calculadas em duas leituras por PID/início; contadores podem incluir arquivos, rede e dispositivos e não atribuem bytes a disco físico, volume, conflito ou gargalo. A lista principal conserva até 50 processos por CPU/RAM.");
         return new PerformanceObservation(DateTimeOffset.UtcNow, Stopwatch.GetElapsedTime(start, cpuEnd),
-            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks, activityContext, gpuMemory, gpuProcessMemory, memoryPaging);
+            cpu, total, available, top, warnings.Distinct().ToArray(), gpuEngines, disks, networks, activityContext, gpuMemory, gpuProcessMemory, memoryPaging, topIo);
     }
 
     internal readonly record struct SystemCpuTimes(ulong Idle, ulong Kernel, ulong User);
@@ -378,7 +389,7 @@ public sealed class WindowsPerformanceProbe
     }
 
     private sealed record ProcessCounter(int Id, string Name, long? StartTicks, long? CpuTicks,
-        ulong WorkingSetBytes, long ObservedAt);
+        ulong WorkingSetBytes, long ObservedAt, ProcessIoCounterSnapshot? IoCounters = null);
 
     private static Dictionary<int, ProcessCounter> ReadProcesses(CancellationToken token, out int missing)
     {
@@ -406,8 +417,11 @@ public sealed class WindowsPerformanceProbe
                     {
                         missing++;
                     }
+                    var observedAt = Stopwatch.GetTimestamp();
+                    var io = ProcessIoReader.Read(id);
+                    if (io?.StartTimeUtcTicks != identity) io = null;
                     result[id] = new ProcessCounter(id, name, identity, cpu,
-                        memory >= 0 ? (ulong)memory : 0, Stopwatch.GetTimestamp());
+                        memory >= 0 ? (ulong)memory : 0, observedAt, io);
                 }
                 catch (Exception error) when (error is Win32Exception or InvalidOperationException or NotSupportedException)
                 {

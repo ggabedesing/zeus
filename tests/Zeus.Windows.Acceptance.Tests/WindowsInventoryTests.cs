@@ -16,6 +16,17 @@ public sealed class WindowsInventoryTests
         Assert.InRange(observation.AvailableMemoryBytes, 0UL, observation.TotalMemoryBytes);
         Assert.True(observation.SamplingDuration >= TimeSpan.FromSeconds(2));
         Assert.InRange(observation.Processes.Count, 1, 50);
+        Assert.NotNull(observation.IoProcesses);
+        Assert.InRange(observation.IoProcesses.Count, 0, 30);
+        Assert.All(observation.IoProcesses, process =>
+        {
+            Assert.True(process.StartTimeUtcTicks > 0);
+            Assert.True(process.IoSamplingDurationSeconds > 0);
+            Assert.All(new[] { process.IoReadBytesPerSecond, process.IoWriteBytesPerSecond, process.IoOtherBytesPerSecond }, rate =>
+            {
+                if (rate is { } value) Assert.True(double.IsFinite(value) && value >= 0);
+            });
+        });
         Assert.NotNull(observation.GpuEngines);
         Assert.NotNull(observation.GpuMemory);
         Assert.NotNull(observation.Disks);

@@ -231,6 +231,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 network,
                 context,
                 processes,
+                FormatProcessIoComparison(comparison),
                 "Interpretação: cobertura mostra amostras válidas sobre o total; engines individuais não são uso total da GPU, ocupação não comprova gargalo e o contexto heurístico não confirma partida ou transmissão. Comparação descritiva, sem atribuir causa ou ganho.");
         }
     }
@@ -273,6 +274,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ? FormatBytesPerSecond(value >= ulong.MaxValue ? ulong.MaxValue : (ulong)Math.Round(value))
         : "indisponível";
 
+    internal static string FormatProcessIo(ProcessObservation process) =>
+        $"I/O: leitura {FormatRate(process.IoReadBytesPerSecond)} · escrita {FormatRate(process.IoWriteBytesPerSecond)} · outras transferências {FormatRate(process.IoOtherBytesPerSecond)}" +
+        (process.IoSamplingDurationSeconds is { } duration && double.IsFinite(duration) && duration > 0
+            ? $" · intervalo do processo: {duration:0.###} s" : " · intervalo do processo: indisponível");
+
+    internal static string FormatProcessIoComparison(PerformanceComparison comparison)
+    {
+        var items = (comparison.ProcessUsage ?? []).Where(item =>
+            item.ReferenceIoReadSamples + item.LaterIoReadSamples + item.ReferenceIoWriteSamples + item.LaterIoWriteSamples +
+            item.ReferenceIoOtherSamples + item.LaterIoOtherSamples > 0).OrderByDescending(item =>
+                Math.Max((item.ReferenceIoReadBytesPerSecond ?? 0) + (item.ReferenceIoWriteBytesPerSecond ?? 0) + (item.ReferenceIoOtherBytesPerSecond ?? 0),
+                    (item.LaterIoReadBytesPerSecond ?? 0) + (item.LaterIoWriteBytesPerSecond ?? 0) + (item.LaterIoOtherBytesPerSecond ?? 0)))
+            .ThenBy(item => item.ProcessId).Take(5).ToArray();
+        if (items.Length == 0) return "I/O por processo: comparação indisponível nas amostras com identidade confirmada.";
+        return "Até cinco processos por soma disponível de I/O; médias das taxas por amostra (inclui rede/dispositivos; não é disco físico): " + string.Join("; ", items.Select(item =>
+            $"{item.Name} · PID {item.ProcessId}: leitura {FormatRate(item.ReferenceIoReadBytesPerSecond)} ({item.ReferenceIoReadSamples}/{comparison.ReferenceSampleCount}) → {FormatRate(item.LaterIoReadBytesPerSecond)} ({item.LaterIoReadSamples}/{comparison.LaterSampleCount}); escrita {FormatRate(item.ReferenceIoWriteBytesPerSecond)} ({item.ReferenceIoWriteSamples}/{comparison.ReferenceSampleCount}) → {FormatRate(item.LaterIoWriteBytesPerSecond)} ({item.LaterIoWriteSamples}/{comparison.LaterSampleCount}); outras transferências {FormatRate(item.ReferenceIoOtherBytesPerSecond)} ({item.ReferenceIoOtherSamples}/{comparison.ReferenceSampleCount}) → {FormatRate(item.LaterIoOtherBytesPerSecond)} ({item.LaterIoOtherSamples}/{comparison.LaterSampleCount})"));
+    }
+
     private static string FormatLatency(double? milliseconds) => milliseconds is { } value && double.IsFinite(value) && value >= 0
         ? $"{value:0.##} ms"
         : "indisponível";
@@ -283,6 +302,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<DeviceRow> DiskRows { get; } = [];
     public ObservableCollection<DeviceRow> ExtendedHardwareRows { get; } = [];
     public ObservableCollection<DeviceRow> ProcessRows { get; } = [];
+    public ObservableCollection<DeviceRow> ProcessIoRows { get; } = [];
+    public string ProcessIoSummary { get; private set; } = "Observe uma amostra para consultar I/O por processo.";
     public ObservableCollection<DeviceRow> PerformanceResourceRows { get; } = [];
     public ObservableCollection<DeviceRow> StartupRows { get; } = [];
     public ObservableCollection<DeviceRow> ServiceDependencyRows { get; } = [];

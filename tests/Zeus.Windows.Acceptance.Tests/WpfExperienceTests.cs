@@ -602,7 +602,7 @@ public sealed class WpfExperienceTests
             for (var index = 0; index < expectedEventRows.Length; index++)
                 Assert.Equal(expectedEventRows[index].Detail, window.EventDiagnosticRows[index].Detail);
             var exportedEventReport = window.CreateExportDocument();
-            Assert.Equal(9, exportedEventReport.SchemaVersion);
+            Assert.Equal(10, exportedEventReport.SchemaVersion);
             Assert.Equal(eventReport.Summary, exportedEventReport.EventDiagnostics!.Summary);
             Assert.Equal(eventReport.Findings, exportedEventReport.EventDiagnostics.Findings);
         }
@@ -1283,6 +1283,17 @@ public sealed class WpfExperienceTests
         Assert.True(window.StatusTitle == "Medição concluída",
             $"A medição pela interface não terminou corretamente: {window.StatusTitle} · {window.StatusDetail}");
         Assert.Contains("não confirma", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(window.Performance!.IoProcesses);
+        Assert.Equal(window.Performance.IoProcesses.Count, window.ProcessIoRows.Count);
+        Assert.Contains("não comprova atividade de disco físico", window.ProcessIoSummary);
+        Assert.All(window.ProcessIoRows, row =>
+        {
+            Assert.Contains("I/O: leitura", row.Detail);
+            Assert.Contains("intervalo do processo:", row.Detail);
+        });
+        var processIoExport = window.CreateExportDocument();
+        Assert.Equal(10, processIoExport.SchemaVersion);
+        Assert.Equal(window.Performance.IoProcesses, processIoExport.Performance!.IoProcesses);
         var savedPerformanceSession = Assert.Single(await new DesktopStorage(fixture).ReadPerformanceSessionsAsync(),
             session => session.Label == "Medição manual · Jogo teste + OBS");
         Assert.Single(savedPerformanceSession.Samples);

@@ -123,7 +123,19 @@ public sealed record PerformanceProcessComparison(
     double? ReferenceCpuCoresUsed = null,
     double? LaterCpuCoresUsed = null,
     int ReferenceCpuCoresSamples = 0,
-    int LaterCpuCoresSamples = 0);
+    int LaterCpuCoresSamples = 0,
+    double? ReferenceIoReadBytesPerSecond = null,
+    double? LaterIoReadBytesPerSecond = null,
+    int ReferenceIoReadSamples = 0,
+    int LaterIoReadSamples = 0,
+    double? ReferenceIoWriteBytesPerSecond = null,
+    double? LaterIoWriteBytesPerSecond = null,
+    int ReferenceIoWriteSamples = 0,
+    int LaterIoWriteSamples = 0,
+    double? ReferenceIoOtherBytesPerSecond = null,
+    double? LaterIoOtherBytesPerSecond = null,
+    int ReferenceIoOtherSamples = 0,
+    int LaterIoOtherSamples = 0);
 
 /// <summary>A process-local, bounded history that preserves observations until exported.</summary>
 public sealed class PerformanceHistoryBuffer
@@ -351,7 +363,7 @@ public static class PerformanceComparisonBuilder
                 referenceContext.EncoderKnown, laterContext.EncoderKnown,
                 referenceContext.EncoderActive, laterContext.EncoderActive);
 
-        var processKeys = reference.Concat(later).SelectMany(sample => sample.Processes)
+        var processKeys = reference.Concat(later).SelectMany(sample => sample.Processes.Concat(sample.IoProcesses ?? []))
             .Where(process => process.StartTimeUtcTicks is > 0)
             .Select(process => (process.Id, StartTime: process.StartTimeUtcTicks!.Value))
             .Distinct().ToArray();
@@ -379,10 +391,41 @@ public static class PerformanceComparisonBuilder
 
             var left = Summarize(reference, key);
             var right = Summarize(later, key);
-            return new PerformanceProcessComparison(key.Id, right.Name ?? left.Name ?? "processo desconhecido", key.StartTime,
+            // Process I/O includes devices other than disks. Preserve per-field coverage
+            // and the PID/start-time identity without inferring a storage bottleneck.
+            static (double? Average, int Count) SummarizeIo(
+                IReadOnlyList<PerformanceObservation> samples, (int Id, long StartTime) identity,
+                Func<ProcessObservation, double?> selector)
+            {
+                var values = samples.Select(sample => (sample.IoProcesses ?? []).Concat(sample.Processes)
+                    .FirstOrDefault(process => process.Id == identity.Id && process.StartTimeUtcTicks == identity.StartTime))
+                    .Where(process => process is not null)
+                    .Select(process => process!)
+                    .Select(selector)
+                    .Where(value => value is { } number && double.IsFinite(number) && number >= 0)
+                    .Select(value => value!.Value).ToArray();
+                // Incremental mean avoids overflowing a sum of valid, nonnegative rates.
+                var average = 0d;
+                for (var index = 0; index < values.Length; index++)
+                    average += (values[index] - average) / (index + 1);
+                return (values.Length == 0 ? null : average, values.Length);
+            }
+
+            var leftRead = SummarizeIo(reference, key, process => process.IoReadBytesPerSecond);
+            var rightRead = SummarizeIo(later, key, process => process.IoReadBytesPerSecond);
+            var leftWrite = SummarizeIo(reference, key, process => process.IoWriteBytesPerSecond);
+            var rightWrite = SummarizeIo(later, key, process => process.IoWriteBytesPerSecond);
+            var leftOther = SummarizeIo(reference, key, process => process.IoOtherBytesPerSecond);
+            var rightOther = SummarizeIo(later, key, process => process.IoOtherBytesPerSecond);
+            var ioName = later.Concat(reference).SelectMany(sample => sample.IoProcesses ?? [])
+                .FirstOrDefault(process => process.Id == key.Id && process.StartTimeUtcTicks == key.StartTime)?.Name;
+            return new PerformanceProcessComparison(key.Id, right.Name ?? left.Name ?? ioName ?? "processo desconhecido", key.StartTime,
                 left.Cpu, right.Cpu, left.CpuCount, right.CpuCount,
                 left.WorkingSet, right.WorkingSet, left.WorkingSetCount, right.WorkingSetCount,
-                left.Cores, right.Cores, left.CoresCount, right.CoresCount);
+                left.Cores, right.Cores, left.CoresCount, right.CoresCount,
+                leftRead.Average, rightRead.Average, leftRead.Count, rightRead.Count,
+                leftWrite.Average, rightWrite.Average, leftWrite.Count, rightWrite.Count,
+                leftOther.Average, rightOther.Average, leftOther.Count, rightOther.Count);
         }).ToArray();
 
         var gpuProcessKeys = reference.Concat(later).SelectMany(sample => sample.GpuProcessMemory ?? [])

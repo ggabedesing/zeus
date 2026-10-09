@@ -108,3 +108,5 @@ Reparos, instalação de drivers, criação de pontos de restauração e reiníc
 O [esquema e a migração do armazenamento local](docs/persistencia-local.md) descrevem localização, preservação dos JSON antigos, verificação de saúde e limites do registro de atividades.
 
 Leia [SECURITY.md](SECURITY.md) e o [relatório de viabilidade com fontes](docs/relatorio-viabilidade-zeus.md).
+
+O Observador também apresenta até 30 processos por atividade de I/O, com leitura/escrita/outras transferências, intervalo próprio e comparação por identidade e cobertura. São contadores de arquivos/rede/dispositivos, sem atribuição a disco físico ou comprovação de gargalo. Exportação JSON: esquema 10.

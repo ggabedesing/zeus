@@ -474,7 +474,14 @@ public partial class MainWindow
         PerformanceSummary = $"CPU: {(observation.CpuPercent.HasValue ? $"{observation.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · {observation.ActivityContext?.Summary ?? "Contexto de jogo/OBS indisponível."} · Intervalo medido da CPU: {observation.SamplingDuration.TotalSeconds:0.#} s; GPU, disco e rede são leituras ao final · {observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
         ProcessRows.Clear();
         foreach (var process in observation.Processes)
-            ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU do computador: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · núcleos equivalentes: {(process.CpuCoresUsed is { } cores ? cores.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture) : "indisponível")} · memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}"));
+            ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU do computador: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · núcleos equivalentes: {(process.CpuCoresUsed is { } cores ? cores.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture) : "indisponível")} · memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}\n{FormatProcessIo(process)}"));
+        ProcessIoRows.Clear();
+        foreach (var process in observation.IoProcesses ?? [])
+            ProcessIoRows.Add(new($"{process.Name} · PID {process.Id}", FormatProcessIo(process)));
+        ProcessIoSummary = observation.IoProcesses is null
+            ? "I/O por processo indisponível nesta amostra ou relatório antigo."
+            : $"{observation.IoProcesses.Count} entradas com taxas disponíveis (até 30), ordenadas pela soma disponível de leitura, escrita e outras transferências. Inclui arquivos, rede e dispositivos; não comprova atividade de disco físico, conflito ou gargalo. A ausência na lista não prova ausência de I/O.";
+        Notify(nameof(ProcessIoSummary));
         PerformanceResourceRows.Clear();
         foreach (var engine in (observation.GpuEngines ?? []).OrderByDescending(engine => engine.UtilizationPercent).Take(20))
         {
@@ -1290,7 +1297,7 @@ public partial class MainWindow
     }
 
     internal ExportDocument CreateExportDocument() =>
-        new(9, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
+        new(10, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
             new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(),
             _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan,
             _performanceSessionExports, EventPatternAnalyzer.AnalyzeInventory(_snapshot?.WindowsInventory));

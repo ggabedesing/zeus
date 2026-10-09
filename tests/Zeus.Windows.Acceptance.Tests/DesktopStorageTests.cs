@@ -178,6 +178,38 @@ public sealed class DesktopStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessIoRoundTripsThroughBoundedSqliteAndSchemaTenExport()
+    {
+        var storage = new DesktopStorage(_root);
+        var id = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var processes = Enumerable.Range(1, 40).Select(pid => new ProcessObservation(pid, "io fixture", 1, 1024, pid,
+            IoReadBytesPerSecond: pid * 1000, IoWriteBytesPerSecond: 0, IoOtherBytesPerSecond: null, IoSamplingDurationSeconds: 2)).ToArray();
+        var observation = new PerformanceObservation(now, TimeSpan.FromSeconds(2), 1, 1024, 512, [], [], IoProcesses: processes);
+        await storage.StartPerformanceSessionAsync(id, "I/O fixture", now);
+        await storage.AppendPerformanceObservationAsync(id, 0, observation);
+        var saved = Assert.Single(Assert.Single(await storage.ReadPerformanceSessionsAsync()).Samples);
+        var restored = JsonSerializer.Deserialize<PerformanceObservation>(saved.DetailsJson, DesktopStorage.JsonOptions)!;
+        Assert.Equal(30, restored.IoProcesses!.Count);
+        Assert.Contains(restored.Warnings, warning => warning.Contains("processos com I/O", StringComparison.Ordinal));
+        Assert.Equal(1000, restored.IoProcesses[0].IoReadBytesPerSecond);
+        Assert.Equal(0, restored.IoProcesses[0].IoWriteBytesPerSecond);
+        Assert.Null(restored.IoProcesses[0].IoOtherBytesPerSecond);
+        Assert.Equal(2, restored.IoProcesses[0].IoSamplingDurationSeconds);
+        var comparison = PerformanceComparisonBuilder.Compare([restored], [restored]);
+        var path = Path.Combine(_root, "process-io-export.json");
+        await DesktopStorage.ExportAsync(path, new ExportDocument(10, now, null, [], Performance: restored, PerformanceComparison: comparison));
+        using var exported = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        Assert.Equal(10, exported.RootElement.GetProperty("SchemaVersion").GetInt32());
+        var io = exported.RootElement.GetProperty("Performance").GetProperty("IoProcesses")[0];
+        Assert.Equal(1000, io.GetProperty("IoReadBytesPerSecond").GetDouble());
+        var compared = exported.RootElement.GetProperty("PerformanceComparison").GetProperty("ProcessUsage")[0];
+        Assert.Equal(1, compared.GetProperty("ReferenceIoReadSamples").GetInt32());
+        Assert.Equal(1, compared.GetProperty("LaterIoWriteSamples").GetInt32());
+        Assert.Equal(0, compared.GetProperty("LaterIoOtherSamples").GetInt32());
+    }
+
+    [Fact]
     public async Task MaintenanceVerificationStatePersistsAndAppearsInHistory()
     {
         var storage = new DesktopStorage(_root);
