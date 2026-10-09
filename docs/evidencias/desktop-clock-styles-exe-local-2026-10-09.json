@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "collectedAtUtc": "2026-10-09T13:57:10.9048470+00:00",
+  "sourceCommit": "a674397004f86f3fe5a2b22ee05aa0b4916451dc",
+  "sourceDirty": false,
+  "change": "Added four configurable desktop clock appearances with preview, confirmation/cancel, SQLite persistence and legacy default.",
+  "clockStyles": [
+    "Glass",
+    "Minimal",
+    "Neon",
+    "Classic"
+  ],
+  "verification": {
+    "focusedClockAndStorageAcceptance": {
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    "fullWpfAcceptance": {
+      "passed": 79,
+      "failed": 0,
+      "skipped": 2,
+      "skippedReason": "Protected session cases require administrator privileges."
+    },
+    "fullSolutionReleaseTests": {
+      "passed": 521,
+      "failed": 0,
+      "skipped": 10
+    },
+    "releaseBuild": {
+      "succeeded": true,
+      "warnings": 0,
+      "errors": 0
+    },
+    "portablePackage": {
+      "runtime": "win-x64",
+      "developmentBuild": true,
+      "opened": true,
+      "responsive": true,
+      "closedCleanly": true,
+      "zipSha256": "78E13001B4E89B827DE2C3D3A4D7B940BA53E4E72F739F426E2F5BE319E76811",
+      "exeSha256": "7287DAE56D7FDF7DD03A3FEDF432AD0DDB8B503074EAE15F8147F2FF93795299"
+    }
+  },
+  "systemChanges": {
+    "windowsPreferencesChanged": false,
+    "productionAuthenticodeSigned": false
+  }
+}
