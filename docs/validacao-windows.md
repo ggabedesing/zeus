@@ -224,6 +224,8 @@ Use Windows 11 suportado, snapshots quando disponíveis e backups independentes.
 | PC com pouca RAM e armazenamento limitado | Medir consumo do ZEUS e comparar tarefa equivalente antes/depois | Pendente em equipamento físico |
 | Assinatura e distribuição | Authenticode, hash e entrega do pacote verificados | Hash implementado; assinatura de produção pendente |
 
+Em 2026-10-09, a recuperação de um recibo de inicialização sem relatório foi exercitada em pasta temporária isolada. O estado permaneceu incompleto, e `MaintenancePolicy.FindUnresolvedAttempts` identificou a ação exata como `ManualReviewRequired`; a interface mostra essa pendência antes de uma nova confirmação explícita. O teste passou (1/1); não iniciou o auxiliar nem executou manutenção. Interrupção real durante operação elevada e recuperação após reinicialização continuam pendentes na matriz acima.
+
 ## Recuperação disponível ao usuário
 
 Na área Limpeza, selecione a sessão guardada e restaure os arquivos. Se o destino já tiver um arquivo novo, ele é preservado. Arquivos excluídos definitivamente não podem ser recuperados pelo ZEUS.

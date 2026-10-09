@@ -10,8 +10,7 @@ namespace Zeus.Windows;
 /// </summary>
 public sealed class PendingMaintenanceSessions
 {
-    private readonly string _directory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zeus", "PendingMaintenance");
+    private readonly string _directory;
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
@@ -19,6 +18,15 @@ public sealed class PendingMaintenanceSessions
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         Converters = { new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false) }
     };
+
+    public PendingMaintenanceSessions() : this(Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zeus", "PendingMaintenance")) { }
+
+    public PendingMaintenanceSessions(string storageDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(storageDirectory);
+        _directory = Path.GetFullPath(storageDirectory);
+    }
 
     public async Task RememberAsync(Guid sessionId, IReadOnlyCollection<MaintenanceRequest> requests,
         DateTimeOffset startedAt, CancellationToken cancellationToken = default)
