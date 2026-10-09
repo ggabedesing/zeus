@@ -84,7 +84,7 @@
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Template">
-                <Setter.Value><ControlTemplate TargetType="TabControl"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="0,0,14,0"><TabPanel IsItemsHost="True" KeyboardNavigation.TabIndex="1"/></Border><ContentPresenter Grid.Column="1" ContentSource="SelectedContent"/></Grid></ControlTemplate></Setter.Value>
+                <Setter.Value><ControlTemplate TargetType="TabControl"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="0,0,14,0"><ScrollViewer x:Name="WorkspaceTabNavigationScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"><TabPanel IsItemsHost="True" KeyboardNavigation.TabIndex="1"/></ScrollViewer></Border><ContentPresenter Grid.Column="1" ContentSource="SelectedContent"/></Grid></ControlTemplate></Setter.Value>
             </Setter>
         </Style>
         <Style TargetType="TabItem">

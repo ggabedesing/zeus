@@ -326,6 +326,25 @@ public sealed class WpfExperienceTests
         window.IsMinimal = false;
         tabs.SelectedIndex = 0;
         await RenderAsync(window, "zeus-complete-overview.png");
+        window.Width = 900;
+        window.Height = 650;
+        Assert.True(window.WorkspaceTabs.ActualWidth > 0 && window.WorkspaceTabs.ActualHeight > 0,
+            "The workspaces must remain available at the minimum supported viewport.");
+        AssertControlFitsWindow(window, technicalModeToggle);
+        AssertControlFitsWindow(window, FindVisualDescendants<Button>(window).Single(button => AutomationProperties.GetAutomationId(button) == "refresh-diagnostics"));
+        AssertControlFitsWindow(window, FindVisualDescendants<Button>(window).Single(button => AutomationProperties.GetAutomationId(button) == "export-report"));
+        var navigationScroll = Assert.IsType<ScrollViewer>(tabs.Template.FindName("WorkspaceTabNavigationScrollViewer", tabs));
+        Assert.True(navigationScroll.ScrollableHeight > 0, "The vertical navigation must offer scrolling when all workspaces do not fit.");
+        navigationScroll.ScrollToEnd();
+        await Task.Delay(50);
+        window.UpdateLayout();
+        var navigationViewport = navigationScroll.TransformToAncestor(window).TransformBounds(new Rect(navigationScroll.RenderSize));
+        var historyTab = actualTabs.Single(tab => AutomationProperties.GetAutomationId(tab) == "HistoryTab");
+        var historyTabBounds = historyTab.TransformToAncestor(window).TransformBounds(new Rect(historyTab.RenderSize));
+        Assert.True(navigationViewport.Contains(historyTabBounds), "The last workspace must fit inside the navigation viewport after scrolling.");
+        await RenderAsync(window, "zeus-compact-viewport.png");
+        window.Width = 1440;
+        window.Height = 1024;
         window.SelectedTheme = DesktopTheme.Minimal;
         window.IsMinimal = true;
         Assert.Equal(Visibility.Collapsed, window.DetailedVisibility);
@@ -411,6 +430,14 @@ public sealed class WpfExperienceTests
         await using (var file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
             encoder.Save(file);
         Assert.True(new FileInfo(path).Length > 10_000, "Acceptance must capture the rendered window, not an empty image.");
+    }
+
+    private static void AssertControlFitsWindow(Window window, FrameworkElement control)
+    {
+        Assert.True(control.IsVisible, $"The {AutomationProperties.GetName(control)} control must remain visible in the compact viewport.");
+        var bounds = control.TransformToAncestor(window).TransformBounds(new Rect(control.RenderSize));
+        Assert.True(bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= window.ActualWidth && bounds.Bottom <= window.ActualHeight,
+            $"The {AutomationProperties.GetName(control)} control must fit inside the compact viewport.");
     }
 
     private static IEnumerable<T> FindVisualDescendants<T>(DependencyObject parent) where T : DependencyObject
