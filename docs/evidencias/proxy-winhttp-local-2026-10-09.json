@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "winhttp-proxy-inventory",
+  "recordedAtUtc": "2026-10-09T08:42:45Z",
+  "sourceCommit": "1ce17880be73927e77c51fb48cca17a6ea0e0916",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "outcome": "success",
+  "nativeWindowsAcceptance": {
+    "inventoryTestPassed": true,
+    "desktopExperienceTestPassed": true,
+    "providerAvailable": true,
+    "observedDefaultMode": "direct-access-configured",
+    "proxyServerOrBypassValuesRecorded": false
+  },
+  "hardwareTests": { "passed": 137, "failed": 0, "skipped": 0 },
+  "portablePackage": {
+    "file": "artifacts/winhttp-proxy-final/zeus-win-x64.zip",
+    "sha256": "f29dcbaee8acb212793772c764c72dffbae103fb08c3d6cb5778cd70162a8d30",
+    "applicationSmoke": { "opened": true, "responded": true, "closedCleanly": true }
+  },
+  "limitations": [
+    "WinHttpGetDefaultProxyConfiguration reads the default WinHTTP registry configuration; per-session and per-application overrides are not inspected.",
+    "This observation describes the current configuration only and does not test network connectivity or apply changes.",
+    "The development package is unsigned for production Authenticode distribution."
+  ]
+}
