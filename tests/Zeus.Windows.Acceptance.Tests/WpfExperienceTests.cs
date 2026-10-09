@@ -411,6 +411,20 @@ public sealed class WpfExperienceTests
                 Assert.Contains("Mais opções oficiais de personalização", FindVisualDescendants<TextBlock>(window).Select(block => block.Text));
                 Assert.True(Assert.IsType<Button>(window.FindName("OpenWindowsTaskbarButton")).IsVisible);
                 var profile = Assert.IsType<ScrollViewer>(content);
+                var organizeScrollTarget = Assert.IsType<Button>(window.FindName("PreviewDesktopOrganizationButton"));
+                organizeScrollTarget.BringIntoView();
+                profile.UpdateLayout();
+                profile.ScrollToVerticalOffset(Math.Min(profile.ScrollableHeight, profile.VerticalOffset + 120));
+                profile.UpdateLayout();
+                await RenderAsync(window, "zeus-desktop-organization-review.png");
+                AssertControlFitsWindow(window, organizeScrollTarget);
+                var organizeApplyScrollTarget = Assert.IsType<Button>(window.FindName("ApplyDesktopOrganizationButton"));
+                AssertControlFitsWindow(window, organizeApplyScrollTarget);
+                var applyBounds = organizeApplyScrollTarget.TransformToAncestor(profile).TransformBounds(new Rect(organizeApplyScrollTarget.RenderSize));
+                Assert.InRange(applyBounds.Top, 0, profile.ViewportHeight);
+                Assert.True(applyBounds.Bottom <= profile.ViewportHeight, "The apply button must fit inside the profile scroll viewport.");
+                Assert.False(organizeApplyScrollTarget.IsEnabled,
+                    "The apply action stays unavailable until the user creates a fresh preview.");
                 profile.ScrollToEnd();
                 await RenderAsync(window, "zeus-general-plan-review.png");
                 profile.ScrollToTop();
