@@ -85,6 +85,9 @@ public sealed class WindowsInventoryTests
         Assert.NotNull(snapshot.WindowsInventory.SecurityState);
         Assert.NotNull(snapshot.WindowsInventory.Warnings);
         Assert.NotNull(snapshot.WindowsInventory.ProxyConfiguration);
+        Assert.NotNull(snapshot.WindowsInventory.WinHttpProxyConfiguration);
+        if (snapshot.WindowsInventory.WinHttpProxyConfiguration is { IsAvailable: false })
+            Assert.Contains(snapshot.WindowsInventory.Warnings, warning => warning.StartsWith("Proxy WinHTTP padrão:", StringComparison.Ordinal));
         Assert.NotNull(snapshot.WindowsInventory.RecentEvents);
         Assert.NotNull(snapshot.WindowsInventory.InstalledSoftware);
         Assert.All(snapshot.WindowsInventory.InstalledSoftware, item =>

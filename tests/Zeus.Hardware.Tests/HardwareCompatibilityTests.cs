@@ -65,4 +65,44 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(restored.AutoDetectEnabled);
         Assert.True(restored.IsAvailable);
     }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(3, true)]
+    public void WinHttpProxyInventoryDistinguishesDirectAndNamedProxy(uint accessType, bool enabled)
+    {
+        var proxy = Zeus.Windows.WinHttpProxyReader.FromNative(accessType,
+            "http://user:secret@proxy.local:8080", "localhost;*.internal");
+
+        Assert.True(proxy.IsAvailable);
+        Assert.Equal(enabled, proxy.NamedProxyEnabled);
+        Assert.DoesNotContain("secret", proxy.ProxyServer);
+        Assert.Contains("[redigido]", proxy.ProxyServer);
+        Assert.Equal("localhost;*.internal", proxy.BypassList);
+
+        var credentialsWithoutScheme = Zeus.Windows.WinHttpProxyReader.FromNative(accessType,
+            "http=user:secret@proxy.local:8080", null);
+        Assert.DoesNotContain("secret", credentialsWithoutScheme.ProxyServer);
+    }
+
+    [Fact]
+    public void WinHttpProxyInventoryKeepsUnknownAccessTypeUnknown()
+    {
+        var proxy = Zeus.Windows.WinHttpProxyReader.FromNative(999, null, null);
+
+        Assert.True(proxy.IsAvailable);
+        Assert.Null(proxy.NamedProxyEnabled);
+        Assert.Null(proxy.ProxyServer);
+    }
+
+    [Fact]
+    public void WinHttpProxyInventoryJsonPreservesUnavailableAsUnknown()
+    {
+        var source = new WinHttpProxyConfigurationInfo(null, null, null, false);
+        var restored = JsonSerializer.Deserialize<WinHttpProxyConfigurationInfo>(JsonSerializer.Serialize(source))!;
+
+        Assert.False(restored.IsAvailable);
+        Assert.Null(restored.NamedProxyEnabled);
+        Assert.Null(restored.ProxyServer);
+    }
 }

@@ -153,14 +153,18 @@ $inventory = [pscustomobject]@{
  UpdateState=[pscustomobject]@{PendingCount=$updates;Source='Não consultado nesta coleta'};
  WindowsImageHealth=$null
 }
-[void]$warnings.Add('RAM: canais de memória não são inferidos pela quantidade de módulos. Integridade da imagem do Windows não é medida nesta coleta; use o Centro de Reparos. O proxy aqui cobre apenas valores observados em HKCU Internet Settings; auto-detecção ausente no Registro e configurações WinHTTP ou por aplicativo permanecem desconhecidas ou fora desta fonte. O inventário de pacotes Appx/MSIX cobre somente o usuário atual; não consulta todos os perfis.')
+[void]$warnings.Add('RAM: canais de memória não são inferidos pela quantidade de módulos. Integridade da imagem do Windows não é medida nesta coleta; use o Centro de Reparos. O proxy do usuário cobre valores observados em HKCU Internet Settings; configurações WinHTTP por sessão e configurações específicas de aplicativos não são consultadas. O inventário de pacotes Appx/MSIX cobre somente o usuário atual; não consulta todos os perfis.')
 [pscustomobject]@{Inventory=$inventory;Warnings=@($warnings)} | ConvertTo-Json -Depth 7 -Compress";
 
         using var json = await RunPowerShellJsonAsync(script, token, TimeSpan.FromSeconds(45), WindowsPowerShellModule.Utility);
         var payload = JsonSerializer.Deserialize<WindowsInventoryPayload>(json.RootElement.GetRawText(),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (payload?.Inventory is not { } inventory) return null;
-        return inventory with { Warnings = payload.Warnings ?? [] };
+        var warnings = (payload.Warnings ?? []).ToList();
+        var winHttpProxy = WinHttpProxyReader.Read();
+        if (!winHttpProxy.IsAvailable)
+            warnings.Add("Proxy WinHTTP padrão: API de configuração indisponível nesta coleta.");
+        return inventory with { Warnings = warnings, WinHttpProxyConfiguration = winHttpProxy };
     }
 
     private static ManagementObjectCollection Query(string query)

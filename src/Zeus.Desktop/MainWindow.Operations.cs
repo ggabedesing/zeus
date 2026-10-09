@@ -1154,7 +1154,8 @@ public partial class MainWindow
                 CollectedAt = _snapshot.CollectedAt,
                 Notice = "Referência dos valores retornados pelo inventário. Não é backup integral da rede nem restauração automática. Confirme cada valor depois de qualquer redefinição.",
                 NetworkConfiguration = inventory.NetworkConfiguration,
-                ProxyConfiguration = inventory.ProxyConfiguration
+                ProxyConfiguration = inventory.ProxyConfiguration,
+                WinHttpProxyConfiguration = inventory.WinHttpProxyConfiguration
             };
             File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(reference, new JsonSerializerOptions { WriteIndented = true }));
             StatusTitle = "Referência de rede salva";

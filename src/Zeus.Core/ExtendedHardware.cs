@@ -48,11 +48,14 @@ public sealed record WindowsInventoryInfo(
     string? WindowsImageHealth,
     IReadOnlyList<string> Warnings,
     ProxyConfigurationInfo? ProxyConfiguration = null,
-    WindowsRestartIndicators? RestartIndicators = null);
+    WindowsRestartIndicators? RestartIndicators = null,
+    WinHttpProxyConfigurationInfo? WinHttpProxyConfiguration = null);
 
 public sealed record NetworkConfigurationInfo(string Adapter, string[] Addresses, string[] DnsServers, string[] Gateways, string Status, string[]? Routes = null, string? Proxy = null);
 public sealed record ProxyConfigurationInfo(bool? ManualProxyEnabled, string? ManualProxyServer,
     string? AutoConfigUrl, bool? AutoDetectEnabled, string? BypassList, bool IsAvailable);
+public sealed record WinHttpProxyConfigurationInfo(bool? NamedProxyEnabled, string? ProxyServer,
+    string? BypassList, bool IsAvailable);
 public sealed record DriverInfo(string Device, string Provider, string Version, string? Date, string? Signer,
     [property: System.Text.Json.Serialization.JsonConverter(typeof(ProviderNullableBooleanJsonConverter))] bool? IsSigned = null,
     string? Manufacturer = null);

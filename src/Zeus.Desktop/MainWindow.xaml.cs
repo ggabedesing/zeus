@@ -616,6 +616,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (inventory.NetworkConfiguration.Count == 0)
                 ExtendedHardwareRows.Add(new("Rede · configuração IP/DNS/rotas", "O provedor de configuração não retornou interfaces nesta coleta. IP, DNS, gateway e rotas estão indisponíveis; isso não confirma ausência de adaptadores."));
             ExtendedHardwareRows.Add(new("Proxy do usuário (HKCU)", FormatProxyConfiguration(inventory.ProxyConfiguration)));
+            ExtendedHardwareRows.Add(new("Proxy WinHTTP padrão", FormatWinHttpProxyConfiguration(inventory.WinHttpProxyConfiguration)));
             ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
             ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
             ExtendedHardwareRows.Add(new("Reinicialização pendente", FormatRestartState(WindowsRestartStateParser.Evaluate(inventory.RestartIndicators))));
@@ -1042,7 +1043,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var pac = string.IsNullOrWhiteSpace(proxy.AutoConfigUrl) ? "PAC: URL não configurada" : $"PAC configurado: {proxy.AutoConfigUrl}";
         var autodetect = proxy.AutoDetectEnabled switch { true => "AutoDetect no Registro: ativado", false => "AutoDetect no Registro: desativado", null => "AutoDetect no Registro: não informado" };
         var bypass = string.IsNullOrWhiteSpace(proxy.BypassList) ? "lista de exceções: não informada" : $"lista de exceções: {proxy.BypassList}";
-        return $"{manual} · {pac} · {autodetect} · {bypass}. Fonte: HKCU Internet Settings; WinHTTP e configurações por aplicativo não consultados.";
+        return $"{manual} · {pac} · {autodetect} · {bypass}. Fonte: HKCU Internet Settings; configurações por sessão e por aplicativo não consultadas.";
+    }
+
+    private static string FormatWinHttpProxyConfiguration(WinHttpProxyConfigurationInfo? proxy)
+    {
+        if (proxy is not { IsAvailable: true }) return "Estado indisponível nesta coleta; não equivale a proxy desativado.";
+        var state = proxy.NamedProxyEnabled switch { true => "proxy nomeado configurado", false => "acesso direto configurado", null => "tipo de acesso desconhecido" };
+        var server = string.IsNullOrWhiteSpace(proxy.ProxyServer) ? "servidor não informado" : $"servidor: {proxy.ProxyServer}";
+        var bypass = string.IsNullOrWhiteSpace(proxy.BypassList) ? "exceções não informadas" : $"exceções: {proxy.BypassList}";
+        return $"{state} · {server} · {bypass}. Fonte: configuração WinHTTP padrão; sessões e aplicativos podem sobrescrever esse valor.";
     }
 
     private static string FormatRestartState(WindowsRestartState state) => state.IsPending switch
