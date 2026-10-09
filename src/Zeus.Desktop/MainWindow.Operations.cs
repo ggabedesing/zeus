@@ -1096,7 +1096,21 @@ public partial class MainWindow
     private void OpenWindowsColors_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:personalization-colors", "cores");
     private void OpenWindowsStart_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:personalization-start", "Iniciar");
     private void OpenWindowsTaskbar_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:taskbar", "barra de tarefas");
-    private void OpenWindowsSound_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:sound", "som");
+    private void OpenWindowsSound_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy) return;
+        try
+        {
+            _openUri("ms-settings:sound");
+            StatusTitle = "Configurações de som abertas";
+            StatusDetail = "Para pré-visualizar sons de eventos e escolher um esquema, procure “Mais configurações de som” ou “Painel de Controle de Som” e abra a guia Sons, se disponível nesta versão do Windows. O ZEUS só encaminhou você ao Windows; não aplicou nem guardou estado para reverter a escolha.";
+        }
+        catch (Exception error) when (error is Win32Exception or InvalidOperationException)
+        {
+            StatusTitle = "Configurações do Windows não foram abertas";
+            StatusDetail = $"A página de som não pôde ser aberta: {error.Message}";
+        }
+    }
     private void OpenWindowsLockScreen_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:lockscreen", "tela de bloqueio");
     private bool Confirm(string text, string title) => MessageBox.Show(this, text, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 }

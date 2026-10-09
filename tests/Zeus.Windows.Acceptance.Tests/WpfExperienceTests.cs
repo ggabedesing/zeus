@@ -209,8 +209,17 @@ public sealed class WpfExperienceTests
             }
             else
             {
-                Assert.Equal("Configurações oficiais do Windows abertas", window.StatusTitle);
-                Assert.Contains("não alterou nem guardou estado para reverter", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
+                if (entry.Uri == "ms-settings:sound")
+                {
+                    Assert.Equal("Configurações de som abertas", window.StatusTitle);
+                    Assert.Contains("guia Sons", window.StatusDetail, StringComparison.Ordinal);
+                    Assert.Contains("não aplicou nem guardou estado para reverter", window.StatusDetail, StringComparison.Ordinal);
+                }
+                else
+                {
+                    Assert.Equal("Configurações oficiais do Windows abertas", window.StatusTitle);
+                    Assert.Contains("não alterou nem guardou estado para reverter", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
+                }
             }
             openedUris.Clear();
         }

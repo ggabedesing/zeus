@@ -17,6 +17,7 @@
 - A navegação das áreas agora rola verticalmente em janelas baixas; a validação WPF confere a última aba no tamanho mínimo e mantém os controles principais dentro da janela.
 - O modo técnico agora é uma preferência independente do tema visual: ele mantém os detalhes visíveis mesmo no tema mínimo e persiste junto às demais preferências locais.
 - A área Perfil e plano agora abre páginas oficiais do Windows para temas, cores, menu Iniciar, barra de tarefas, som e tela de bloqueio, deixando explícito que essas alterações são controladas pelo Windows e não são revertidas pelo ZEUS.
+- O atalho de som agora orienta o usuário a localizar “Mais configurações de som” e a guia Sons no Windows para pré-visualizar e escolher esquemas de eventos, sem o ZEUS alterar nem registrar essa escolha.
 - O ciclo automatizado do MSI abre a janela principal da versão instalada após a atualização e valida o encerramento antes da desinstalação.
 - A aba de drivers identifica separadamente o fabricante do dispositivo e o fabricante do driver, e oferece consulta de atualizações em fontes oficiais.
 - A interface acompanha a ativação e a desativação do alto contraste do Windows enquanto está aberta.
