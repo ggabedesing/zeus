@@ -11,7 +11,7 @@ public sealed class WindowsAcceptanceFactAttribute : FactAttribute
     public WindowsAcceptanceFactAttribute()
     {
         if (!OperatingSystem.IsWindows() || Environment.GetEnvironmentVariable("ZEUS_WINDOWS_ACCEPTANCE") != "1")
-            Skip = "Requer Windows com ZEUS_WINDOWS_ACCEPTANCE=1; o teste aplica e restaura as preferências visuais do usuário.";
+            Skip = "Requer Windows com ZEUS_WINDOWS_ACCEPTANCE=1; o teste aplica e restaura uma configuração visual real do usuário.";
     }
 }
 
@@ -224,6 +224,59 @@ public sealed class WallpaperChangeTests
         catch (InvalidDataException error)
         {
             Assert.Contains("imagem estática", error.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [WindowsAcceptanceFact]
+    public async Task RealWindowsWallpaperCanBeAppliedVerifiedAndRestoredFromHistory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.RealWallpaperTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(selected, Bmp(17, 83, 149));
+        var platform = new WindowsWallpaperPlatform();
+        var service = new UserOptimizationService(root, platform);
+        Guid sessionId = Guid.Empty;
+        try
+        {
+            if (platform.IsSlideshowConfigured())
+                throw Xunit.Sdk.SkipException.ForSkip("O teste preserva apresentações de slides e não altera o papel de parede.");
+
+            var originalStates = platform.GetAttachedMonitorWallpapers();
+            var originalHashes = originalStates.ToDictionary(state => state.MonitorId, state => Hash(state.Path), StringComparer.OrdinalIgnoreCase);
+            var originalPosition = platform.GetWallpaperPosition();
+            var applied = await service.ApplyWallpaperAsync(selected);
+            sessionId = applied.SessionId;
+            Assert.True(applied.Succeeded, applied.Message);
+            Assert.NotEqual(Guid.Empty, sessionId);
+            Assert.Contains("aplicado e verificado", applied.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.All(platform.GetAttachedMonitorWallpapers(), state => Assert.Equal(Hash(selected), Hash(state.Path)));
+
+            var restored = await service.RestoreAsync(sessionId);
+            Assert.True(restored.Succeeded, restored.Message);
+            Assert.Equal(originalPosition, platform.GetWallpaperPosition());
+            var restoredStates = platform.GetAttachedMonitorWallpapers();
+            Assert.Equal(originalHashes.Count, restoredStates.Count);
+            foreach (var state in restoredStates)
+                Assert.Equal(originalHashes[state.MonitorId], Hash(state.Path));
+            Assert.Equal(UserChangeStatus.Restored, Assert.Single(await service.ListChangesAsync()).Status);
+        }
+        catch (InvalidDataException error) when (error.Message.Contains("imagem estática", StringComparison.OrdinalIgnoreCase))
+        {
+            throw Xunit.Sdk.SkipException.ForSkip("O Windows não expôs uma imagem estática reversível para o teste: " + error.Message);
+        }
+        finally
+        {
+            if (sessionId != Guid.Empty)
+            {
+                var pending = (await service.ListChangesAsync()).FirstOrDefault(change => change.Id == sessionId && !change.Restored);
+                if (pending is not null)
+                {
+                    var recovery = await service.RestoreAsync(sessionId);
+                    Assert.True(recovery.Succeeded, "A restauração de segurança do teste falhou: " + recovery.Message);
+                }
+            }
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
 
