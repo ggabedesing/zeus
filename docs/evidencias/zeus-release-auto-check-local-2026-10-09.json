@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-09",
+  "feature": "optional daily ZEUS release check",
+  "sourceCommit": "9e441007175de467006d0928eaab8fe3be51753f",
+  "sourceTreeDirtyDuringPackage": true,
+  "policy": {
+    "enabledByDefault": false,
+    "trigger": "application startup",
+    "minimumIntervalHours": 24,
+    "endpoint": "official GitHub releases API",
+    "sendsComputerInventory": false,
+    "remoteSeesConnectionIp": true,
+    "downloadsOrInstallsAutomatically": false
+  },
+  "verification": {
+    "focusedTestsPassed": 5,
+    "focusedTestsFailed": 0,
+    "fullSuitePassed": 513,
+    "fullSuiteFailed": 0,
+    "fullSuiteSkipped": 10,
+    "portableExeSmoke": "window opened, remained responsive, and closed normally",
+    "automaticLiveGithubRequest": "not performed; tests cover cadence, preference persistence, and application acceptance, not the external HTTP response"
+  },
+  "package": {
+    "runtime": "win-x64",
+    "zip": "artifacts/auto-update-opt-in-package/zeus-win-x64.zip",
+    "zipSha256": "833AAD44B6580F14F079024F29A6FD05A6C0B2C11CBA82CA3E6E95BFC4801B21",
+    "exeSha256": "45672EF9B865315E22059ECCCA193D9B7A12E165D609B6206E620454C69700C4",
+    "authenticodeProductionSignature": false
+  }
+}

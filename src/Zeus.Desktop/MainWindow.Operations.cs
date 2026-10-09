@@ -14,16 +14,66 @@ namespace Zeus.Desktop;
 
 public partial class MainWindow
 {
+    private static readonly TimeSpan AutomaticZeusUpdateCheckInterval = TimeSpan.FromHours(24);
+
+    internal static bool ShouldRunAutomaticZeusUpdateCheck(bool enabled, DateTimeOffset? lastCheckUtc, DateTimeOffset nowUtc) =>
+        enabled && (lastCheckUtc is null || nowUtc - lastCheckUtc.Value >= AutomaticZeusUpdateCheckInterval);
+
+    private async Task CheckZeusUpdatesAutomaticallyAsync()
+    {
+        if (_isClosing || !ShouldRunAutomaticZeusUpdateCheck(CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc, DateTimeOffset.UtcNow)) return;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _automaticZeusUpdateCheckCancellation = cancellation;
+        ZeusReleaseSummary = "Verificando automaticamente a publicação oficial do ZEUS…";
+        try
+        {
+            var result = await _zeusReleaseChecker.CheckAsync(BuildVersion, cancellation.Token);
+            if (_isClosing || !CheckZeusUpdatesAutomatically) return;
+            _lastZeusUpdateCheckUtc = DateTimeOffset.UtcNow;
+            ZeusReleaseSummary = $"{result.Summary} Verificado automaticamente em {_lastZeusUpdateCheckUtc.Value.ToLocalTime():dd/MM HH:mm}.";
+            QueueActivity(new(_lastZeusUpdateCheckUtc.Value, "zeus-update", "automatic-check", "info",
+                "Consulta automática somente leitura da versão do ZEUS concluída.",
+                JsonSerializer.Serialize(new { result.Summary, checkedAt = _lastZeusUpdateCheckUtc })));
+            await SavePreferencesAsync();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            if (!_isClosing && !CheckZeusUpdatesAutomatically)
+                ZeusReleaseSummary = "Verificação automática cancelada; nenhuma atualização foi baixada ou instalada.";
+        }
+        catch (Exception error)
+        {
+            if (_isClosing) return;
+            _lastZeusUpdateCheckUtc = DateTimeOffset.UtcNow;
+            ZeusReleaseSummary = $"A verificação automática ficou inconclusiva: {error.Message} · nova tentativa após 24 horas.";
+            QueueActivity(new(_lastZeusUpdateCheckUtc.Value, "zeus-update", "automatic-check-incomplete", "warning",
+                "A consulta automática somente leitura do ZEUS ficou inconclusiva.",
+                JsonSerializer.Serialize(new { checkedAt = _lastZeusUpdateCheckUtc })));
+            await SavePreferencesAsync();
+        }
+        finally
+        {
+            if (ReferenceEquals(_automaticZeusUpdateCheckCancellation, cancellation))
+                _automaticZeusUpdateCheckCancellation = null;
+        }
+    }
+
     private async void CheckZeusUpdates_Click(object sender, RoutedEventArgs e)
     {
         if (_isBusy) return;
+        _automaticZeusUpdateCheckCancellation?.Cancel();
         ZeusReleaseSummary = "Consultando a publicação oficial do ZEUS no GitHub…";
         await RunOperationAsync("Consultando atualização do ZEUS", "Somente leitura. Nenhum arquivo será baixado ou instalado.", async token =>
         {
             try
             {
                 var result = await _zeusReleaseChecker.CheckAsync(BuildVersion, token);
+                _lastZeusUpdateCheckUtc = DateTimeOffset.UtcNow;
                 ZeusReleaseSummary = result.Summary;
+                QueueActivity(new(_lastZeusUpdateCheckUtc.Value, "zeus-update", "manual-check", "info",
+                    "Consulta manual somente leitura da versão do ZEUS concluída.",
+                    JsonSerializer.Serialize(new { result.Summary, checkedAt = _lastZeusUpdateCheckUtc })));
+                await SavePreferencesAsync();
                 StatusTitle = "Consulta de versão do ZEUS concluída";
                 StatusDetail = result.Summary;
                 if (result.ReleasePage is not null && Confirm($"{result.Summary}\n\nAbrir a página oficial de versões do ZEUS no navegador? Nenhum instalador será baixado automaticamente.", "Versões do ZEUS"))
@@ -35,7 +85,12 @@ public partial class MainWindow
             }
             catch (Exception error)
             {
+                _lastZeusUpdateCheckUtc = DateTimeOffset.UtcNow;
                 ZeusReleaseSummary = $"Não foi possível confirmar a versão mais recente: {error.Message}";
+                QueueActivity(new(_lastZeusUpdateCheckUtc.Value, "zeus-update", "manual-check-incomplete", "warning",
+                    "A consulta manual somente leitura da versão do ZEUS ficou inconclusiva.",
+                    JsonSerializer.Serialize(new { checkedAt = _lastZeusUpdateCheckUtc })));
+                await SavePreferencesAsync();
                 StatusTitle = "Consulta de versão inconclusiva";
                 StatusDetail = ZeusReleaseSummary;
             }

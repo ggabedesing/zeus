@@ -741,6 +741,26 @@ public sealed class WpfExperienceTests
         var updateSearchButton = Assert.IsType<Button>(window.FindName("SearchPendingWindowsUpdatesButton"));
         Assert.Equal("search-pending-windows-updates", AutomationProperties.GetAutomationId(updateSearchButton));
         Assert.True(updateSearchButton.IsEnabled, "A busca online somente leitura deve exigir ação explícita do usuário.");
+        var automaticZeusUpdateCheck = Assert.IsType<CheckBox>(window.FindName("AutomaticZeusUpdateCheckToggle"));
+        Assert.Equal("automatic-zeus-update-check", AutomationProperties.GetAutomationId(automaticZeusUpdateCheck));
+        Assert.False(automaticZeusUpdateCheck.IsChecked, "A verificação de rede no início deve permanecer desativada até a pessoa optar por ela.");
+        automaticZeusUpdateCheck.IsChecked = true;
+        Assert.True(window.CheckZeusUpdatesAutomatically);
+        var autoCheckSaveDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        DesktopPreferences updatePreferences;
+        do
+        {
+            await Task.Delay(25);
+            updatePreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        } while (!updatePreferences.CheckZeusUpdatesAutomatically && DateTimeOffset.UtcNow < autoCheckSaveDeadline);
+        Assert.True(updatePreferences.CheckZeusUpdatesAutomatically);
+        automaticZeusUpdateCheck.IsChecked = false;
+        do
+        {
+            await Task.Delay(25);
+            updatePreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        } while (updatePreferences.CheckZeusUpdatesAutomatically && DateTimeOffset.UtcNow < autoCheckSaveDeadline);
+        Assert.False(updatePreferences.CheckZeusUpdatesAutomatically);
         var updateHistoryButton = Assert.IsType<Button>(window.FindName("ReadWindowsUpdateHistoryButton"));
         Assert.Equal("read-windows-update-history", AutomationProperties.GetAutomationId(updateHistoryButton));
         Assert.True(updateHistoryButton.IsEnabled, "A consulta local somente leitura do histórico também deve exigir ação explícita.");

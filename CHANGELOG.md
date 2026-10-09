@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- A consulta de release do ZEUS agora pode ser ativada para executar automaticamente no máximo a cada 24 horas; permanece desativada por padrão, não envia inventário, não baixa nem instala pacotes e permite cancelar a consulta em andamento desativando a opção.
 - As opções do relógio flutuante agora entram em prévia temporária; confirmar salva aparência e posição, enquanto cancelar restaura o estado anterior, inclusive depois de mover ou recentralizar o relógio.
 - A aba de atualizações agora pode ler, sob solicitação, o histórico local do Windows Update: somente leitura, sem rede, limitada aos 50 eventos recentes e sem inferir saúde atual ou instalação presente.
 - O validador do histórico do Windows Update rejeita registros malformados, preserva resultados desconhecidos e sinaliza quando a resposta ultrapassa o limite.

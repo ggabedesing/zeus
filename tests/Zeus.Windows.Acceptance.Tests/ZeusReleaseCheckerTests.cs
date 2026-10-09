@@ -8,6 +8,18 @@ namespace Zeus.Windows.Acceptance.Tests;
 public sealed class ZeusReleaseCheckerTests
 {
     [Fact]
+    public void AutomaticCheckIsOptInAndThrottledForTwentyFourHours()
+    {
+        var now = new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero);
+
+        Assert.False(MainWindow.ShouldRunAutomaticZeusUpdateCheck(false, null, now));
+        Assert.True(MainWindow.ShouldRunAutomaticZeusUpdateCheck(true, null, now));
+        Assert.False(MainWindow.ShouldRunAutomaticZeusUpdateCheck(true, now.AddHours(-23), now));
+        Assert.True(MainWindow.ShouldRunAutomaticZeusUpdateCheck(true, now.AddHours(-24), now));
+        Assert.False(MainWindow.ShouldRunAutomaticZeusUpdateCheck(true, now.AddHours(1), now));
+    }
+
+    [Fact]
     public async Task ReportsNewerStableVersionAndOnlyOfficialReleasePage()
     {
         var checker = new ZeusReleaseChecker(new StubHandler(HttpStatusCode.OK,

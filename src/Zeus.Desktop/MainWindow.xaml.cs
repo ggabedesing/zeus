@@ -76,6 +76,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private double _desktopClockOpacity = 0.88, _desktopClockLeft = 40, _desktopClockTop = 80;
     private DesktopClockPreferences _savedClockPreferences = new();
     private bool _desktopClockSettingsPreviewing;
+    private bool _checkZeusUpdatesAutomatically;
+    private DateTimeOffset? _lastZeusUpdateCheckUtc;
+    private CancellationTokenSource? _automaticZeusUpdateCheckCancellation;
     private DesktopClockWindow? _desktopClock;
     private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
     private bool _networkResetReviewed, _networkResetRecoveryReady;
@@ -453,6 +456,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             : "Escolha um perfil para pré-visualizar nesta interface; confirme para salvar ou cancele a prévia.";
     public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
     public bool IsTechnicalMode { get => _isTechnicalMode; set { if (Set(ref _isTechnicalMode, value)) { Notify(nameof(DetailedVisibility)); QueuePreferencesSave(); } } }
+    public bool CheckZeusUpdatesAutomatically
+    {
+        get => _checkZeusUpdatesAutomatically;
+        set
+        {
+            if (!Set(ref _checkZeusUpdatesAutomatically, value)) return;
+            if (!value) _automaticZeusUpdateCheckCancellation?.Cancel();
+            QueuePreferencesSave();
+        }
+    }
     public DesktopTheme SelectedTheme
     {
         get => _selectedTheme;
@@ -577,6 +590,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _savedVisualLayoutPresetId = p.VisualLayoutPresetId;
                 SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency;
                 IsTechnicalMode = p.IsTechnicalMode;
+                _checkZeusUpdatesAutomatically = p.CheckZeusUpdatesAutomatically;
+                _lastZeusUpdateCheckUtc = p.LastZeusUpdateCheckUtc;
+                Notify(nameof(CheckZeusUpdatesAutomatically));
                 FirstRunSetupComplete = p.FirstRunSetupComplete;
                 NeedsBluetooth = p.NeedsBluetooth; NeedsPrinting = p.NeedsPrinting; NeedsCloudSync = p.NeedsCloudSync; NeedsVirtualization = p.NeedsVirtualization;
                 var clock = p.Clock ?? new();
@@ -638,6 +654,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         finally { SetBusy(false); }
         await RefreshDiagnosticsAsync();
+        if (ShouldRunAutomaticZeusUpdateCheck(CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc, DateTimeOffset.UtcNow))
+            _ = CheckZeusUpdatesAutomaticallyAsync();
     }
 
     private void HardwareCardsList_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -957,7 +975,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
-        _desktopClockSettingsPreviewing ? _savedClockPreferences : CaptureDesktopClockPreferences(), SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson, _customAccentHex);
+        _desktopClockSettingsPreviewing ? _savedClockPreferences : CaptureDesktopClockPreferences(), SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson, _customAccentHex,
+        CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
     internal static Point ResolveInitialClockPosition(double left, double top, double width, double height, Rect virtualScreen) =>
