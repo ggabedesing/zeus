@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "82ddbb8",
+  "sourceDirty": false,
+  "test": "isolated-sqlite-backup-restore-on-windows",
+  "databaseSchema": 5,
+  "backupCreated": true,
+  "backupBytes": 77824,
+  "backupIntegrity": "ok",
+  "restoredPreferenceMatchesBackup": true,
+  "restoredBackupActivityFound": true,
+  "postBackupActivityAbsentAfterRestore": true,
+  "safetyCopyCreated": true,
+  "safetyCopyContainsCurrentPreference": true,
+  "safetyCopyContainsPreRestoreActivity": true,
+  "restoredDatabaseIntegrity": "ok",
+  "applicationDatabaseTouched": false,
+  "dataLeftInUsersProfile": false,
+  "limitations": [
+    "This direct Windows service probe did not exercise file-picker dialogs, confirmation prompt, or desktop restart.",
+    "The database was created under a unique temporary folder and contains only synthetic validation data."
+  ]
+}
