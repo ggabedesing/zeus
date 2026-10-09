@@ -273,6 +273,21 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository, [strin
     $sbomPath = Join-Path $Destination 'SBOM.spdx.json'
     $spdxDocument | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $sbomPath -Encoding utf8
     $validatedSbom = Get-Content -LiteralPath $sbomPath -Raw -Encoding utf8 | ConvertFrom-Json
+    $validatedSpdxIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    [void]$validatedSpdxIds.Add('SPDXRef-DOCUMENT')
+    foreach ($component in $validatedSbom.packages) {
+        if ([string]::IsNullOrWhiteSpace($component.name) -or [string]::IsNullOrWhiteSpace($component.SPDXID) -or
+            [string]::IsNullOrWhiteSpace($component.versionInfo) -or
+            [string]::IsNullOrWhiteSpace($component.licenseDeclared) -or !$validatedSpdxIds.Add([string]$component.SPDXID)) {
+            throw 'Generated SPDX SBOM has a component with missing identity/metadata or duplicate SPDXID.'
+        }
+    }
+    foreach ($relationship in $validatedSbom.relationships) {
+        if (!$validatedSpdxIds.Contains([string]$relationship.spdxElementId) -or
+            !$validatedSpdxIds.Contains([string]$relationship.relatedSpdxElement)) {
+            throw 'Generated SPDX SBOM contains a relationship to an unknown component.'
+        }
+    }
     if ($validatedSbom.spdxVersion -ne 'SPDX-2.3' -or $validatedSbom.packages.Count -ne $spdxComponents.Count -or
         $validatedSbom.relationships.Count -ne $spdxRelationships.Count -or
         @($validatedSbom.packages | Select-Object -ExpandProperty SPDXID -Unique).Count -ne $spdxComponents.Count) {
