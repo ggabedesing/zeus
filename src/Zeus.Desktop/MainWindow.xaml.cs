@@ -249,7 +249,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS", "Interface escura com acento violeta e cartões suaves, inspirada em uma estética Aurora."),
         new(DesktopTheme.Light, "Claro · leitura", "Interface clara com contraste ajustado para leitura em superfícies claras."),
         new(DesktopTheme.GamingNeon, "Gamer Neon · foco em jogos", "Interface escura com acento verde neon; não altera jogos, drivers ou configurações de desempenho."),
-        new(DesktopTheme.Cyberpunk, "Cyberpunk · criação", "Interface escura com acento rosa; não altera jogos, drivers ou configurações de desempenho.")
+        new(DesktopTheme.Cyberpunk, "Cyberpunk · criação", "Interface escura com acento rosa; não altera jogos, drivers ou configurações de desempenho."),
+        new(DesktopTheme.RetroAmber, "Retrô âmbar", "Paleta escura inspirada em terminais e monitores clássicos, com destaque âmbar."),
+        new(DesktopTheme.Monochrome, "Monocromático", "Interface em tons neutros, sem depender de cores fortes para indicar navegação.")
     ];
     public IReadOnlyList<VisualLayoutPreset> VisualLayoutPresets { get; } = VisualLayoutCatalog.Load();
     public IReadOnlyList<AppearanceCapabilityRow> AppearanceCapabilities { get; } =
@@ -882,7 +884,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                         ? new[] { "#090D16", "#111A2B", "#293650", "#EEF4FF", "#ABB8CD", "#D6FF5F", "#1B2A3E", "#1B2A26", "#070B12" }
                         : theme == DesktopTheme.Cyberpunk
                             ? new[] { "#100B1A", "#1A1230", "#3D2C58", "#F7F1FF", "#C4B5D5", "#FF63D8", "#2E1A43", "#291A39", "#0A0711" }
-                            : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
+                            : theme == DesktopTheme.RetroAmber
+                                ? new[] { "#171109", "#241A0D", "#51402A", "#FFF1D6", "#D6BA8C", "#FFC857", "#38280E", "#3A2A12", "#100C07" }
+                                : theme == DesktopTheme.Monochrome
+                                    ? new[] { "#101010", "#1B1B1B", "#414141", "#F4F4F4", "#C4C4C4", "#D9D9D9", "#252525", "#323232", "#090909" }
+                                    : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
         colors[5] = GetAccentHex(accent, theme);
         return colors;
     }
@@ -942,6 +948,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             DesktopTheme.Light => "#176B87",
             DesktopTheme.GamingNeon => "#D6FF5F",
             DesktopTheme.Cyberpunk => "#FF63D8",
+            DesktopTheme.RetroAmber => "#FFC857",
+            DesktopTheme.Monochrome => "#D9D9D9",
             _ => "#65E3E0"
         },
         _ => theme == DesktopTheme.Light ? "#176B87" : "#65E3E0"

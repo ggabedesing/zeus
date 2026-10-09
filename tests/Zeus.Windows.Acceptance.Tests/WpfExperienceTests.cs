@@ -98,13 +98,16 @@ public sealed class WpfExperienceTests
     {
         var presets = VisualLayoutCatalog.Load();
 
-        Assert.Equal(4, presets.Count);
-        Assert.Equal(4, presets.Select(preset => preset.Id).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(9, presets.Count);
+        Assert.Equal(9, presets.Select(preset => preset.Id).Distinct(StringComparer.Ordinal).Count());
         Assert.All(presets, preset => Assert.Equal("zeus-ui", preset.Scope));
         Assert.Contains(presets, preset => preset.Name == "Windows Moderno");
         Assert.Contains(presets, preset => preset.Name == "Minimalista");
         Assert.Contains(presets, preset => preset.Name == "Produtividade");
         Assert.Contains(presets, preset => preset.Name == "Aurora");
+        Assert.Contains(presets, preset => preset.Id == "terminal" && preset.Theme == DesktopTheme.Minimal && preset.Accent == AppAccentColor.Green);
+        Assert.Contains(presets, preset => preset.Id == "retro-amber" && preset.Theme == DesktopTheme.RetroAmber);
+        Assert.Contains(presets, preset => preset.Id == "monocromatico" && preset.Theme == DesktopTheme.Monochrome);
 
         const string unexpectedCommand = """{"schemaVersion":1,"presets":[{"id":"teste","name":"Teste","theme":"Complete","accent":"ThemeDefault","description":"Perfil de teste","scope":"zeus-ui","command":"powershell"}]}""";
         Assert.Throws<JsonException>(() => VisualLayoutCatalog.Parse(unexpectedCommand));
@@ -271,7 +274,7 @@ public sealed class WpfExperienceTests
         var themeSelectorPeer = Assert.IsAssignableFrom<ComboBoxAutomationPeer>(UIElementAutomationPeer.CreatePeerForElement(themeSelector));
         Assert.Equal("Tema do aplicativo", themeSelectorPeer.GetName());
         var expandCollapse = Assert.IsAssignableFrom<IExpandCollapseProvider>(themeSelectorPeer.GetPattern(PatternInterface.ExpandCollapse));
-        Assert.Equal(6, themeSelector.Items.Count);
+        Assert.Equal(8, themeSelector.Items.Count);
         var themeScope = Assert.IsType<ItemsControl>(window.FindName("AppearanceCapabilitiesList"));
         Assert.Equal(5, themeScope.Items.Count);
         Assert.Equal("Matriz do que o tema altera", AutomationProperties.GetName(themeScope));
@@ -287,7 +290,7 @@ public sealed class WpfExperienceTests
         var visualLayoutSelector = Assert.IsType<ComboBox>(window.FindName("VisualLayoutPresetSelector"));
         Assert.Equal("visual-layout-preset-selector", AutomationProperties.GetAutomationId(visualLayoutSelector));
         Assert.Equal("Perfil visual do ZEUS", AutomationProperties.GetName(visualLayoutSelector));
-        Assert.Equal(4, visualLayoutSelector.Items.Count);
+        Assert.Equal(9, visualLayoutSelector.Items.Count);
         var visualLayoutPreview = Assert.IsType<Border>(window.FindName("VisualLayoutPreviewCard"));
         Assert.Equal("visual-layout-preview", AutomationProperties.GetAutomationId(visualLayoutPreview));
         var applyVisualLayoutButton = Assert.IsType<Button>(window.FindName("ApplyVisualLayoutButton"));
@@ -310,6 +313,8 @@ public sealed class WpfExperienceTests
             Assert.Equal(transparencyBeforeThemeChange, window.ReduceTransparency);
             Assert.Equal(wallpaperBeforeThemeChange, window.SelectedWallpaperPath);
         }
+        window.SelectedVisualLayoutPreset = window.VisualLayoutPresets.Single(preset => preset.Id == "aurora");
+        applyVisualLayoutButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var accentSelector = Assert.IsType<ComboBox>(window.FindName("AccentColorSelector"));
         Assert.Equal("accent-color-selector", AutomationProperties.GetAutomationId(accentSelector));
         Assert.Equal("Cor de destaque do aplicativo", AutomationProperties.GetName(accentSelector));
@@ -324,6 +329,7 @@ public sealed class WpfExperienceTests
         Assert.False(themeSelector.IsDropDownOpen);
         foreach (var theme in Enum.GetValues<DesktopTheme>())
         {
+            window.SelectedAccentColor = AppAccentColor.ThemeDefault;
             window.SelectedTheme = theme;
             Assert.Equal(theme, window.SelectedThemeOption.Value);
             Assert.False(string.IsNullOrWhiteSpace(window.SelectedThemeOption.Description));
@@ -332,6 +338,10 @@ public sealed class WpfExperienceTests
             Assert.Equal(wallpaperBeforeThemeChange, window.SelectedWallpaperPath);
             Assert.Same(Application.Current.Resources["PanelBrush"], themeSelector.Background);
             Assert.Same(Application.Current.Resources["TextBrush"], themeSelector.Foreground);
+            if (theme == DesktopTheme.RetroAmber)
+                Assert.Equal(Color.FromRgb(0xFF, 0xC8, 0x57), Assert.IsType<SolidColorBrush>(Application.Current.Resources["AccentBrush"]).Color);
+            if (theme == DesktopTheme.Monochrome)
+                Assert.Equal(Color.FromRgb(0xD9, 0xD9, 0xD9), Assert.IsType<SolidColorBrush>(Application.Current.Resources["AccentBrush"]).Color);
             await RenderAsync(window, $"zeus-theme-{theme}.png");
         }
         foreach (var accent in Enum.GetValues<AppAccentColor>())
