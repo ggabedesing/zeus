@@ -35,6 +35,15 @@
     "runtime": "win-x64",
     "smoke": "Main window opened, responded, and closed cleanly."
   },
+  "githubActions": {
+    "workflow": "Build and validate ZEUS",
+    "runNumber": 245,
+    "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37922128209",
+    "conclusion": "success",
+    "windowsAcceptance": "success",
+    "portableRulesAndCleanupBoundaries": "success",
+    "releaseSigningAndStaging": "skipped for branch push"
+  },
   "limitations": [
     "SMBIOS interleave metadata does not certify the number of active memory channels.",
     "Firmware may omit or report incomplete interleave metadata; ZEUS keeps such values unavailable.",
