@@ -43,6 +43,111 @@ function Test-PortableApplicationLaunch([string]$Executable, [string]$WorkingDir
     Write-Output 'Portable application smoke passed: main window opened, responded, and closed cleanly.'
 }
 
+function Add-ThirdPartyNotices([string]$Destination, [string]$Repository) {
+    $dotnetCommand = Get-Command dotnet -CommandType Application -ErrorAction Stop
+    $dotnetNotices = Join-Path (Split-Path -Parent $dotnetCommand.Source) 'ThirdPartyNotices.txt'
+    if (!(Test-Path -LiteralPath $dotnetNotices -PathType Leaf)) {
+        throw "The installed .NET distribution has no ThirdPartyNotices.txt: $dotnetNotices"
+    }
+    Copy-Item -LiteralPath $dotnetNotices -Destination (Join-Path $Destination 'THIRD-PARTY-NOTICES.NET.txt')
+
+    $globalPackages = $env:NUGET_PACKAGES
+    if ([string]::IsNullOrWhiteSpace($globalPackages)) {
+        $userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+        $globalPackages = Join-Path $userProfile '.nuget/packages'
+    }
+    if (!(Test-Path -LiteralPath $globalPackages -PathType Container)) {
+        throw "NuGet global package directory was not found: $globalPackages"
+    }
+
+    $dependencies = @{}
+    $runtimePacks = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($depsFile in @('Zeus.Desktop.deps.json', 'Zeus.Maintenance.deps.json')) {
+        $depsPath = Join-Path $Destination $depsFile
+        if (!(Test-Path -LiteralPath $depsPath -PathType Leaf)) { throw "Required dependency manifest missing: $depsFile" }
+        $deps = Get-Content -LiteralPath $depsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($library in $deps.libraries.PSObject.Properties) {
+            if ($library.Value.type -eq 'runtimepack') {
+                [void]$runtimePacks.Add($library.Name)
+                continue
+            }
+            if ($library.Value.type -ne 'package') { continue }
+            $separator = $library.Name.LastIndexOf('/')
+            if ($separator -le 0) { throw "Invalid package identity in ${depsFile}: $($library.Name)" }
+            $id = $library.Name.Substring(0, $separator)
+            $version = $library.Name.Substring($separator + 1)
+            $key = "$id/$version"
+            $dependencies[$key] = [pscustomobject]@{ Id = $id; Version = $version }
+        }
+    }
+
+    $licenseDirectory = Join-Path $Destination 'licenses'
+    New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
+    $rows = [System.Collections.Generic.List[string]]::new()
+    $licenseExpressions = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($package in @($dependencies.Values | Sort-Object Id, Version)) {
+        $packageDirectory = Join-Path $globalPackages (Join-Path $package.Id.ToLowerInvariant() $package.Version)
+        if (!(Test-Path -LiteralPath $packageDirectory -PathType Container)) {
+            throw "NuGet package required by the published application is missing: $($package.Id) $($package.Version)"
+        }
+        $nuspec = Get-ChildItem -LiteralPath $packageDirectory -Filter '*.nuspec' -File | Select-Object -First 1
+        if ($null -eq $nuspec) { throw "NuGet package has no nuspec license metadata: $($package.Id) $($package.Version)" }
+        [xml]$packageMetadata = Get-Content -LiteralPath $nuspec.FullName -Raw -Encoding UTF8
+        $license = $packageMetadata.package.metadata.license
+        if ($null -eq $license) { throw "NuGet package has no declared license metadata: $($package.Id) $($package.Version)" }
+        $licenseType = $license.GetAttribute('type')
+        if ($licenseType -eq 'expression') {
+            $expression = $license.InnerText.Trim()
+            if ($expression -notin @('MIT', 'Apache-2.0')) {
+                throw "Unreviewed NuGet SPDX expression for $($package.Id) $($package.Version): $expression"
+            }
+            [void]$licenseExpressions.Add($expression)
+            $licenseText = "licenses/$expression.txt"
+        } elseif ($licenseType -eq 'file') {
+            $licenseRelativePath = $license.InnerText.Trim()
+            $licenseSource = Join-Path $packageDirectory $licenseRelativePath
+            if (!(Test-Path -LiteralPath $licenseSource -PathType Leaf)) {
+                throw "Declared license file is missing for $($package.Id) $($package.Version): $licenseRelativePath"
+            }
+            $licenseText = "licenses/NuGet-$($package.Id)-$($package.Version).txt"
+            Copy-Item -LiteralPath $licenseSource -Destination (Join-Path $Destination $licenseText)
+        } else {
+            throw "Unsupported NuGet license metadata for $($package.Id) $($package.Version)."
+        }
+        $packageUrl = "https://www.nuget.org/packages/$($package.Id)/$($package.Version)"
+        $copyright = [string]$packageMetadata.package.metadata.copyright
+        if ([string]::IsNullOrWhiteSpace($copyright)) { $copyright = 'Veja os avisos incluídos e os metadados do pacote NuGet.' }
+        $copyright = $copyright -replace '[|\r\n]+', ' '
+        $rows.Add("| [$($package.Id)]($packageUrl) | $($package.Version) | [$licenseText]($licenseText) | $copyright |")
+
+        foreach ($notice in Get-ChildItem -LiteralPath $packageDirectory -File | Where-Object { $_.Name -match '^(?i)(THIRD-PARTY-NOTICES|NOTICE)' }) {
+            $noticeName = "THIRD-PARTY-NOTICES-$($package.Id)-$($package.Version).txt"
+            Copy-Item -LiteralPath $notice.FullName -Destination (Join-Path $Destination $noticeName)
+        }
+    }
+
+    foreach ($expression in $licenseExpressions) {
+        $licenseFile = "$expression.txt"
+        $licenseSource = Join-Path $Repository (Join-Path 'licenses/SPDX' $licenseFile)
+        if (!(Test-Path -LiteralPath $licenseSource -PathType Leaf)) { throw "Bundled SPDX license text missing: $licenseSource" }
+        Copy-Item -LiteralPath $licenseSource -Destination (Join-Path $licenseDirectory $licenseFile)
+    }
+
+    $runtimeSummary = if ($runtimePacks.Count -gt 0) { ($runtimePacks | Sort-Object) -join ', ' } else { 'runtime self-contained conforme o RID do pacote' }
+    $noticeText = @(
+        '# Third-party notices',
+        '',
+        'Este pacote portátil inclui o runtime .NET e dependências NuGet listadas abaixo. Os avisos completos do runtime estão em `THIRD-PARTY-NOTICES.NET.txt`; avisos adicionais de pacotes estão em arquivos `THIRD-PARTY-NOTICES-*.txt`.',
+        'Estes avisos cobrem somente componentes de terceiros; não concedem licença para o código ou a marca ZEUS.',
+        '',
+        "Runtime packs: $runtimeSummary.",
+        '',
+        '| Pacote | Versão | Licença | Aviso de copyright |',
+        '| --- | --- | --- | --- |'
+    ) + @($rows)
+    $noticeText | Set-Content -LiteralPath (Join-Path $Destination 'THIRD-PARTY-NOTICES.md') -Encoding utf8
+}
+
 $repository = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repository 'artifacts'
@@ -61,6 +166,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Desktop publication failed.' }
     dotnet publish src/Zeus.Maintenance/Zeus.Maintenance.csproj -c Release -r $Runtime --self-contained true "-p:Version=$ProductVersion" -o $destination
     if ($LASTEXITCODE -ne 0) { throw 'Maintenance helper publication failed.' }
+    Add-ThirdPartyNotices -Destination $destination -Repository $repository
     foreach ($assemblyName in @('Zeus.Desktop.dll', 'Zeus.Maintenance.dll')) {
         $assemblyPath = Join-Path $destination $assemblyName
         if (!(Test-Path -LiteralPath $assemblyPath -PathType Leaf)) { throw "Required versioned assembly missing: $assemblyName" }

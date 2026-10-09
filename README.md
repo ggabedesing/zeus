@@ -8,6 +8,8 @@ O [histórico de versões](CHANGELOG.md) registra as mudanças entregues. A vers
 
 O [processo de release](docs/release-process.md) descreve como tags validadas podem gerar um rascunho de release com executáveis e MSI Authenticode assinados. Builds atuais continuam sendo de desenvolvimento; ainda não há certificado de produção configurado.
 
+O pacote portátil inclui avisos do runtime .NET e inventário de licenças das dependências NuGet em `THIRD-PARTY-NOTICES.md`. Essa documentação de terceiros não substitui a licença do ZEUS, que ainda precisa ser escolhida.
+
 ## Recursos
 
 | Área | O que o aplicativo faz |

@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O pacote portátil inclui os avisos do runtime .NET, expressões de licença NuGet e avisos adicionais das dependências empacotadas.
 - Ao fechar o ZEUS com registros de atividade pendentes, o encerramento final agora também fecha o relógio flutuante; isso evita deixar o processo aberto depois que a janela principal desaparece.
 - O Observador mostra, por processo GPU, a alocação dedicada como parcela da capacidade dedicada reportada pelo adaptador quando o LUID tem uma única correspondência, e compara essa parcela entre sessões com cobertura das amostras válidas. O percentual não representa orçamento individual nem diagnóstico de pressão; correspondência ambígua ou dado ausente permanece indisponível também na comparação.
 - O relógio do desktop agora restaura a posição salva em monitores secundários, inclusive quando ficam à esquerda ou acima da tela principal; coordenadas fora da área virtual são limitadas para manter o relógio visível.
