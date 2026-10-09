@@ -60,6 +60,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _firstRunSetupComplete = true;
     private bool _isTechnicalMode;
     private DesktopTheme _selectedTheme = DesktopTheme.Complete;
+    private DesktopDensity _selectedDensity = DesktopDensity.Comfortable;
     private AppAccentColor _selectedAccentColor = AppAccentColor.ThemeDefault;
     private VisualLayoutPreset? _selectedVisualLayoutPreset;
     private bool _visualLayoutPreviewActive;
@@ -523,6 +524,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             QueuePreferencesSave();
         }
     }
+    public DesktopDensity SelectedDensity
+    {
+        get => _selectedDensity;
+        set
+        {
+            if (!Enum.IsDefined(value) || !Set(ref _selectedDensity, value)) return;
+            ApplyDensity();
+            QueuePreferencesSave();
+        }
+    }
+    public DesktopDensityOption[] DensityOptions { get; } =
+    [new("Confortável", DesktopDensity.Comfortable), new("Compacta", DesktopDensity.Compact)];
     public AppAccentColor SelectedAccentColor
     {
         get => _selectedAccentColor;
@@ -614,6 +627,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             {
                 var p = await _storage.ReadPreferencesAsync();
                 SelectedTheme = p.IsMinimal ? DesktopTheme.Minimal : p.Theme;
+                SelectedDensity = Enum.IsDefined(p.Density) ? p.Density : DesktopDensity.Comfortable;
                 SelectedAccentColor = Enum.IsDefined(p.AccentColor) ? p.AccentColor : AppAccentColor.ThemeDefault;
                 _customVisualLayoutsJson = p.CustomVisualLayoutsJson;
                 if (!string.IsNullOrWhiteSpace(_customVisualLayoutsJson))
@@ -1025,7 +1039,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
         _desktopClockSettingsPreviewing ? _savedClockPreferences : CaptureDesktopClockPreferences(), SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson, _customAccentHex,
-        CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc, ReduceZeusMotion);
+        CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc, ReduceZeusMotion, SelectedDensity);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
     internal static DesktopClockStyle ResolveClockStyle(DesktopClockStyle savedStyle) =>
@@ -1100,6 +1114,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ApplyTheme(DesktopTheme? previewTheme = null, AppAccentColor? previewAccent = null, string? customAccentOverride = null)
     {
+        ApplyDensity();
         if (SystemParameters.HighContrast) return;
         var theme = previewTheme ?? SelectedTheme;
         var colors = GetThemePalette(theme, previewAccent ?? SelectedAccentColor);
@@ -1129,6 +1144,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Application.Current.Resources["PrimaryTextBrush"] = BrushFromHex("#071623");
         }
         if (previewTheme is null && _loaded && DesktopClockEnabled) SyncDesktopClock();
+    }
+
+    private void ApplyDensity()
+    {
+        if (Application.Current is null) return;
+        var compact = SelectedDensity == DesktopDensity.Compact;
+        Application.Current.Resources["CardContentPadding"] = compact ? new Thickness(14) : new Thickness(20);
+        Application.Current.Resources["ButtonContentPadding"] = compact ? new Thickness(12, 7, 12, 7) : new Thickness(17, 10, 17, 10);
+        Application.Current.Resources["NavigationItemPadding"] = compact ? new Thickness(11, 9, 11, 9) : new Thickness(15, 13, 15, 13);
+        Application.Current.Resources["NavigationItemSpacing"] = compact ? new Thickness(0, 0, 0, 4) : new Thickness(0, 0, 0, 8);
+        Application.Current.Resources["InputContentPadding"] = compact ? new Thickness(8) : new Thickness(12);
+        Application.Current.Resources["CardCornerRadius"] = compact ? new CornerRadius(8) : new CornerRadius(12);
     }
 
     private static string[] GetThemePalette(DesktopTheme theme, AppAccentColor accent)

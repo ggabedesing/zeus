@@ -19,6 +19,12 @@
         <SolidColorBrush x:Key="WarningBorderBrush" Color="#6A532F" />
         <SolidColorBrush x:Key="LogBackgroundBrush" Color="#080F1B" />
         <SolidColorBrush x:Key="LogTextBrush" Color="#C8D8E8" />
+        <Thickness x:Key="CardContentPadding">20</Thickness>
+        <Thickness x:Key="ButtonContentPadding">17,10</Thickness>
+        <Thickness x:Key="NavigationItemPadding">15,13</Thickness>
+        <Thickness x:Key="NavigationItemSpacing">0,0,0,8</Thickness>
+        <Thickness x:Key="InputContentPadding">12</Thickness>
+        <CornerRadius x:Key="CardCornerRadius">12</CornerRadius>
 
         <Style TargetType="Window">
             <Setter Property="FontFamily" Value="Segoe UI" />
@@ -42,15 +48,15 @@
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
-            <Setter Property="Padding" Value="20" />
+            <Setter Property="CornerRadius" Value="{DynamicResource CardCornerRadius}" />
+            <Setter Property="Padding" Value="{DynamicResource CardContentPadding}" />
         </Style>
         <Style TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource ButtonBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="17,10" />
+            <Setter Property="Padding" Value="{DynamicResource ButtonContentPadding}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Template">
@@ -90,8 +96,8 @@
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Padding" Value="15,13" />
-            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Padding" Value="{DynamicResource NavigationItemPadding}" />
+            <Setter Property="Margin" Value="{DynamicResource NavigationItemSpacing}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -107,7 +113,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource LogBackgroundBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Padding" Value="12"/></Style>
+        <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource LogBackgroundBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Padding" Value="{DynamicResource InputContentPadding}"/></Style>
         <ControlTemplate x:Key="ComboDropDownToggleTemplate" TargetType="ToggleButton">
             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"

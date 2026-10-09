@@ -242,7 +242,7 @@ internal sealed record DesktopPreferences(bool IsMinimal, DesktopTheme Theme = D
     AppAccentColor AccentColor = AppAccentColor.ThemeDefault, string? VisualLayoutPresetId = null,
     string? CustomVisualLayoutsJson = null, string? CustomAccentHex = null,
     bool CheckZeusUpdatesAutomatically = false, DateTimeOffset? LastZeusUpdateCheckUtc = null,
-    bool ReduceZeusMotion = false);
+    bool ReduceZeusMotion = false, DesktopDensity Density = DesktopDensity.Comfortable);
 
 internal sealed record DesktopClockPreferences(bool Enabled = false, bool ShowDate = true, bool ShowSeconds = false,
     bool AlwaysOnTop = false, double Opacity = 0.88, double Left = 40, double Top = 80,
@@ -256,6 +256,8 @@ public enum DesktopClockSize { Compact, Medium, Large }
 public sealed record DesktopClockSizeOption(string Label, DesktopClockSize Value);
 public enum DesktopClockStyle { Glass, Minimal, Neon, Classic }
 public sealed record DesktopClockStyleOption(string Label, DesktopClockStyle Value);
+public enum DesktopDensity { Comfortable, Compact }
+public sealed record DesktopDensityOption(string Label, DesktopDensity Value);
 
 // Export deliberately excludes startup command strings, raw logs and process environment.
 internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset ExportedAt, HardwareSnapshot? Diagnostics,

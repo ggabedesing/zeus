@@ -16,7 +16,8 @@ public sealed class DesktopStorageTests : IDisposable
         var storage = new DesktopStorage(_root);
         const string customCatalog = "{\"schemaVersion\":1,\"presets\":[]}";
         await storage.SavePreferencesAsync(new DesktopPreferences(false, DesktopTheme.Light, AccentColor: AppAccentColor.Green,
-            VisualLayoutPresetId: "aurora", CustomVisualLayoutsJson: customCatalog, ReduceZeusMotion: true));
+            VisualLayoutPresetId: "aurora", CustomVisualLayoutsJson: customCatalog, ReduceZeusMotion: true,
+            Density: DesktopDensity.Compact));
 
         var restored = await storage.ReadPreferencesAsync();
 
@@ -25,6 +26,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal("aurora", restored.VisualLayoutPresetId);
         Assert.Equal(customCatalog, restored.CustomVisualLayoutsJson);
         Assert.True(restored.ReduceZeusMotion);
+        Assert.Equal(DesktopDensity.Compact, restored.Density);
     }
 
     [Fact]
@@ -53,6 +55,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(MaintenanceActionId.VerifySystemFiles, migratedHistory.Steps[0].Action);
         Assert.Equal(MaintenanceVerificationStatus.NotRecorded, migratedHistory.Steps[0].Verification);
         Assert.True(migratedPreferences.IsMinimal);
+        Assert.Equal(DesktopDensity.Comfortable, migratedPreferences.Density);
         Assert.False(migratedPreferences.ReduceZeusMotion, "Older preference JSON keeps the existing motion behavior by default.");
         Assert.False(migratedPreferences.IsTechnicalMode, "Older preferences must retain the default non-technical mode when the new field is absent.");
         Assert.Equal(AppAccentColor.ThemeDefault, migratedPreferences.AccentColor);

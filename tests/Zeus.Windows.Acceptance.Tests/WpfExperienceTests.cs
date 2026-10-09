@@ -982,9 +982,33 @@ public sealed class WpfExperienceTests
             persistedPreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
         } while (!persistedPreferences.IsTechnicalMode && DateTimeOffset.UtcNow < technicalPreferencesDeadline);
         Assert.True(persistedPreferences.IsTechnicalMode, "Technical mode must persist in the SQLite-backed app settings.");
+        var densitySelector = Assert.IsType<ComboBox>(window.FindName("DensitySelector"));
+        Assert.Equal("interface-density-selector", AutomationProperties.GetAutomationId(densitySelector));
+        Assert.Equal(2, densitySelector.Items.Count);
+        window.SelectedDensity = DesktopDensity.Compact;
+        Assert.Equal(new Thickness(14), Assert.IsType<Thickness>(appResource("CardContentPadding")));
+        Assert.Equal(new Thickness(12, 7, 12, 7), Assert.IsType<Thickness>(appResource("ButtonContentPadding")));
+        var refreshAction = FindVisualDescendants<Button>(window).Single(button => AutomationProperties.GetAutomationId(button) == "refresh-diagnostics");
+        Assert.Equal(new Thickness(12, 7, 12, 7), refreshAction.Padding);
+        var compactStyledCard = Assert.IsType<Border>(window.FindName("DensityCard"));
+        Assert.Equal(new Thickness(14), compactStyledCard.Padding);
+        Assert.Equal(new Thickness(11, 9, 11, 9), actualTabs[0].Padding);
+        await RenderAsync(window, "zeus-compact-density.png");
+        var densitySaveDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        do
+        {
+            await Task.Delay(25);
+            persistedPreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        } while (persistedPreferences.Density != DesktopDensity.Compact && DateTimeOffset.UtcNow < densitySaveDeadline);
+        Assert.Equal(DesktopDensity.Compact, persistedPreferences.Density);
+        window.SelectedDensity = DesktopDensity.Comfortable;
+        Assert.Equal(new Thickness(20), Assert.IsType<Thickness>(appResource("CardContentPadding")));
+        Assert.Equal(new Thickness(17, 10, 17, 10), refreshAction.Padding);
         window.SelectedTheme = DesktopTheme.MacInspired;
         Assert.True(window.IsTechnicalMode, "Changing the application theme must not change the technical-mode preference.");
         Assert.Equal(Visibility.Visible, window.DetailedVisibility);
+
+        object appResource(string key) => Application.Current.Resources[key];
         window.SelectedTheme = DesktopTheme.Minimal;
         technicalModeToggle.IsChecked = false;
         Assert.Equal(Visibility.Collapsed, window.DetailedVisibility);
