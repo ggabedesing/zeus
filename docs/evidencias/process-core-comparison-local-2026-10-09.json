@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "ab5f56c2700ee7f8e635512fa1339619412bbfcb",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "package": "artifacts/process-core-comparison/zeus-win-x64.zip",
+  "packageSha256": "622a2cbf2a4b1f88db9746c63dd3ff1de13c769d3c37c1ef4a0691aaafab8945",
+  "desktopExeSha256": "b8c85bb8bcae7d06e4efe5b92cbee256ce2e7bc43c2a17fe4b9800f5e3d256de",
+  "portableExeSmoke": {
+    "result": "passed",
+    "openedMainWindow": true,
+    "responded": true,
+    "closedCleanly": true
+  },
+  "tests": {
+    "solution": "Zeus.slnx",
+    "configuration": "Release",
+    "passed": 468,
+    "failed": 0,
+    "skipped": 9,
+    "hardwarePassed": 143,
+    "windowsAcceptancePassed": 56,
+    "focusedComparisonAndExport": "2 passed"
+  },
+  "notes": [
+    "Per-process before/after CPU comparison now includes equivalent cores used and sample coverage for each session.",
+    "Process identity continues to require matching PID and start time; reused PIDs are kept separate.",
+    "Package is a development build and is not Authenticode signed for production."
+  ]
+}
