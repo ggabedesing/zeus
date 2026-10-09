@@ -281,7 +281,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Single(Directory.EnumerateFiles(SessionPath(result.SessionId), "*.bin"));
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public async Task SourceFileAndDirectoryLinksAreExcludedWithoutTouchingTheirTargets()
     {
         var outside = Path.Combine(_fixture, "outside");
@@ -299,7 +299,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Equal("external", await File.ReadAllTextAsync(outsideFile));
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public void SymlinkRootsAndOverlappingRootsAreRejected()
     {
         var link = Path.Combine(_fixture, "temporary-link");
@@ -311,7 +311,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Throws<ArgumentException>(() => new TemporaryFileCleanup(TemporaryRoot, _fixture));
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public async Task SourceDirectoryReplacedBySymlinkAfterScanIsSkipped()
     {
         WriteOld("nested/old.tmp", "old");
@@ -328,7 +328,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Equal("old", await File.ReadAllTextAsync(Path.Combine(movedDirectory, "old.tmp")));
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public async Task RestoreDoesNotFollowASymlinkDestinationDirectory()
     {
         WriteOld("nested/old.tmp", "old");
@@ -347,7 +347,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Single(Directory.EnumerateFiles(SessionPath(result.SessionId), "*.bin"));
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public async Task ReplacedSessionDirectoryIsNeverUsedForRestoreOrPurge()
     {
         WriteOld("old.tmp", "keep");
@@ -409,7 +409,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Equal("original", await File.ReadAllTextAsync(original));
     }
 
-    [Fact]
+    [SymbolicLinkFact]
     public async Task RecoveryStorageChangedIntoLinkAfterConstructionIsRejected()
     {
         WriteOld("old.tmp", "keep");
@@ -550,7 +550,7 @@ public sealed class TemporaryFileCleanupTests : IDisposable
         Assert.Equal("original document", await File.ReadAllTextAsync(outside));
     }
 
-    [WindowsFact]
+    [SymbolicLinkFact]
     public async Task WindowsMetadataLinksCannotModifyExternalFiles()
     {
         var outside = Path.Combine(_fixture, "document.txt");
