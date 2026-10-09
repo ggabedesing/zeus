@@ -324,7 +324,7 @@ public partial class MainWindow
             ? "Nenhuma sessão de desempenho foi salva ainda."
             : string.Join(Environment.NewLine, recentSessions.Select(session =>
                 $"{session.StartedAt.ToLocalTime():dd/MM HH:mm} · {session.Label} · {session.Samples.Count} amostras"));
-        var all = new List<(bool IsReference, PerformanceObservation Observation)>();
+        var all = new List<(Guid SessionId, bool IsReference, PerformanceObservation Observation)>();
         foreach (var session in sessions.OrderBy(session => session.StartedAt))
         {
             if (!Guid.TryParseExact(session.SessionId, "D", out var id) || id == Guid.Empty)
@@ -341,7 +341,7 @@ public partial class MainWindow
                     var observation = JsonSerializer.Deserialize<PerformanceObservation>(sample.DetailsJson, DesktopStorage.JsonOptions)
                         ?? throw new InvalidDataException("A amostra armazenada está vazia.");
                     if (!session.IsReference) _performanceHistory.Add(new(id, observation));
-                    all.Add((session.IsReference, observation));
+                    all.Add((id, session.IsReference, observation));
                     _performanceSessionSequences[id] = Math.Max(_performanceSessionSequences.GetValueOrDefault(id), sample.Sequence + 1);
                 }
                 catch (Exception error) when (error is JsonException or InvalidDataException or NotSupportedException)
@@ -361,7 +361,8 @@ public partial class MainWindow
             }
         }
 
-        _performanceBaseline = all.Where(item => item.IsReference).Select(item => item.Observation).TakeLast(5).ToArray();
+        _performanceBaseline = PerformanceSessionSelection.LatestSessionSamples(all.Where(item => item.IsReference)
+            .Select(item => new PerformanceHistoryEntry(item.SessionId, item.Observation)).ToArray()).ToArray();
         var last = _performanceHistory.Snapshot().LastOrDefault();
         if (last is not null)
         {
@@ -371,9 +372,8 @@ public partial class MainWindow
         if (_performanceBaseline.Length >= 3)
         {
             var baselineEnd = _performanceBaseline[^1].CollectedAt;
-            var later = all.Where(item => !item.IsReference && item.Observation.CollectedAt > baselineEnd)
-                .Select(item => item.Observation).TakeLast(5).ToArray();
-            if (later.Length >= 3) _performanceComparison = PerformanceComparisonBuilder.Compare(_performanceBaseline, later);
+            var later = PerformanceSessionSelection.LatestSessionSamples(_performanceHistory.Snapshot(), after: baselineEnd);
+            if (later.Count >= 3) _performanceComparison = PerformanceComparisonBuilder.Compare(_performanceBaseline, later);
         }
         Notify(nameof(Performance)); Notify(nameof(CanSetPerformanceBaseline)); Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
     }
@@ -443,12 +443,12 @@ public partial class MainWindow
 
     private async void SetPerformanceBaseline_Click(object sender, RoutedEventArgs e)
     {
-        var observations = _performanceHistory.Snapshot().TakeLast(5).Select(entry => entry.Observation).ToArray();
+        var observations = PerformanceSessionSelection.LatestSessionSamples(_performanceHistory.Snapshot()).ToArray();
         if (observations.Length < 3) return;
         _performanceBaseline = observations;
         _performanceComparison = null;
         Notify(nameof(CanComparePerformance)); Notify(nameof(PerformanceComparisonSummary));
-        StatusDetail = $"Referência definida com {observations.Length} amostras. Execute a mesma tarefa em condições semelhantes e colete ao menos três amostras posteriores.";
+        StatusDetail = $"Referência definida com {observations.Length} amostras de uma única sessão, até {observations[^1].CollectedAt.ToLocalTime():dd/MM HH:mm:ss}. Repita a mesma tarefa em condições semelhantes e colete ao menos três amostras em uma única sessão posterior.";
 
         var referenceId = Guid.NewGuid();
         var referenceLabel = BuildPerformanceSessionLabel("Referência de desempenho", PerformanceActivityLabel);
@@ -478,13 +478,11 @@ public partial class MainWindow
     {
         var baselineEnd = _performanceBaseline.LastOrDefault()?.CollectedAt;
         if (_performanceBaseline.Length < 3 || baselineEnd is null) return;
-        var later = _performanceHistory.Snapshot()
-            .Where(entry => entry.Observation.CollectedAt > baselineEnd.Value)
-            .TakeLast(5).Select(entry => entry.Observation).ToArray();
-        if (later.Length < 3) return;
+        var later = PerformanceSessionSelection.LatestSessionSamples(_performanceHistory.Snapshot(), after: baselineEnd.Value);
+        if (later.Count < 3) return;
         _performanceComparison = PerformanceComparisonBuilder.Compare(_performanceBaseline, later);
         Notify(nameof(PerformanceComparisonSummary));
-        StatusDetail = "Comparação descritiva entre médias de CPU e uso de RAM. Ela não identifica a causa das diferenças nem garante ganho de desempenho.";
+        StatusDetail = $"Comparação de uma sessão de referência com uma sessão posterior ({later.Count} amostras). Ela não identifica a causa das diferenças nem garante ganho de desempenho.";
     }
 
     private async void ScanCleanup_Click(object sender, RoutedEventArgs e)

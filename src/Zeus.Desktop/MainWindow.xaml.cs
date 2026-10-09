@@ -125,9 +125,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public DatabaseHealth? StorageHealth => _storageHealth;
     public PerformanceObservation? Performance => _performance;
     public IReadOnlyList<PerformanceHistoryEntry> PerformanceHistory => _performanceHistory.Snapshot();
-    public bool CanSetPerformanceBaseline => !_isBusy && _performanceHistory.Snapshot().Count >= 3;
+    public bool CanSetPerformanceBaseline => !_isBusy &&
+        PerformanceSessionSelection.LatestSessionSamples(_performanceHistory.Snapshot()).Count >= 3;
     public bool CanComparePerformance => !_isBusy && _performanceBaseline.Length >= 3 &&
-        _performanceHistory.Snapshot().Count(entry => entry.Observation.CollectedAt > _performanceBaseline[^1].CollectedAt) >= 3;
+        PerformanceSessionSelection.LatestSessionSamples(_performanceHistory.Snapshot(), after: _performanceBaseline[^1].CollectedAt).Count >= 3;
     public string PerformanceComparisonSummary
     {
         get
@@ -161,6 +162,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     .Take(5).Select(item => $"{item.ProcessName} · PID {item.ProcessId} · {item.AdapterInstance}: {FormatByteQuantity(item.ReferenceDedicatedBytes)} ({item.ReferenceAvailableSamples}/{comparison.ReferenceSampleCount}) → {FormatByteQuantity(item.LaterDedicatedBytes)} ({item.LaterAvailableSamples}/{comparison.LaterSampleCount})"))
                 : "Memória GPU dedicada por processo: indisponível (PID, horário de início e adaptador não confirmados nos períodos)";
             return string.Join(Environment.NewLine,
+                $"Sessão de referência: até {comparison.ReferenceEndedAt.ToLocalTime():dd/MM HH:mm:ss} ({comparison.ReferenceSampleCount} amostras) → sessão posterior: até {comparison.LaterEndedAt.ToLocalTime():dd/MM HH:mm:ss} ({comparison.LaterSampleCount} amostras).",
                 $"CPU média: {FormatMetricCoverage(comparison.CpuUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · RAM em uso: {FormatMetricCoverage(comparison.MemoryUsage, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio da engine GPU mais ativa: {FormatMetricCoverage(comparison.GpuEnginePeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)} · pico médio de atividade de disco: {FormatMetricCoverage(comparison.DiskActivityPeak, comparison.ReferenceSampleCount, comparison.LaterSampleCount)}",
                 diskIo,
                 gpuMemory,

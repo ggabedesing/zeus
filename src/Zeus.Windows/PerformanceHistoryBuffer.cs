@@ -2,6 +2,33 @@ namespace Zeus.Windows;
 
 public sealed record PerformanceHistoryEntry(Guid SessionId, PerformanceObservation Observation);
 
+/// <summary>Selects one session at a time so comparisons do not combine different workloads.</summary>
+public static class PerformanceSessionSelection
+{
+    public static IReadOnlyList<PerformanceObservation> LatestSessionSamples(
+        IReadOnlyList<PerformanceHistoryEntry> history,
+        int minimumSamples = 3,
+        int maximumSamples = 5,
+        DateTimeOffset? after = null)
+    {
+        ArgumentNullException.ThrowIfNull(history);
+        if (minimumSamples < 1) throw new ArgumentOutOfRangeException(nameof(minimumSamples));
+        if (maximumSamples < minimumSamples) throw new ArgumentOutOfRangeException(nameof(maximumSamples));
+
+        var latest = history
+            .Where(entry => after is null || entry.Observation.CollectedAt > after.Value)
+            .GroupBy(entry => entry.SessionId)
+            .Select(group => group.Select(entry => entry.Observation)
+                .OrderBy(observation => observation.CollectedAt).ToArray())
+            .OrderByDescending(samples => samples[^1].CollectedAt)
+            .FirstOrDefault();
+
+        return latest is { Length: >= 1 } && latest.Length >= minimumSamples
+            ? latest.TakeLast(maximumSamples).ToArray()
+            : [];
+    }
+}
+
 public sealed record PerformanceComparison(
     int ReferenceSampleCount,
     int LaterSampleCount,

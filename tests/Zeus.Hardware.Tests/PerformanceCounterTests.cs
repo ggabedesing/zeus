@@ -315,6 +315,43 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void SessionSelectionDoesNotBorrowSamplesFromAnOlderSession()
+    {
+        var olderSession = Guid.NewGuid();
+        var newestSession = Guid.NewGuid();
+        var history = Enumerable.Range(1, 5)
+            .Select(second => new PerformanceHistoryEntry(olderSession,
+                Sample(10) with { CollectedAt = DateTimeOffset.UnixEpoch.AddSeconds(second) }))
+            .Concat(Enumerable.Range(6, 2).Select(second => new PerformanceHistoryEntry(newestSession,
+                Sample(90) with { CollectedAt = DateTimeOffset.UnixEpoch.AddSeconds(second) })))
+            .ToList();
+
+        Assert.Empty(PerformanceSessionSelection.LatestSessionSamples(history));
+
+        history.Add(new(newestSession, Sample(95) with { CollectedAt = DateTimeOffset.UnixEpoch.AddSeconds(8) }));
+        var selected = PerformanceSessionSelection.LatestSessionSamples(history);
+
+        Assert.Equal(3, selected.Count);
+        Assert.All(selected, observation => Assert.InRange(observation.CpuPercent!.Value, 90, 100));
+        Assert.All(selected, observation => Assert.True(observation.CollectedAt > DateTimeOffset.UnixEpoch.AddSeconds(5)));
+    }
+
+    [Fact]
+    public void LaterSessionSelectionIncludesOnlySamplesAfterReferenceEnd()
+    {
+        var session = Guid.NewGuid();
+        var history = Enumerable.Range(1, 5)
+            .Select(second => new PerformanceHistoryEntry(session,
+                Sample(second * 10) with { CollectedAt = DateTimeOffset.UnixEpoch.AddSeconds(second) }))
+            .ToArray();
+
+        var selected = PerformanceSessionSelection.LatestSessionSamples(history, after: DateTimeOffset.UnixEpoch.AddSeconds(2));
+
+        Assert.Equal(3, selected.Count);
+        Assert.All(selected, observation => Assert.True(observation.CollectedAt > DateTimeOffset.UnixEpoch.AddSeconds(2)));
+    }
+
+    [Fact]
     public void CpuAndMemoryComparisonExposeCoverageAndIgnoreInvalidPercentages()
     {
         var reference = new[]
