@@ -327,7 +327,7 @@ $inventory = [pscustomobject]@{
 
     private static IReadOnlyList<MemoryModuleInfo> ReadMemoryModules(CancellationToken token, ConcurrentQueue<string> warnings)
     {
-        using var rows = Query("SELECT DeviceLocator,BankLabel,Capacity,Speed,ConfiguredClockSpeed,Manufacturer FROM Win32_PhysicalMemory");
+        using var rows = Query("SELECT DeviceLocator,BankLabel,Capacity,Speed,ConfiguredClockSpeed,Manufacturer,InterleavePosition,InterleaveDataDepth FROM Win32_PhysicalMemory");
         var result = new List<MemoryModuleInfo>();
         foreach (ManagementObject row in rows)
         {
@@ -340,8 +340,12 @@ $inventory = [pscustomobject]@{
                 if (!TryReadCapacity(capacity, $"Módulo de memória {location}", warnings, out var bytes)) continue;
                 var speed = UnsignedValue(row, "ConfiguredClockSpeed");
                 if (speed is null or 0) speed = UnsignedValue(row, "Speed");
+                var interleavePosition = UnsignedValue(row, "InterleavePosition");
+                var interleaveDepth = UnsignedValue(row, "InterleaveDataDepth");
                 result.Add(new MemoryModuleInfo(location, bytes,
-                    speed is > 0 and <= uint.MaxValue ? (uint)speed.Value : null, StringValue(row, "Manufacturer")));
+                    speed is > 0 and <= uint.MaxValue ? (uint)speed.Value : null, StringValue(row, "Manufacturer"),
+                    interleavePosition is <= uint.MaxValue ? (uint?)interleavePosition : null,
+                    interleaveDepth is <= ushort.MaxValue ? (ushort?)interleaveDepth : null));
             }
         }
         return result;

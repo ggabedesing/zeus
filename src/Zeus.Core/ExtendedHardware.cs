@@ -5,8 +5,9 @@ public sealed record BoardInfo(string Manufacturer, string Product);
 
 public sealed record BiosInfo(string Manufacturer, string Version, string? ReleaseDate);
 
-/// <summary>Speed is the reported module speed. Slot inventory does not establish channel configuration.</summary>
-public sealed record MemoryModuleInfo(string Location, ulong CapacityBytes, uint? SpeedMHz, string Manufacturer);
+/// <summary>SMBIOS values describe module inventory/interleave; they do not certify active memory channels.</summary>
+public sealed record MemoryModuleInfo(string Location, ulong CapacityBytes, uint? SpeedMHz, string Manufacturer,
+    uint? InterleavePosition = null, ushort? InterleaveDataDepth = null);
 
 /// <summary>
 /// Status, sensors, and reliability counters are those supplied by the storage provider.

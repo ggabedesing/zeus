@@ -35,7 +35,7 @@ public sealed class HardwareCompatibilityTests
     {
         var snapshot = new HardwareSnapshot(DateTimeOffset.UtcNow, "Windows", "PC", null, null, [], [], [], null, [],
             new BoardInfo("Fabricante", "Modelo"), new BiosInfo("Fabricante", "1.0", null),
-            [new MemoryModuleInfo("DIMM 1", 8UL * 1024 * 1024 * 1024, null, "Fabricante")],
+            [new MemoryModuleInfo("ChannelA-DIMM0", 8UL * 1024 * 1024 * 1024, null, "Fabricante", 1, 2)],
             [new PhysicalDiskInfo("NVMe", "SSD", "NVMe", 512UL * 1024 * 1024 * 1024, "Healthy", null, null),
              new PhysicalDiskInfo("SATA", "HDD", "SATA", 1024UL * 1024 * 1024 * 1024, "Warning", 42, 12)],
             [new BatteryInfo("Bateria", null, "Desconhecido")],
@@ -49,10 +49,23 @@ public sealed class HardwareCompatibilityTests
         Assert.Equal(42d, restored.PhysicalDisks[1].TemperatureCelsius);
         Assert.Equal(12UL, restored.PhysicalDisks[1].Wear);
         Assert.Null(restored.MemoryModules![0].SpeedMHz);
+        Assert.Equal(1u, restored.MemoryModules[0].InterleavePosition);
+        Assert.Equal((ushort)2, restored.MemoryModules[0].InterleaveDataDepth);
         Assert.Null(restored.Batteries![0].ChargePercent);
         Assert.Equal(1_000_000_000UL, restored.NetworkAdapters![0].SpeedBitsPerSecond);
         Assert.Null(restored.Bios!.ReleaseDate);
         Assert.Equal(4, restored.MemoryArraySlotsReported);
+    }
+
+    [Fact]
+    public void PreviousMemoryModuleReportsKeepNewInterleaveDataUnknown()
+    {
+        const string previous = """{"Location":"DIMM 1","CapacityBytes":8589934592,"SpeedMHz":2666,"Manufacturer":"Fabricante"}""";
+
+        var restored = JsonSerializer.Deserialize<MemoryModuleInfo>(previous)!;
+
+        Assert.Null(restored.InterleavePosition);
+        Assert.Null(restored.InterleaveDataDepth);
     }
 
     [Fact]

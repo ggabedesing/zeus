@@ -1,0 +1,43 @@
+{
+  "evidenceType": "memory-module-smbios-interleave-inventory-and-portable-exe-smoke",
+  "date": "2026-10-09",
+  "sourceCommit": "fd3dd9bdd34db10a01dd71a4e3d74fd7bae0079a",
+  "sourceTreeDirtyAtBuild": true,
+  "implementation": {
+    "source": "Win32_PhysicalMemory.InterleavePosition and InterleaveDataDepth",
+    "reportedValues": "Only when provided by firmware/SMBIOS",
+    "activeChannelClaim": "Never inferred; UI explicitly says active channels are not confirmed",
+    "legacyRecords": "Missing fields remain null and compatible"
+  },
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-physicalmemory",
+    "https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-physicalmemoryarray"
+  ],
+  "tests": {
+    "solutionCommand": "dotnet test Zeus.slnx --no-restore",
+    "passed": 490,
+    "failed": 0,
+    "skipped": 10,
+    "total": 500,
+    "coverage": [
+      "memory interleave fields survive JSON compatibility round-trip",
+      "legacy memory records without interleave fields remain compatible",
+      "UI formats available, partial, non-interleaved, and unavailable SMBIOS states",
+      "WPF acceptance verifies RAM summary and module rows"
+    ],
+    "skippedReason": "Seven cleanup link tests, two protected-session tests, and one real Windows visual-preference test require privileges or opt-in."
+  },
+  "portablePackage": {
+    "path": "artifacts/memory-interleave-package/zeus-win-x64.zip",
+    "sha256": "b8d4cda1b3bdbe8a5b0f89b4eb6a4b4defae43b6aa8170a64ab32cfe08ee6c24",
+    "desktopExePath": "artifacts/memory-interleave-package/zeus-win-x64-fd3dd9bdd34d-20261009T110951855Z-7bb0a07e/Zeus.Desktop.exe",
+    "desktopExeSha256": "c3cec35d4e5f1c7cc45c1d83f174392cb07218977a150ccc0281b36ca0a1f9d6",
+    "runtime": "win-x64",
+    "smoke": "Main window opened, responded, and closed cleanly."
+  },
+  "limitations": [
+    "SMBIOS interleave metadata does not certify the number of active memory channels.",
+    "Firmware may omit or report incomplete interleave metadata; ZEUS keeps such values unavailable.",
+    "The portable development build is not signed with a production Authenticode certificate."
+  ]
+}

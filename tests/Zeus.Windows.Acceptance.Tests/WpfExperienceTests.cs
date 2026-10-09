@@ -38,6 +38,17 @@ public sealed class WpfExperienceTests
         }
     }
 
+    [Fact]
+    public void MemoryInterleaveFormattingDoesNotClaimActiveChannels()
+    {
+        Assert.Equal("Interleave SMBIOS: posição 1 · profundidade 2; canais ativos não confirmados.",
+            MainWindow.FormatMemoryInterleave(new MemoryModuleInfo("ChannelA-DIMM0", 8UL * 1024 * 1024 * 1024, 2666, "Fabricante", 1, 2)));
+        Assert.Equal("Interleave SMBIOS: não intercalado; canais ativos não confirmados.",
+            MainWindow.FormatMemoryInterleave(new MemoryModuleInfo("DIMM 1", 8UL * 1024 * 1024 * 1024, null, "Fabricante", 0, 0)));
+        Assert.Equal("Interleave SMBIOS indisponível; canais ativos não confirmados.",
+            MainWindow.FormatMemoryInterleave(new MemoryModuleInfo("DIMM 1", 8UL * 1024 * 1024 * 1024, null, "Fabricante")));
+    }
+
     [Theory]
     [InlineData(WallpaperPosition.Fill, Stretch.UniformToFill, TileMode.None)]
     [InlineData(WallpaperPosition.Fit, Stretch.Uniform, TileMode.None)]
@@ -572,6 +583,15 @@ public sealed class WpfExperienceTests
         Assert.NotNull(window.Snapshot.Cpu);
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
+        if (window.Snapshot.MemoryModules is { } memoryModules)
+        {
+            var memorySummary = Assert.Single(window.ExtendedHardwareRows, row => row.Title == "RAM · Slots e canais");
+            Assert.Contains("canais: não certificados", memorySummary.Detail, StringComparison.Ordinal);
+            var memoryRows = window.ExtendedHardwareRows.Where(row => row.Title.StartsWith("RAM · ", StringComparison.Ordinal) && row.Title != "RAM · Slots e canais").ToArray();
+            Assert.Equal(memoryModules.Count, memoryRows.Length);
+            for (var index = 0; index < memoryModules.Count; index++)
+                Assert.Contains(MainWindow.FormatMemoryInterleave(memoryModules[index]), memoryRows[index].Detail, StringComparison.Ordinal);
+        }
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Proxy do usuário (HKCU)");
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Proxy WinHTTP padrão" &&
             row.Detail.Contains(window.Snapshot.WindowsInventory?.WinHttpProxyConfiguration is { IsAvailable: true } ? "Fonte: configuração WinHTTP padrão" : "Estado indisponível", StringComparison.Ordinal));
