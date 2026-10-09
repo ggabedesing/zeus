@@ -765,6 +765,7 @@ public partial class MainWindow
             var discovery = await _userOptimization.ReadWallpaperMonitorDiscoveryAsync(_lifetime.Token);
             _currentWallpaperPosition = discovery.Position;
             Notify(nameof(CurrentWallpaperPositionSummary));
+            RefreshWallpaperPreviewPresentation();
             _wallpaperSlideshowDetected = discovery.IsSlideshowConfigured;
             Notify(nameof(CanApplyWallpaper));
             if (discovery.IsSlideshowConfigured)
@@ -773,12 +774,16 @@ public partial class MainWindow
                 SelectedWallpaperMonitor = WallpaperMonitorChoices[0];
                 return;
             }
-            WallpaperMonitorChoices.Add(new(null, "Todos os monitores conectados", "Aplica a imagem escolhida em cada monitor detectado."));
+            var attachedBounds = discovery.Monitors.Select(monitor => monitor.Bounds).Where(bounds => bounds is { Width: > 0, Height: > 0 }).Cast<WallpaperMonitorBounds>().ToArray();
+            WallpaperMonitorBounds? combinedBounds = attachedBounds.Length == 0 ? null : new(
+                attachedBounds.Min(bounds => bounds.Left), attachedBounds.Min(bounds => bounds.Top),
+                attachedBounds.Max(bounds => bounds.Right), attachedBounds.Max(bounds => bounds.Bottom));
+            WallpaperMonitorChoices.Add(new(null, "Todos os monitores conectados", "Aplica a imagem escolhida em cada monitor detectado.", combinedBounds));
             foreach (var monitor in discovery.Monitors)
             {
                 var bounds = monitor.Bounds;
                 var description = bounds is null ? "Posição e resolução indisponíveis" : $"x={bounds.Left}, y={bounds.Top} · {bounds.Width} × {bounds.Height}";
-                WallpaperMonitorChoices.Add(new(monitor.MonitorId, $"Monitor · {description}", $"Identificador técnico: {monitor.MonitorId}"));
+                WallpaperMonitorChoices.Add(new(monitor.MonitorId, $"Monitor · {description}", $"Identificador técnico: {monitor.MonitorId}", bounds));
             }
             SelectedWallpaperMonitor = WallpaperMonitorChoices[0];
         }
@@ -786,6 +791,7 @@ public partial class MainWindow
         {
             _currentWallpaperPosition = null;
             Notify(nameof(CurrentWallpaperPositionSummary));
+            RefreshWallpaperPreviewPresentation();
             _wallpaperSlideshowDetected = false;
             WallpaperMonitorChoices.Add(new(null, "Todos os monitores (seleção individual indisponível)", "A leitura dos monitores falhou; a seleção será revalidada ao aplicar."));
             SelectedWallpaperMonitor = WallpaperMonitorChoices[0];

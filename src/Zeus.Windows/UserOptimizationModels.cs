@@ -31,7 +31,7 @@ public sealed record WallpaperMonitorBounds(int Left, int Top, int Right, int Bo
     public int Height => Bottom - Top;
 }
 public sealed record WallpaperMonitorDiscovery(bool IsSlideshowConfigured, IReadOnlyList<WallpaperMonitorState> Monitors, WallpaperPosition? Position = null);
-public sealed record WallpaperMonitorChoice(string? MonitorId, string Name, string TechnicalDetails)
+public sealed record WallpaperMonitorChoice(string? MonitorId, string Name, string TechnicalDetails, WallpaperMonitorBounds? Bounds = null)
 {
     public override string ToString() => Name;
 }

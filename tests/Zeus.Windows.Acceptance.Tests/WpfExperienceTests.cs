@@ -38,6 +38,42 @@ public sealed class WpfExperienceTests
     }
 
     [Theory]
+    [InlineData(WallpaperPosition.Fill, Stretch.UniformToFill, TileMode.None)]
+    [InlineData(WallpaperPosition.Fit, Stretch.Uniform, TileMode.None)]
+    [InlineData(WallpaperPosition.Stretch, Stretch.Fill, TileMode.None)]
+    [InlineData(WallpaperPosition.Center, Stretch.Uniform, TileMode.None)]
+    [InlineData(WallpaperPosition.Tile, Stretch.Fill, TileMode.Tile)]
+    [InlineData(WallpaperPosition.Span, Stretch.UniformToFill, TileMode.None)]
+    public void WallpaperPreviewPresentationMatchesSelectedPlacement(WallpaperPosition mode, Stretch expectedStretch, TileMode expectedTileMode)
+    {
+        var target = new WallpaperMonitorBounds(-1920, 0, 0, 1080);
+        var preview = WallpaperPreviewPresentation.Create(mode, null, target, 16d / 9d);
+
+        Assert.Equal(expectedStretch, preview.Stretch);
+        Assert.Equal(expectedTileMode, preview.TileMode);
+        Assert.Equal(16d / 9d, preview.TargetAspectRatio, 3);
+        Assert.Equal(preview.TargetAspectRatio, preview.Width / preview.Height, 3);
+        Assert.InRange(preview.Width, 1, 640);
+        Assert.InRange(preview.Height, 1, 260);
+        if (mode == WallpaperPosition.Tile)
+        {
+            Assert.True(preview.Viewport.Width > 0 && preview.Viewport.Height > 0);
+            Assert.Contains("ilustrativa", preview.Description, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void WallpaperPreviewKeepsUnknownCurrentModeExplicit()
+    {
+        var preview = WallpaperPreviewPresentation.Create(null, null, null, double.NaN);
+
+        Assert.Equal(Stretch.Uniform, preview.Stretch);
+        Assert.Equal(TileMode.None, preview.TileMode);
+        Assert.Equal(16d / 9d, preview.TargetAspectRatio, 3);
+        Assert.Contains("desconhecido", preview.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
     [InlineData(519.9, 1)]
     [InlineData(520, 2)]
     [InlineData(839.9, 2)]
@@ -409,6 +445,11 @@ public sealed class WpfExperienceTests
         Assert.Null(window.SelectedWallpaperPosition);
         Assert.Contains(window.WallpaperPositionOptions, option => option.Value == WallpaperPosition.Span && option.Description.Contains("todos os monitores", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("Ajuste atual no Windows:", window.CurrentWallpaperPositionSummary, StringComparison.Ordinal);
+        var wallpaperPreviewFrame = Assert.IsType<Border>(window.FindName("WallpaperPreviewFrame"));
+        Assert.Equal("Prévia do papel de parede conforme o modo selecionado", AutomationProperties.GetName(wallpaperPreviewFrame));
+        Assert.InRange(window.WallpaperPreviewWidth, 1, 640);
+        Assert.InRange(window.WallpaperPreviewHeight, 1, 260);
+        Assert.Contains("formato", window.WallpaperPreviewSummary, StringComparison.OrdinalIgnoreCase);
         var organizePreviewButton = Assert.IsType<Button>(window.FindName("PreviewDesktopOrganizationButton"));
         Assert.Equal("preview-desktop-organization", AutomationProperties.GetAutomationId(organizePreviewButton));
         Assert.True(organizePreviewButton.IsEnabled);

@@ -81,6 +81,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private WallpaperPosition? _currentWallpaperPosition;
     private bool _wallpaperSlideshowDetected;
     private ImageSource? _wallpaperPreview;
+    private ImageBrush? _wallpaperPreviewBrush;
+    private double _wallpaperPreviewWidth = 640;
+    private double _wallpaperPreviewHeight = 360;
+    private string _wallpaperPreviewSummary = "A prévia usa proporção 16:9 enquanto os limites do destino não estão disponíveis.";
     private DesktopOrganizationPreview? _desktopOrganizationPreview;
     private string _desktopOrganizationSummary = "Gere uma prévia para ver quais arquivos comuns seriam movidos. Pastas, atalhos e itens não reconhecidos ficam onde estão.";
     private string _statusTitle = "Preparando diagnóstico", _statusDetail = "As informações serão lidas diretamente neste computador.";
@@ -259,6 +263,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             if (value is null || !WallpaperPositionOptions.Contains(value) || !Set(ref _selectedWallpaperPosition, value.Value)) return;
             Notify(nameof(CanApplyWallpaper));
+            RefreshWallpaperPreviewPresentation();
         }
     }
     public ObservableCollection<DriverChoice> DriverCandidates { get; } = [];
@@ -434,9 +439,40 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool OfflineRestartConfirmed { get => _offlineRestartConfirmed; set { if (Set(ref _offlineRestartConfirmed, value)) Notify(nameof(CanOfflineScan)); } }
     public bool OfflineRecoveryConfirmed { get => _offlineRecoveryConfirmed; set { if (Set(ref _offlineRecoveryConfirmed, value)) Notify(nameof(CanOfflineScan)); } }
     public PowerPlanInfo? SelectedPowerPlan { get => _selectedPowerPlan; set { if (Set(ref _selectedPowerPlan, value)) Notify(nameof(CanSetPowerPlan)); } }
-    public WallpaperMonitorChoice? SelectedWallpaperMonitor { get => _selectedWallpaperMonitor; set { if (Set(ref _selectedWallpaperMonitor, value)) Notify(nameof(CanApplyWallpaper)); } }
+    public WallpaperMonitorChoice? SelectedWallpaperMonitor { get => _selectedWallpaperMonitor; set { if (Set(ref _selectedWallpaperMonitor, value)) { Notify(nameof(CanApplyWallpaper)); RefreshWallpaperPreviewPresentation(); } } }
     public string? SelectedWallpaperPath { get => _selectedWallpaperPath; private set { if (Set(ref _selectedWallpaperPath, value)) Notify(nameof(CanApplyWallpaper)); } }
-    public ImageSource? WallpaperPreview { get => _wallpaperPreview; private set => Set(ref _wallpaperPreview, value); }
+    public ImageSource? WallpaperPreview { get => _wallpaperPreview; private set { if (Set(ref _wallpaperPreview, value)) RefreshWallpaperPreviewPresentation(); } }
+    public ImageBrush? WallpaperPreviewBrush { get => _wallpaperPreviewBrush; private set => Set(ref _wallpaperPreviewBrush, value); }
+    public double WallpaperPreviewWidth { get => _wallpaperPreviewWidth; private set => Set(ref _wallpaperPreviewWidth, value); }
+    public double WallpaperPreviewHeight { get => _wallpaperPreviewHeight; private set => Set(ref _wallpaperPreviewHeight, value); }
+    public string WallpaperPreviewSummary { get => _wallpaperPreviewSummary; private set => Set(ref _wallpaperPreviewSummary, value); }
+
+    private void RefreshWallpaperPreviewPresentation()
+    {
+        var targetBounds = GetWallpaperPreviewBounds();
+        var sourceAspect = _wallpaperPreview is { Height: > 0 } image ? image.Width / image.Height : 16d / 9d;
+        var presentation = WallpaperPreviewPresentation.Create(_selectedWallpaperPosition, _currentWallpaperPosition, targetBounds, sourceAspect);
+        WallpaperPreviewWidth = presentation.Width;
+        WallpaperPreviewHeight = presentation.Height;
+        WallpaperPreviewSummary = targetBounds is { Width: > 0, Height: > 0 }
+            ? $"{presentation.Description} Formato do destino: {targetBounds.Width} × {targetBounds.Height}."
+            : $"{presentation.Description} Formato estimado 16:9; limites do destino indisponíveis.";
+        WallpaperPreviewBrush = _wallpaperPreview is { } source ? presentation.CreateBrush(source) : null;
+    }
+
+    private WallpaperMonitorBounds? GetWallpaperPreviewBounds()
+    {
+        if (_selectedWallpaperMonitor?.Bounds is { Width: > 0, Height: > 0 } selectedBounds) return selectedBounds;
+        if (_selectedWallpaperMonitor?.MonitorId is not null) return null;
+        var bounds = WallpaperMonitorChoices.Where(choice => choice.MonitorId is not null && choice.Bounds is { Width: > 0, Height: > 0 })
+            .Select(choice => choice.Bounds!).ToArray();
+        if (bounds.Length == 0) return null;
+        var left = bounds.Min(item => item.Left);
+        var top = bounds.Min(item => item.Top);
+        var right = bounds.Max(item => item.Right);
+        var bottom = bounds.Max(item => item.Bottom);
+        return right > left && bottom > top ? new WallpaperMonitorBounds(left, top, right, bottom) : null;
+    }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
