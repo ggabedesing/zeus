@@ -35,14 +35,14 @@ public sealed class WpfExperienceTests
     }
 
     [Fact]
-    public void DesktopClockKeepsSecondaryMonitorPositionAndClampsOffscreenCoordinates()
+    public void DesktopClockRestoresSecondaryMonitorPositionAndClampsOffscreenCoordinates()
     {
         var virtualScreen = new Rect(-1920, -200, 3840, 1280);
 
-        var visiblePosition = DesktopClockWindow.ClampPosition(-1700, -100, 280, 112, virtualScreen);
+        var visiblePosition = MainWindow.ResolveInitialClockPosition(-1700, -100, 280, 112, virtualScreen);
         Assert.Equal(new Point(-1700, -100), visiblePosition);
 
-        var offscreenPosition = DesktopClockWindow.ClampPosition(100000, 100000, 280, 112, virtualScreen);
+        var offscreenPosition = MainWindow.ResolveInitialClockPosition(100000, 100000, 280, 112, virtualScreen);
         Assert.Equal(new Point(1640, 968), offscreenPosition);
     }
 

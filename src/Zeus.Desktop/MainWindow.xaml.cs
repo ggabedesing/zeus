@@ -740,6 +740,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop, SelectedDesktopClockSize) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
+    internal static Point ResolveInitialClockPosition(double left, double top, double width, double height, Rect virtualScreen) =>
+        DesktopClockWindow.ClampPosition(left, top, width, height, virtualScreen);
     private void ClockChanged() { if (_loaded) { SyncDesktopClock(); QueuePreferencesSave(); } }
     private void SyncDesktopClock(bool? highContrastOverride = null)
     {
@@ -752,9 +754,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 _desktopClockLeft = _desktopClock.Left; _desktopClockTop = _desktopClock.Top; QueuePreferencesSave();
             });
             _desktopClock.Closed += (_, _) => { if (DesktopClockEnabled && !_isClosing) { _desktopClockEnabled = false; Notify(nameof(DesktopClockEnabled)); QueuePreferencesSave(); } _desktopClock = null; };
-            var area = SystemParameters.WorkArea;
-            _desktopClock.Left = Math.Clamp(_desktopClockLeft, area.Left, Math.Max(area.Left, area.Right - 220));
-            _desktopClock.Top = Math.Clamp(_desktopClockTop, area.Top, Math.Max(area.Top, area.Bottom - 90));
+            var virtualScreen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+            var position = ResolveInitialClockPosition(_desktopClockLeft, _desktopClockTop, 220, 90, virtualScreen);
+            _desktopClock.Left = position.X;
+            _desktopClock.Top = position.Y;
             _desktopClock.Show();
         }
         var accentBrush = Application.Current.Resources["AccentBrush"] as Brush ?? SystemColors.WindowTextBrush;
