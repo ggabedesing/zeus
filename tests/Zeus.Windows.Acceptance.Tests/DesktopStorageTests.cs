@@ -11,6 +11,17 @@ public sealed class DesktopStorageTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "zeus-desktop-storage-tests-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public async Task LightThemePreferencePersistsInSqlite()
+    {
+        var storage = new DesktopStorage(_root);
+        await storage.SavePreferencesAsync(new DesktopPreferences(false, DesktopTheme.Light));
+
+        var restored = await storage.ReadPreferencesAsync();
+
+        Assert.Equal(DesktopTheme.Light, restored.Theme);
+    }
+
+    [Fact]
     public async Task LegacyJsonHistoryAndPreferencesAreImportedWithoutRemovingSourceFiles()
     {
         Directory.CreateDirectory(_root);

@@ -105,7 +105,7 @@ public sealed class WpfExperienceTests
         var themeSelectorPeer = Assert.IsAssignableFrom<ComboBoxAutomationPeer>(UIElementAutomationPeer.CreatePeerForElement(themeSelector));
         Assert.Equal("Tema do aplicativo", themeSelectorPeer.GetName());
         var expandCollapse = Assert.IsAssignableFrom<IExpandCollapseProvider>(themeSelectorPeer.GetPattern(PatternInterface.ExpandCollapse));
-        Assert.Equal(3, themeSelector.Items.Count);
+        Assert.Equal(4, themeSelector.Items.Count);
         var technicalModeToggle = Assert.IsType<CheckBox>(window.FindName("TechnicalModeToggle"));
         Assert.Equal("technical-mode-toggle", AutomationProperties.GetAutomationId(technicalModeToggle));
         Assert.Equal("Modo técnico: mostrar detalhes adicionais", AutomationProperties.GetName(technicalModeToggle));
@@ -114,7 +114,7 @@ public sealed class WpfExperienceTests
         Assert.True(themeSelector.IsDropDownOpen);
         expandCollapse.Collapse();
         Assert.False(themeSelector.IsDropDownOpen);
-        foreach (var theme in new[] { DesktopTheme.Complete, DesktopTheme.Minimal, DesktopTheme.MacInspired })
+        foreach (var theme in Enum.GetValues<DesktopTheme>())
         {
             window.SelectedTheme = theme;
             Assert.Same(Application.Current.Resources["PanelBrush"], themeSelector.Background);
@@ -397,6 +397,10 @@ public sealed class WpfExperienceTests
         Assert.Equal(Color.FromRgb(0xFF, 0xD1, 0x8B), Assert.IsType<SolidColorBrush>(app.Resources["WarningBrush"]).Color);
         window.SelectedTheme = DesktopTheme.MacInspired;
         await RenderAsync(window, "zeus-mac-inspired-overview.png");
+        window.SelectedTheme = DesktopTheme.Light;
+        Assert.Equal(Color.FromRgb(0x17, 0x6B, 0x87), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
+        Assert.Equal(Color.FromRgb(0x80, 0x54, 0x00), Assert.IsType<SolidColorBrush>(app.Resources["WarningBrush"]).Color);
+        await RenderAsync(window, "zeus-light-overview.png");
 
         foreach (var tab in actualTabs)
         {

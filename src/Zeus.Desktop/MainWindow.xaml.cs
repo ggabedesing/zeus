@@ -196,7 +196,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<WingetUpdateRow> WingetUpdates { get; } = [];
     public ObservableCollection<WindowsUpdateRow> PendingWindowsUpdates { get; } = [];
     public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
-    public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS")];
+    public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS"), new(DesktopTheme.Light, "Claro · leitura")];
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public bool CanRefresh => !_isBusy;
@@ -656,12 +656,30 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ? new[] { "#151625", "#202235", "#3C3E58", "#F5F4FC", "#CBCBDF", "#C5B4FF", "#303248", "#37304F", "#0D0D18" }
             : SelectedTheme == DesktopTheme.Minimal
                 ? new[] { "#101216", "#191D22", "#3B424A", "#F5F7FA", "#BEC6D1", "#BFE7D7", "#282F37", "#293C35", "#0D1013" }
-                : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
+                : SelectedTheme == DesktopTheme.Light
+                    ? new[] { "#F3F6FA", "#FFFFFF", "#D8E0EA", "#17212E", "#4B5A6B", "#176B87", "#EFF4F8", "#E7F1F5", "#F6F8FB" }
+                    : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
         var keys = new[] { "BackgroundBrush", "PanelBrush", "BorderBrush", "TextBrush", "MutedBrush", "AccentBrush", "ButtonBrush", "SelectedTabBrush", "LogBackgroundBrush" };
         for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[i]));
         Application.Current.Resources["PrimaryButtonBrush"] = Application.Current.Resources["AccentBrush"];
         Application.Current.Resources["SelectedTabTextBrush"] = Application.Current.Resources["AccentBrush"];
         Application.Current.Resources["ButtonTextBrush"] = Application.Current.Resources["TextBrush"];
+        if (SelectedTheme == DesktopTheme.Light)
+        {
+            Application.Current.Resources["WarningBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#805400"));
+            Application.Current.Resources["WarningPanelBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF6DF"));
+            Application.Current.Resources["WarningBorderBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D5B66D"));
+            Application.Current.Resources["LogTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#263648"));
+            Application.Current.Resources["PrimaryTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFFFFF"));
+        }
+        else
+        {
+            Application.Current.Resources["WarningBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD18B"));
+            Application.Current.Resources["WarningPanelBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2B251B"));
+            Application.Current.Resources["WarningBorderBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#6A532F"));
+            Application.Current.Resources["LogTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#C8D8E8"));
+            Application.Current.Resources["PrimaryTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#071623"));
+        }
     }
 
     internal void RefreshSelectedThemeAfterContrastChange() => ApplyTheme();
