@@ -1,11 +1,11 @@
 {
   "evidenceType": "desktop-volume-and-physical-disk-association-rendering-and-portable-exe-smoke",
   "date": "2026-10-09",
-  "sourceCommit": "cc3e10092e7dbd605f052df97a86e779c7c697e4",
+  "sourceCommit": "35eb743145b57fa048b338df05032e2040c1fba6",
   "sourceTreeDirtyAtBuild": false,
   "ui": {
     "volumeRows": "Windows WPF acceptance compared each real collected volume with the rendered row and required its confirmed disk numbers or explicit unavailable label.",
-    "physicalDiskRows": "Windows WPF acceptance compared each physical disk number from the live provider with the rendered disk card and required explicit unavailable text when absent.",
+    "physicalDiskRows": "Windows WPF acceptance compares physical disk rows in provider order, then checks the displayed number or explicit unavailable text. Disk names are not assumed unique.",
     "multipleAndUnavailableFormatting": "Unit acceptance verifies multiple disk numbers and both null and empty mappings."
   },
   "tests": {
@@ -14,7 +14,13 @@
     "failed": 0,
     "skipped": 0,
     "solutionBuildWarnings": 0,
-    "solutionBuildErrors": 0
+    "solutionBuildErrors": 0,
+    "ciPreviousAttempt": {
+      "run": "https://github.com/ggabedesing/zeus/actions/runs/37947483167",
+      "failedTest": "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+      "cause": "The Windows VM exposes two physical disk rows with the same model name; the test incorrectly assumed disk names were unique.",
+      "resolution": "Compare rendered physical disk rows in provider order and assert each disk number instead of selecting a row by model name."
+    }
   },
   "localMachineSample": {
     "confirmedVolumeMappings": 1,
@@ -27,10 +33,10 @@
     "repairOrRestoreExecuted": false
   },
   "portablePackage": {
-    "path": "artifacts/desktop-storage-association-cc3e100/zeus-win-x64.zip",
-    "sha256": "E0CC89C3C8A560BEF4B4ECE7E734841118E4C266A2ADBC40E57D26554BB6E34B",
-    "desktopExePath": "artifacts/desktop-storage-association-cc3e100/zeus-win-x64-cc3e10092e7d-20261009T145115081Z-39d594d7/Zeus.Desktop.exe",
-    "desktopExeSha256": "F38C8A7DECDF1B502FFA0067EBE475ACC769D99546A20095F2BFDB053D7DC4EA",
+    "path": "artifacts/desktop-storage-association-35eb743/zeus-win-x64.zip",
+    "sha256": "D431E00CBB2A71481FB8DAFF88312C989F4CCD6ABAE85A3F1EEF50B6DF79B064",
+    "desktopExePath": "artifacts/desktop-storage-association-35eb743/zeus-win-x64-35eb743145b5-20261009T150138361Z-b5c4f9e6/Zeus.Desktop.exe",
+    "desktopExeSha256": "CA405F9B2215FA5F1270DC1DC36E049E9A43FD0E01E526AE220F0D01FB234A0E",
     "runtime": "win-x64",
     "smoke": "Main window opened, responded, and closed cleanly.",
     "productionAuthenticodeSigned": false
