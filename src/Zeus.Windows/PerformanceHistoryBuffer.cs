@@ -161,6 +161,9 @@ public static class AdaptiveSamplingPolicy
         var loadSignals = new List<double>();
         AddPercent(observation.CpuPercent, loadSignals);
         foreach (var process in observation.Processes) AddPercent(process.CpuPercent, loadSignals);
+        foreach (var process in observation.Processes)
+            if (process.CpuCoresUsed is { } coresUsed && double.IsFinite(coresUsed) && coresUsed >= 0)
+                AddPercent(Math.Min(100, coresUsed * 100), loadSignals);
         foreach (var engine in observation.GpuEngines ?? []) AddPercent(engine.UtilizationPercent, loadSignals);
         foreach (var disk in observation.Disks ?? []) AddPercent(disk.ActivePercent, loadSignals);
         foreach (var network in observation.Networks ?? [])

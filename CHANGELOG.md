@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O Observador agora mostra também núcleos equivalentes usados por processo; a amostragem adaptativa considera esse sinal para detectar carga alta em um núcleo mesmo em CPUs com muitos processadores lógicos.
 - O inventário mostra edição, versão, build e arquitetura do Windows a partir de `Win32_OperatingSystem`; a ausência de dados não é substituída por uma versão presumida.
 - O inventário reporta se o Windows iniciou em UEFI ou BIOS legado, usando a API nativa `GetFirmwareType`; estado desconhecido e indisponível permanecem explícitos.
 - A aba de drivers agora mostra também um atalho oficial para o fabricante reportado da placa-mãe, quando reconhecido, explica quando não há fabricante/portal disponível e identifica o nome do fornecedor nos links por dispositivo. O link só abre uma busca manual e não confirma driver compatível.

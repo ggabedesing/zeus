@@ -9,7 +9,8 @@ using System.Text.RegularExpressions;
 
 namespace Zeus.Windows;
 
-public sealed record ProcessObservation(int Id, string Name, double? CpuPercent, ulong WorkingSetBytes, long? StartTimeUtcTicks = null);
+public sealed record ProcessObservation(int Id, string Name, double? CpuPercent, ulong WorkingSetBytes,
+    long? StartTimeUtcTicks = null, double? CpuCoresUsed = null);
 public sealed record GpuEngineObservation(string InstanceName, int? ProcessId, string EngineType, double UtilizationPercent, string? ProcessName = null);
 public sealed record DiskPerformanceObservation(string InstanceName, ulong? BytesPerSecond, double? ActivePercent, double? AverageReadLatencyMilliseconds);
 public sealed record NetworkPerformanceObservation(string Adapter, ulong? BytesPerSecond, ulong? LinkBitsPerSecond, ulong? QueueLength, ulong? ErrorPackets);
@@ -97,14 +98,17 @@ public sealed class WindowsPerformanceProbe
         {
             token.ThrowIfCancellationRequested();
             double? processCpu = null;
+            double? processCoresUsed = null;
             if (last.CpuTicks is { } ticks && last.StartTicks is { } identity &&
                 before.TryGetValue(last.Id, out var firstProcess) && firstProcess.StartTicks == identity &&
                 firstProcess.CpuTicks is { } priorTicks)
             {
-                processCpu = CalculateProcessCpuPercent(priorTicks, ticks,
-                    Stopwatch.GetElapsedTime(firstProcess.ObservedAt, last.ObservedAt), logicalProcessors);
+                var elapsed = Stopwatch.GetElapsedTime(firstProcess.ObservedAt, last.ObservedAt);
+                processCoresUsed = CalculateProcessCoresUsed(priorTicks, ticks, elapsed);
+                processCpu = CalculateProcessCpuPercent(priorTicks, ticks, elapsed, logicalProcessors);
             }
-            observations.Add(new ProcessObservation(last.Id, last.Name, processCpu, last.WorkingSetBytes, last.StartTicks));
+            observations.Add(new ProcessObservation(last.Id, last.Name, processCpu, last.WorkingSetBytes,
+                last.StartTicks, processCoresUsed));
         }
         var allObservedProcesses = observations.ToArray();
         var top = allObservedProcesses.OrderByDescending(process => process.CpuPercent.HasValue)
@@ -162,9 +166,17 @@ public sealed class WindowsPerformanceProbe
         TimeSpan elapsed, int logicalProcessors)
     {
         if (beforeTicks < 0 || afterTicks < beforeTicks || elapsed <= TimeSpan.Zero || logicalProcessors <= 0) return null;
-        var load = ((afterTicks - beforeTicks) / (double)TimeSpan.TicksPerSecond) /
-            elapsed.TotalSeconds / logicalProcessors * 100;
+        var coresUsed = CalculateProcessCoresUsed(beforeTicks, afterTicks, elapsed);
+        if (coresUsed is not { } value) return null;
+        var load = value / logicalProcessors * 100;
         return double.IsFinite(load) ? Math.Clamp(load, 0, 100) : null;
+    }
+
+    internal static double? CalculateProcessCoresUsed(long beforeTicks, long afterTicks, TimeSpan elapsed)
+    {
+        if (beforeTicks < 0 || afterTicks < beforeTicks || elapsed <= TimeSpan.Zero) return null;
+        var coresUsed = ((afterTicks - beforeTicks) / (double)TimeSpan.TicksPerSecond) / elapsed.TotalSeconds;
+        return double.IsFinite(coresUsed) && coresUsed >= 0 ? coresUsed : null;
     }
 
     internal static IReadOnlyList<GpuEngineObservation> MapGpuEnginesToProcesses(

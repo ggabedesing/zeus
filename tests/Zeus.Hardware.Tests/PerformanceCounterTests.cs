@@ -303,6 +303,17 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void AdaptivePolicyDetectsBusyProcessCoreEvenWhenWholeMachinePercentIsLow()
+    {
+        var observation = Sample(1.5) with
+        {
+            Processes = [new ProcessObservation(42, "game", 1.5, 1024, CpuCoresUsed: 0.8)]
+        };
+
+        Assert.Equal(TimeSpan.FromSeconds(2), AdaptiveSamplingPolicy.NextInterval(observation));
+    }
+
+    [Fact]
     public void AdaptivePolicyRespondsToGpuAndDiskLoadWhenCpuIsUnavailable()
     {
         var gpuBusy = Sample(null) with { GpuEngines = [new("gpu", null, "3D", 82)] };
@@ -760,6 +771,8 @@ public sealed class PerformanceCounterTests
         var result = WindowsPerformanceProbe.CalculateProcessCpuPercent(TimeSpan.TicksPerSecond,
             3 * TimeSpan.TicksPerSecond, TimeSpan.FromSeconds(2), 4);
         Assert.Equal(25d, result!.Value, 8);
+        Assert.Equal(1d, WindowsPerformanceProbe.CalculateProcessCoresUsed(TimeSpan.TicksPerSecond,
+            3 * TimeSpan.TicksPerSecond, TimeSpan.FromSeconds(2))!.Value, 8);
     }
 
     [Theory]

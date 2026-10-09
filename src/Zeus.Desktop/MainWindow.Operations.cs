@@ -409,7 +409,7 @@ public partial class MainWindow
         PerformanceSummary = $"CPU: {(observation.CpuPercent.HasValue ? $"{observation.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · {observation.ActivityContext?.Summary ?? "Contexto de jogo/OBS indisponível."} · Intervalo medido da CPU: {observation.SamplingDuration.TotalSeconds:0.#} s; GPU, disco e rede são leituras ao final · {observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
         ProcessRows.Clear();
         foreach (var process in observation.Processes)
-            ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · Memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}"));
+            ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU do computador: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · núcleos equivalentes: {(process.CpuCoresUsed is { } cores ? cores.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture) : "indisponível")} · memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}"));
         PerformanceResourceRows.Clear();
         foreach (var engine in (observation.GpuEngines ?? []).OrderByDescending(engine => engine.UtilizationPercent).Take(20))
         {
