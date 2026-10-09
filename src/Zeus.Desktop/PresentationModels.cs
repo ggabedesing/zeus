@@ -241,7 +241,8 @@ internal sealed record DesktopPreferences(bool IsMinimal, DesktopTheme Theme = D
     bool FirstRunSetupComplete = true, bool IsTechnicalMode = false, DesktopClockPreferences? Clock = null,
     AppAccentColor AccentColor = AppAccentColor.ThemeDefault, string? VisualLayoutPresetId = null,
     string? CustomVisualLayoutsJson = null, string? CustomAccentHex = null,
-    bool CheckZeusUpdatesAutomatically = false, DateTimeOffset? LastZeusUpdateCheckUtc = null);
+    bool CheckZeusUpdatesAutomatically = false, DateTimeOffset? LastZeusUpdateCheckUtc = null,
+    bool ReduceZeusMotion = false);
 
 internal sealed record DesktopClockPreferences(bool Enabled = false, bool ShowDate = true, bool ShowSeconds = false,
     bool AlwaysOnTop = false, double Opacity = 0.88, double Left = 40, double Top = 80,

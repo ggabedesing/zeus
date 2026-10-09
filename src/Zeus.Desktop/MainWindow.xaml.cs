@@ -71,7 +71,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _visualLayoutCatalogStatus = "Perfis personalizados aceitam somente cores e temas do ZEUS; nenhum código ou imagem será executado.";
     private readonly List<VisualLayoutPreset> _customVisualLayoutPresets = [];
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
-    private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
+    private bool _reduceAnimations, _reduceTransparency, _reduceZeusMotion, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
     private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop, _desktopClockHideDuringFullscreen = true, _desktopClockUse24HourFormat = true;
     private DesktopClockSize _desktopClockSize = DesktopClockSize.Medium;
     private DesktopClockStyle _desktopClockStyle = DesktopClockStyle.Glass;
@@ -540,6 +540,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public UsageProfile SelectedProfile { get => _selectedProfile; set { if (Enum.IsDefined(value) && Set(ref _selectedProfile, value)) ProfileChanged(); } }
     public bool ReduceAnimations { get => _reduceAnimations; set { if (Set(ref _reduceAnimations, value)) ProfileChanged(); } }
     public bool ReduceTransparency { get => _reduceTransparency; set { if (Set(ref _reduceTransparency, value)) ProfileChanged(); } }
+    public bool ReduceZeusMotion { get => _reduceZeusMotion; set { if (Set(ref _reduceZeusMotion, value)) QueuePreferencesSave(); } }
     public bool DesktopClockEnabled { get => _desktopClockEnabled; set { if (Set(ref _desktopClockEnabled, value)) ClockChanged(); } }
     public bool DesktopClockShowDate { get => _desktopClockShowDate; set { if (Set(ref _desktopClockShowDate, value)) ClockChanged(); } }
     public bool DesktopClockShowSeconds { get => _desktopClockShowSeconds; set { if (Set(ref _desktopClockShowSeconds, value)) ClockChanged(); } }
@@ -635,7 +636,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 SelectedVisualLayoutPreset = VisualLayoutPresets.FirstOrDefault(preset =>
                     string.Equals(preset.Id, p.VisualLayoutPresetId, StringComparison.Ordinal)) ?? VisualLayoutPresets[0];
                 _savedVisualLayoutPresetId = p.VisualLayoutPresetId;
-                SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency;
+                SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency; ReduceZeusMotion = p.ReduceZeusMotion;
                 IsTechnicalMode = p.IsTechnicalMode;
                 _checkZeusUpdatesAutomatically = p.CheckZeusUpdatesAutomatically;
                 _lastZeusUpdateCheckUtc = p.LastZeusUpdateCheckUtc;
@@ -1024,7 +1025,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
         _desktopClockSettingsPreviewing ? _savedClockPreferences : CaptureDesktopClockPreferences(), SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson, _customAccentHex,
-        CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc);
+        CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc, ReduceZeusMotion);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
     internal static DesktopClockStyle ResolveClockStyle(DesktopClockStyle savedStyle) =>
@@ -1189,7 +1190,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         if (!ReferenceEquals(e.Source, WorkspaceTabs)) return;
         if (WorkspaceTabs.SelectedContent is not FrameworkElement content) return;
-        if (ReduceAnimations || SystemParameters.HighContrast || !SystemParameters.ClientAreaAnimation)
+        if (ReduceZeusMotion || ReduceAnimations || SystemParameters.HighContrast || !SystemParameters.ClientAreaAnimation)
         {
             content.BeginAnimation(UIElement.OpacityProperty, null);
             return;

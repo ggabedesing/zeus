@@ -915,6 +915,19 @@ public sealed class WpfExperienceTests
             Assert.True(Assert.IsAssignableFrom<FrameworkElement>(tabs.SelectedContent).HasAnimatedProperties,
                 "Workspace navigation should use the brief transition when motion is allowed.");
         }
+        var reduceZeusMotionToggle = Assert.IsType<CheckBox>(window.FindName("ReduceZeusMotionToggle"));
+        Assert.Equal("reduce-zeus-motion", AutomationProperties.GetAutomationId(reduceZeusMotionToggle));
+        window.ReduceZeusMotion = true;
+        tabs.SelectedIndex = 1;
+        Assert.False(Assert.IsAssignableFrom<FrameworkElement>(tabs.SelectedContent).HasAnimatedProperties,
+            "The ZEUS motion preference must disable its own workspace transition.");
+        window.ReduceZeusMotion = false;
+        if (!SystemParameters.HighContrast && SystemParameters.ClientAreaAnimation && !window.ReduceAnimations)
+        {
+            tabs.SelectedIndex = 0;
+            Assert.True(Assert.IsAssignableFrom<FrameworkElement>(tabs.SelectedContent).HasAnimatedProperties,
+                "Restoring the ZEUS preference must restore its brief transition when Windows permits motion.");
+        }
         tabs.SelectedIndex = 0;
         await RenderAsync(window, "zeus-complete-overview.png");
         var hardwareCardsList = Assert.IsType<ItemsControl>(window.FindName("HardwareCardsList"));
