@@ -79,14 +79,14 @@ function Assert-ZeusLaunches {
             $process.Refresh()
             if ($process.HasExited) { throw "ZEUS exited during startup with code $($process.ExitCode)." }
             if ($process.MainWindowHandle -ne [IntPtr]::Zero -and
-                $process.MainWindowTitle -eq 'ZEUS · Otimização e diagnóstico') {
+                $process.MainWindowTitle -eq 'ZEUS · Otimização e diagnóstico' -and $process.Responding) {
                 $windowReady = $true
                 break
             }
             Start-Sleep -Milliseconds 250
         }
-        if (!$windowReady) { throw 'The installed ZEUS application did not show its main window within 45 seconds.' }
-        Write-Output 'Installed ZEUS application opened its main window.'
+        if (!$windowReady) { throw 'The installed ZEUS application did not show a responsive main window within 45 seconds.' }
+        Write-Output 'Installed ZEUS application opened a responsive main window.'
     } finally {
         $process.Refresh()
         if (!$process.HasExited) {
