@@ -273,6 +273,7 @@ public sealed class WpfExperienceTests
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Proxy do usuário (HKCU)");
+        Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Programas instalados" && row.Detail.Contains("Win32/Appx-MSIX", StringComparison.Ordinal));
         Assert.Contains(window.ExtendedHardwareRows, row => row.Title == "Reinicialização pendente");
         var imageHealthRow = Assert.Single(window.ExtendedHardwareRows, row => row.Title == "Integridade da imagem do Windows");
         if (window.Snapshot.WindowsInventory?.WindowsImageHealth is null)

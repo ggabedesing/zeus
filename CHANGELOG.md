@@ -23,6 +23,7 @@
 - O ciclo automatizado do MSI abre a janela principal da versão instalada após a atualização e valida o encerramento antes da desinstalação.
 - A aba de drivers identifica separadamente o fabricante do dispositivo e o fabricante do driver, e oferece consulta de atualizações em fontes oficiais.
 - A interface acompanha a ativação e a desativação do alto contraste do Windows enquanto está aberta.
+- O inventário de programas agora inclui entradas Win32 do Registro e pacotes Appx/MSIX `Main`/`Bundle` do usuário atual, com a fonte identificada; a consulta não usa `-AllUsers` nem instala ou atualiza programas. A aba Hardware mostra até 30 entradas e o relatório completo mantém a lista coletada.
 - A versão do aplicativo é exibida na janela e compartilhada pelo pacote portátil, pelo manifesto de proveniência e pelo MSI.
 - A geração do pacote interrompe a publicação se os executáveis e assemblies do aplicativo ou do auxiliar administrativo divergirem da versão solicitada.
 - A instalação de driver do Windows Update é individual: selecionar mais de um candidato bloqueia a transação, e a confirmação detalha apenas o dispositivo escolhido.

@@ -201,7 +201,8 @@ public sealed class DesktopStorageTests : IDisposable
     public async Task ReportSchemaEightExportsInventoryAndPerformanceSessionMetadata()
     {
         var inventory = new WindowsInventoryInfo([], [new("Display", "Fixture", "1.2.3", "2025-01-02", "Fixture Signer", false, "Dell Inc.")],
-            [new("Display", "Display", "OK", null, "USB\\VID_1234&PID_5678\\A1", true)], [], [], [], [], [], null, null, null, []);
+            [new("Display", "Display", "OK", null, "USB\\VID_1234&PID_5678\\A1", true)], [], [], [],
+            [new("Store Fixture", "2.0", "Fixture Publisher", "Pacote Appx/MSIX do usuário")], [], null, null, null, []);
         var snapshot = new HardwareSnapshot(DateTimeOffset.UtcNow, "Windows fixture", "fixture", null, null, [], [], [], null, [],
             WindowsInventory: inventory);
         var path = Path.Combine(_root, "export.json");
@@ -215,6 +216,9 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.False(diagnostics.GetProperty("Drivers")[0].GetProperty("IsSigned").GetBoolean());
         Assert.Equal("Dell Inc.", diagnostics.GetProperty("Drivers")[0].GetProperty("Manufacturer").GetString());
         Assert.True(diagnostics.GetProperty("PnpDevices")[0].GetProperty("IsPresent").GetBoolean());
+        var installedSoftware = Assert.Single(diagnostics.GetProperty("InstalledSoftware").EnumerateArray());
+        Assert.Equal("Store Fixture", installedSoftware.GetProperty("Name").GetString());
+        Assert.Equal("Pacote Appx/MSIX do usuário", installedSoftware.GetProperty("Source").GetString());
         var session = Assert.Single(export.RootElement.GetProperty("PerformanceSessions").EnumerateArray());
         Assert.Equal("Jogo teste + OBS", session.GetProperty("Label").GetString());
         Assert.Equal(started, session.GetProperty("StartedAt").GetDateTimeOffset());

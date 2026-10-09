@@ -84,6 +84,9 @@ public sealed class WindowsInventoryTests
         Assert.NotNull(snapshot.WindowsInventory.Warnings);
         Assert.NotNull(snapshot.WindowsInventory.ProxyConfiguration);
         Assert.NotNull(snapshot.WindowsInventory.RecentEvents);
+        Assert.NotNull(snapshot.WindowsInventory.InstalledSoftware);
+        Assert.All(snapshot.WindowsInventory.InstalledSoftware, item =>
+            Assert.Contains(item.Source, new[] { "Registro de desinstalação", "Pacote Appx/MSIX do usuário" }));
         Assert.All(snapshot.WindowsInventory.RecentEvents, item =>
         {
             Assert.False(string.IsNullOrWhiteSpace(item.Log));

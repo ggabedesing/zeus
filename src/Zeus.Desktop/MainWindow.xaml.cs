@@ -571,6 +571,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ExtendedHardwareRows.Add(new("Reinicialização pendente", FormatRestartState(WindowsRestartStateParser.Evaluate(inventory.RestartIndicators))));
             ExtendedHardwareRows.Add(new("Tarefas agendadas", $"{inventory.ScheduledTasks.Count} entradas inventariadas; nomes e estados completos ficam no relatório exportado."));
             ExtendedHardwareRows.Add(new("Serviços", $"{inventory.Services.Count} entradas inventariadas; nenhuma foi alterada."));
+            var software = inventory.InstalledSoftware.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+            ExtendedHardwareRows.Add(new("Programas instalados", $"{software.Length} entradas Win32/Appx-MSIX; a fonte Winget é consultada separadamente e nada foi instalado."));
+            foreach (var item in software.Take(30))
+                ExtendedHardwareRows.Add(new($"Programa · {Available(item.Name)}", $"Versão: {Available(item.Version)} · Publicador: {Available(item.Publisher)} · Origem: {Available(item.Source)}"));
+            if (software.Length > 30)
+                ExtendedHardwareRows.Add(new("Programas instalados · restante", $"Mais {software.Length - 30} entradas permanecem no relatório completo."));
             ExtendedHardwareRows.Add(new("Windows Update", inventory.UpdateState?.PendingCount is { } pending ? $"{pending} atualização(ões) pendente(s)" : "Atualizações pendentes não consultadas nesta leitura."));
             ExtendedHardwareRows.Add(new("Integridade da imagem do Windows", string.IsNullOrWhiteSpace(inventory.WindowsImageHealth)
                 ? "Não verificada nesta coleta. Use o Centro de Reparos para uma verificação explícita."
