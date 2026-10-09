@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "c9ce4777691acbac3232f21c472d73b9fee4cbe0",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "productionSigned": false,
+  "validation": {
+    "releaseBuildWarnings": 0,
+    "releaseBuildErrors": 0,
+    "coreTestsPassed": 151,
+    "newRuleResolutionTestCases": 24,
+    "fullSolutionTestsPassed": 578,
+    "fullSolutionTestsSkipped": 11,
+    "fullSolutionTestsFailed": 0,
+    "fullSolutionTestsTotal": 589,
+    "portableExeOpenedRespondedClosed": true,
+    "independentReadOnlyReview": true
+  },
+  "verifiedContracts": [
+    "Atomic candidate prerequisite closure; rejected candidates cannot suppress independent alternatives.",
+    "Symmetric conflicts including one-sided declarations and internal prerequisite conflicts.",
+    "Candidate confidence then ordinal ID determines bundle priority; not global benefit maximization.",
+    "Cycles rejected; caller-owned collections copied and protected against later mutation.",
+    "CPU must be finite and in 0..100; memory/GPU windows finite and sufficient."
+  ],
+  "package": {
+    "directory": "artifacts/rule-resolution-exe/zeus-win-x64-c9ce4777691a-20261009T165226685Z-5b370bf8",
+    "exeSha256": "55d49912549a709d3ff9800b40d4fdef1029e2bfbd105137d27d5b5510541637",
+    "zipSha256": "5CEF15D995AD0B9FEB8C5BBFBDD18A1FCA1F85CEDC2BF75D352931653DF4A95B"
+  },
+  "limitations": [
+    "Eleven elevated or opt-in tests were skipped; no maintenance, repair, driver operation or restart was executed.",
+    "Rules remain review-only and do not authorize Windows changes.",
+    "Administrative acceptance and production signing remain separate pending requirements."
+  ]
+}
