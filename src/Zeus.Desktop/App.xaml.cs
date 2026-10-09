@@ -60,6 +60,7 @@ public partial class App : Application
             Resources["WarningBorderBrush"] = SystemColors.WindowFrameBrush;
             Resources["LogBackgroundBrush"] = SystemColors.WindowBrush;
             Resources["LogTextBrush"] = SystemColors.WindowTextBrush;
+            if (MainWindow is Zeus.Desktop.MainWindow highContrastWindow) highContrastWindow.RefreshDesktopClockAppearance(true);
             return;
         }
 

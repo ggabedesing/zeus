@@ -628,7 +628,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
         new(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop), SelectedAccentColor);
     private void ClockChanged() { if (_loaded) { SyncDesktopClock(); QueuePreferencesSave(); } }
-    private void SyncDesktopClock()
+    private void SyncDesktopClock(bool? highContrastOverride = null)
     {
         if (!DesktopClockEnabled) { _desktopClock?.Close(); _desktopClock = null; return; }
         if (_desktopClock is null)
@@ -644,7 +644,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _desktopClock.Top = Math.Clamp(_desktopClockTop, area.Top, Math.Max(area.Top, area.Bottom - 90));
             _desktopClock.Show();
         }
-        _desktopClock.Configure(DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity);
+        var accentBrush = Application.Current.Resources["AccentBrush"] as Brush ?? SystemColors.WindowTextBrush;
+        _desktopClock.Configure(DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, accentBrush, highContrastOverride ?? SystemParameters.HighContrast);
     }
     private void QueuePreferencesSave() { if (_loaded) _ = SavePreferencesAsync(); }
     private async Task SavePreferencesAsync()
@@ -699,9 +700,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Application.Current.Resources["LogTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#C8D8E8"));
             Application.Current.Resources["PrimaryTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#071623"));
         }
+        if (_loaded && DesktopClockEnabled) SyncDesktopClock();
     }
 
     internal void RefreshSelectedThemeAfterContrastChange() => ApplyTheme();
+    internal void RefreshDesktopClockAppearance(bool highContrast) { if (DesktopClockEnabled) SyncDesktopClock(highContrast); }
 
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
