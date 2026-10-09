@@ -64,6 +64,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private AppAccentColor _selectedAccentColor = AppAccentColor.ThemeDefault;
     private VisualLayoutPreset? _selectedVisualLayoutPreset;
     private bool _visualLayoutPreviewActive;
+    private bool? _visualLayoutReduceMotionPreview;
     private string? _savedVisualLayoutPresetId;
     private string? _customVisualLayoutsJson;
     private string? _customAccentHex, _customAccentPreviewHex;
@@ -460,7 +461,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (_loaded)
             {
                 _visualLayoutPreviewActive = value.Theme != SelectedTheme || value.Accent != SelectedAccentColor ||
-                    value.Density is { } density && density != SelectedDensity;
+                    value.Density is { } density && density != SelectedDensity ||
+                    value.ReduceZeusMotion is { } reduceMotion && reduceMotion != ReduceZeusMotion;
+                _visualLayoutReduceMotionPreview = _visualLayoutPreviewActive ? value.ReduceZeusMotion : null;
                 ApplyTheme(value.Theme, value.Accent);
                 Notify(nameof(IsVisualLayoutPreviewing));
                 Notify(nameof(VisualLayoutPreviewState));
@@ -476,6 +479,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         DesktopDensity.Comfortable => "Prévia: espaçamento confortável.",
         _ => "Este perfil mantém a densidade selecionada atualmente."
     };
+    public string SelectedVisualLayoutMotionSummary => SelectedVisualLayoutPreset.ReduceZeusMotion switch
+    {
+        true => "Este perfil reduz as transições entre áreas do ZEUS.",
+        false => "Este perfil mantém as transições breves do ZEUS quando o Windows permite movimento.",
+        _ => "Este perfil mantém a preferência de movimento atual."
+    };
+    public bool EffectiveReduceZeusMotion => _visualLayoutReduceMotionPreview ?? ReduceZeusMotion;
     public string VisualLayoutCatalogStatus => _visualLayoutCatalogStatus;
     public bool IsVisualLayoutPreviewing => _visualLayoutPreviewActive;
     public bool CanEditDensity => CanChooseActions && !_visualLayoutPreviewActive;
@@ -501,13 +511,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         (_visualLayoutPreviewActive ||
          (SelectedVisualLayoutPreset.Theme == SelectedTheme && SelectedVisualLayoutPreset.Accent == SelectedAccentColor &&
           (SelectedVisualLayoutPreset.Density is null || SelectedVisualLayoutPreset.Density == SelectedDensity) &&
+          (SelectedVisualLayoutPreset.ReduceZeusMotion is null || SelectedVisualLayoutPreset.ReduceZeusMotion == ReduceZeusMotion) &&
           !string.Equals(SelectedVisualLayoutPreset.Id, _savedVisualLayoutPresetId, StringComparison.Ordinal)));
     public string VisualLayoutPreviewState => SystemParameters.HighContrast
         ? "O alto contraste do Windows prevalece; confirme o perfil para salvar ou cancele a prévia."
         : _visualLayoutPreviewActive
-            ? "Prévia temporária ativa nesta interface. Tema, densidade salva, relógio e Windows permanecem sem alteração até confirmar."
+            ? "Prévia temporária ativa nesta interface. Tema, espaçamento salvo, preferência de movimento, relógio e Windows permanecem sem alteração até confirmar."
             : CanConfirmVisualLayout
-                ? "Este perfil já corresponde às cores atuais; confirmar salva o perfil sem mudar as cores."
+                ? "Este perfil corresponde às opções atuais; confirmar salva sua escolha."
             : "Escolha um perfil para pré-visualizar nesta interface; confirme para salvar ou cancele a prévia.";
     public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
     public bool IsTechnicalMode { get => _isTechnicalMode; set { if (Set(ref _isTechnicalMode, value)) { Notify(nameof(DetailedVisibility)); QueuePreferencesSave(); } } }
@@ -529,6 +540,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (!Enum.IsDefined(value) || !Set(ref _selectedTheme, value)) return;
             ClearCustomAccentForThemeChange();
             _visualLayoutPreviewActive = false;
+            _visualLayoutReduceMotionPreview = null;
             ApplyTheme(); Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout)); Notify(nameof(CanEditDensity)); Notify(nameof(IsMinimal)); Notify(nameof(DetailedVisibility)); Notify(nameof(LayoutDescription)); Notify(nameof(SelectedThemeOption));
             UpdateAppearanceStatus();
             QueuePreferencesSave();
@@ -555,6 +567,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (!Enum.IsDefined(value) || !Set(ref _selectedAccentColor, value)) return;
             ClearCustomAccentForThemeChange();
             _visualLayoutPreviewActive = false;
+            _visualLayoutReduceMotionPreview = null;
             ApplyTheme();
             Notify(nameof(IsVisualLayoutPreviewing)); Notify(nameof(VisualLayoutPreviewState)); Notify(nameof(CanConfirmVisualLayout)); Notify(nameof(CanEditDensity));
             UpdateAppearanceStatus();
@@ -564,7 +577,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public UsageProfile SelectedProfile { get => _selectedProfile; set { if (Enum.IsDefined(value) && Set(ref _selectedProfile, value)) ProfileChanged(); } }
     public bool ReduceAnimations { get => _reduceAnimations; set { if (Set(ref _reduceAnimations, value)) ProfileChanged(); } }
     public bool ReduceTransparency { get => _reduceTransparency; set { if (Set(ref _reduceTransparency, value)) ProfileChanged(); } }
-    public bool ReduceZeusMotion { get => _reduceZeusMotion; set { if (Set(ref _reduceZeusMotion, value)) QueuePreferencesSave(); } }
+    public bool ReduceZeusMotion { get => _reduceZeusMotion; set { if (Set(ref _reduceZeusMotion, value)) { QueuePreferencesSave(); Notify(nameof(CanConfirmVisualLayout)); } } }
     public bool DesktopClockEnabled { get => _desktopClockEnabled; set { if (Set(ref _desktopClockEnabled, value)) ClockChanged(); } }
     public bool DesktopClockShowDate { get => _desktopClockShowDate; set { if (Set(ref _desktopClockShowDate, value)) ClockChanged(); } }
     public bool DesktopClockShowSeconds { get => _desktopClockShowSeconds; set { if (Set(ref _desktopClockShowSeconds, value)) ClockChanged(); } }
@@ -1228,7 +1241,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         if (!ReferenceEquals(e.Source, WorkspaceTabs)) return;
         if (WorkspaceTabs.SelectedContent is not FrameworkElement content) return;
-        if (ReduceZeusMotion || ReduceAnimations || SystemParameters.HighContrast || !SystemParameters.ClientAreaAnimation)
+        if (EffectiveReduceZeusMotion || ReduceAnimations || SystemParameters.HighContrast || !SystemParameters.ClientAreaAnimation)
         {
             content.BeginAnimation(UIElement.OpacityProperty, null);
             return;

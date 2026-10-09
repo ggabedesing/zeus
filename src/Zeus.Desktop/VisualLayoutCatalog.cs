@@ -80,7 +80,7 @@ internal static class VisualLayoutCatalog
 
     internal static string CreateTemplate() => SerializeCustom([
         new VisualLayoutPreset("custom-meu-tema", "Meu tema", DesktopTheme.Complete,
-            AppAccentColor.ThemeDefault, "Meu perfil visual do ZEUS.", "zeus-ui", DesktopDensity.Comfortable)
+            AppAccentColor.ThemeDefault, "Meu perfil visual do ZEUS.", "zeus-ui", DesktopDensity.Comfortable, false)
     ]);
 
     private sealed record VisualLayoutManifest(int SchemaVersion, List<VisualLayoutPreset>? Presets);

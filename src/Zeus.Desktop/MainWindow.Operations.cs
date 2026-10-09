@@ -782,8 +782,10 @@ public partial class MainWindow
         var preset = SelectedVisualLayoutPreset;
         ClearCustomAccentForThemeChange();
         _visualLayoutPreviewActive = false;
+        _visualLayoutReduceMotionPreview = null;
         _savedVisualLayoutPresetId = preset.Id;
         if (preset.Density is { } density) SelectedDensity = density;
+        if (preset.ReduceZeusMotion is { } reduceMotion) ReduceZeusMotion = reduceMotion;
         SelectedTheme = preset.Theme;
         SelectedAccentColor = preset.Accent;
         ApplyTheme();
@@ -792,8 +794,9 @@ public partial class MainWindow
         Notify(nameof(VisualLayoutPreviewState));
         Notify(nameof(CanConfirmVisualLayout));
         Notify(nameof(CanEditDensity));
+        Notify(nameof(EffectiveReduceZeusMotion));
         StatusTitle = "Perfil visual aplicado";
-        StatusDetail = $"{preset.Name} foi aplicado somente à interface do ZEUS. Papel de parede, relógio, animações e configurações do Windows permanecem independentes.";
+        StatusDetail = $"{preset.Name} foi aplicado somente à interface do ZEUS. O perfil afeta apenas as transições de navegação do app; papel de parede, relógio e animações do Windows permanecem independentes.";
     }
 
     private void PreviewCustomAccent_Click(object sender, RoutedEventArgs e)
@@ -833,11 +836,13 @@ public partial class MainWindow
     {
         if (!CanChooseActions || !_visualLayoutPreviewActive) return;
         _visualLayoutPreviewActive = false;
+        _visualLayoutReduceMotionPreview = null;
         ApplyTheme();
         Notify(nameof(IsVisualLayoutPreviewing));
         Notify(nameof(VisualLayoutPreviewState));
         Notify(nameof(CanConfirmVisualLayout));
         Notify(nameof(CanEditDensity));
+        Notify(nameof(EffectiveReduceZeusMotion));
         StatusTitle = "Prévia cancelada";
         StatusDetail = "O tema salvo e o relógio da Área de Trabalho foram mantidos.";
     }
@@ -886,7 +891,7 @@ public partial class MainWindow
         try
         {
             File.WriteAllText(dialog.FileName, VisualLayoutCatalog.CreateTemplate());
-            SetVisualLayoutCatalogStatus("Modelo salvo. Edite apenas ID, nome, descrição, tema, cor e espaçamento antes de importar.");
+            SetVisualLayoutCatalogStatus("Modelo salvo. Edite apenas ID, nome, descrição, tema, cor, espaçamento e preferência de movimento do ZEUS antes de importar.");
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
