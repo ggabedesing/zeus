@@ -78,10 +78,11 @@ public sealed class StartupChoice(StartupEntry entry) : SelectableRow
     public string Detail => Entry.IsProtected ? $"Protegido: {Entry.ProtectionReason}" : Entry.IsEnabled ? "Ativo · A alteração poderá ser desfeita" : "Desativado";
 }
 
-public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRow
+public sealed class DriverChoice(DriverUpdateCandidate candidate, bool searchComplete = true) : SelectableRow
 {
     private bool _eulaAccepted;
     public DriverUpdateCandidate Candidate { get; } = candidate;
+    public bool SearchComplete { get; } = searchComplete;
     public string Id => Candidate.Id;
     public string Title => Candidate.Title;
     public string? DeviceName => Candidate.DeviceName;
@@ -97,12 +98,13 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
     public bool RequiresEula => Candidate.RequiresEula;
     public string EulaText => Candidate.EulaText ?? "A licença não está disponível. Instale este candidato pelo Windows Update para revisar os termos.";
     public bool LicenseReady => !RequiresEula || (EulaAccepted && !string.IsNullOrWhiteSpace(Candidate.EulaText));
-    public bool CanSelectForInstall => HasTargetIdentity && HasUsableDate && HasUsableSource;
+    public bool CanSelectForInstall => SearchComplete && HasTargetIdentity && HasUsableDate && HasUsableSource;
     public string InstallabilityReason
     {
         get
         {
             var missing = new List<string>();
+            if (!SearchComplete) missing.Add("busca incompleta");
             if (!HasTargetIdentity) missing.Add("fabricante e modelo ausentes");
             if (!HasUsableDate) missing.Add("data ausente, inválida ou futura");
             if (!HasUsableSource) missing.Add("origem do Windows Update não reconhecida para instalação");

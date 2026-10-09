@@ -10,7 +10,7 @@ public sealed record DriverUpdateCandidate(string Id, string Title, string? Manu
     int? UpdateServerSelection = null, string? UpdateServiceId = null);
 
 public sealed record DriverUpdateSearch(DateTimeOffset CheckedAt,
-    IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
+    bool IsComplete, IReadOnlyList<DriverUpdateCandidate> Updates, IReadOnlyList<string> Warnings);
 
 public sealed record PendingWindowsUpdate(string Title, IReadOnlyList<string> KnowledgeBaseIds, bool Downloaded, string UpdateId);
 public sealed record PendingWindowsUpdateSearch(DateTimeOffset CheckedAt, bool IsComplete,
@@ -141,7 +141,7 @@ public sealed class WindowsUpdateService
                 DriverDate = $driverDate
             });
         };
-        [pscustomobject]@{ Updates = @($drivers.ToArray()); Warnings = @($warnings.ToArray()); ServerSelection=$serverSelection; ServiceId=$serviceId } |
+        [pscustomobject]@{ IsComplete=([int]$search.ResultCode -eq 2); Updates = @($drivers.ToArray()); Warnings = @($warnings.ToArray()); ServerSelection=$serverSelection; ServiceId=$serviceId } |
             Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 5 -Compress;
         """;
 
@@ -367,7 +367,7 @@ public sealed class WindowsUpdateService
     }
 
     private static DriverUpdateSearch Failed(string message) =>
-        new(DateTimeOffset.UtcNow, [], [message]);
+        new(DateTimeOffset.UtcNow, false, [], [message]);
 
     private static PendingWindowsUpdateSearch FailedPending(string message) =>
         new(DateTimeOffset.UtcNow, false, [], [message]);
@@ -391,7 +391,7 @@ public sealed class WindowsUpdateService
         return output.ToString();
     }
 
-    private sealed record SearchPayload(IReadOnlyList<DriverSearchCandidate>? Updates, IReadOnlyList<string>? Warnings,
+    private sealed record SearchPayload(bool? IsComplete, IReadOnlyList<DriverSearchCandidate>? Updates, IReadOnlyList<string>? Warnings,
         int? ServerSelection, string? ServiceId);
     private sealed record DriverSearchCandidate(string? Id, string? Title, string? Manufacturer,
         string? DeviceName, string? DriverVersion, bool RequiresEula, string? EulaText,
@@ -405,9 +405,10 @@ public sealed class WindowsUpdateService
     {
         var result = JsonSerializer.Deserialize<SearchPayload>(output)
             ?? throw new InvalidDataException("Resposta vazia do Windows Update.");
-        if (result.Updates is null || result.Warnings is null)
+        if (result.IsComplete is null || result.Updates is null || result.Warnings is null)
             throw new InvalidDataException("Resposta incompleta do Windows Update.");
         var warnings = result.Warnings.ToList();
+        var malformed = false;
         var sourceValid = WindowsUpdateSourcePolicy.IsAllowed(result.ServerSelection, result.ServiceId);
         if (!sourceValid)
             warnings.Add("A seleção de servidor do Windows Update Agent não é reconhecida como Windows Update ou Microsoft Update oficial; os candidatos ficam visíveis, mas bloqueados para instalação.");
@@ -419,6 +420,7 @@ public sealed class WindowsUpdateService
                 string.IsNullOrWhiteSpace(driver.Title) || !identities.Add(driver.Id))
             {
                 warnings.Add("Uma oferta de driver foi ignorada porque sua identidade era inválida ou repetida.");
+                malformed = true;
                 continue;
             }
             DateOnly? driverDate = null;
@@ -449,7 +451,7 @@ public sealed class WindowsUpdateService
         }
         warnings.Add("As ofertas seguem as fontes configuradas no Windows Update. Em notebooks, confira a recomendação do fabricante antes de instalar.");
         warnings.Add("O Windows Update informa fornecedor, classe e data do driver, mas não uma versão numérica nem hash/assinatura do arquivo nesta busca; esses itens permanecem indisponíveis e não são inferidos do título.");
-        return new(DateTimeOffset.UtcNow, drivers.AsReadOnly(), warnings.AsReadOnly());
+        return new(DateTimeOffset.UtcNow, result.IsComplete.Value && !malformed, drivers.AsReadOnly(), warnings.AsReadOnly());
     }
 
     private static string? Optional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

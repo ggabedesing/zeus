@@ -708,6 +708,10 @@ public sealed class WpfExperienceTests
             UpdateServiceId: Zeus.Core.WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId));
         Assert.True(microsoftUpdate.CanSelectForInstall);
         Assert.Contains("Microsoft Update", microsoftUpdate.DriverSource, StringComparison.Ordinal);
+        var partialSearchChoice = new DriverChoice(new(Guid.NewGuid().ToString("D") + ":8", "Partial result fixture", "Fixture", "Fixture adapter", null, false,
+            DriverDate: DateOnly.FromDateTime(DateTime.Today), UpdateServerSelection: 2), searchComplete: false);
+        Assert.False(partialSearchChoice.CanSelectForInstall);
+        Assert.Contains("busca incompleta", partialSearchChoice.InstallabilityReason, StringComparison.OrdinalIgnoreCase);
         window.DriverCandidates.Add(licensed); window.DriverCandidates.Add(unlicensed);
         licensed.IsSelected = true; unlicensed.IsSelected = true;
         Assert.False(window.CanInstallDriver);

@@ -1042,8 +1042,9 @@ public partial class MainWindow
         await RunOperationAsync("Consultando drivers oficiais", "A consulta ao Windows Update pode demorar. Nenhum driver será instalado durante a busca.", async token =>
         {
             var search = await _windowsUpdate.SearchDriverUpdatesAsync(token); DriverCandidates.Clear();
-            foreach (var candidate in search.Updates) { var choice = new DriverChoice(candidate); choice.PropertyChanged += (_, _) => NotifyActionState(); DriverCandidates.Add(choice); }
-            DriverSummary = $"{search.Updates.Count} candidato(s) retornado(s) em {search.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}. " + string.Join(" ", search.Warnings);
+            foreach (var candidate in search.Updates) { var choice = new DriverChoice(candidate, search.IsComplete); choice.PropertyChanged += (_, _) => NotifyActionState(); DriverCandidates.Add(choice); }
+            var completeness = search.IsComplete ? "Busca concluída" : "Resultado incompleto";
+            DriverSummary = $"{completeness} · {search.Updates.Count} candidato(s) em {search.CheckedAt.ToLocalTime():dd/MM HH:mm:ss}. " + string.Join(" ", search.Warnings);
             StatusTitle = "Consulta de drivers encerrada"; StatusDetail = DriverSummary;
         }, cancellable: true);
     }

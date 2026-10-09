@@ -66,11 +66,12 @@ public sealed class WindowsUpdateServiceTests
     [Fact]
     public void DriverSearchRetainsWindowsUpdateProviderClassAndDateWithoutInventingVersionOrSignature()
     {
-        var payload = """{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"NVIDIA Display Update","Manufacturer":"NVIDIA","DeviceName":"Graphics Adapter","DriverVersion":null,"RequiresEula":false,"DriverProvider":"NVIDIA","DriverClass":"Display","DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":2,"ServiceId":null}""";
+        var payload = """{"IsComplete":true,"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"NVIDIA Display Update","Manufacturer":"NVIDIA","DeviceName":"Graphics Adapter","DriverVersion":null,"RequiresEula":false,"DriverProvider":"NVIDIA","DriverClass":"Display","DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":2,"ServiceId":null}""";
 
         var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
 
         var candidate = Assert.Single(result.Updates);
+        Assert.True(result.IsComplete);
         Assert.Equal("NVIDIA", candidate.DriverProvider);
         Assert.Equal("Display", candidate.DriverClass);
         Assert.Equal(new DateOnly(2025, 11, 4), candidate.DriverDate);
@@ -84,11 +85,12 @@ public sealed class WindowsUpdateServiceTests
     [Fact]
     public void DriverSearchOmitsDuplicateOrMalformedWuaIdentities()
     {
-        var payload = """{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"A","RequiresEula":false},{"Id":"9D1FA4A8-A21A-4CC9-84A1-42D7428A46D8:2","Title":"B","RequiresEula":false},{"Id":"bad","Title":"C","RequiresEula":false}],"Warnings":[]}""";
+        var payload = """{"IsComplete":true,"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"A","RequiresEula":false},{"Id":"9D1FA4A8-A21A-4CC9-84A1-42D7428A46D8:2","Title":"B","RequiresEula":false},{"Id":"bad","Title":"C","RequiresEula":false}],"Warnings":[]}""";
 
         var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
 
         Assert.Single(result.Updates);
+        Assert.False(result.IsComplete);
         Assert.Equal(2, result.Warnings.Count(warning => warning.Contains("identidade era inválida ou repetida", StringComparison.OrdinalIgnoreCase)));
     }
 
@@ -97,7 +99,7 @@ public sealed class WindowsUpdateServiceTests
     [InlineData("0001-01-01")]
     public void InvalidDriverDateStaysUnavailableWithoutDiscardingOtherSearchResults(string value)
     {
-        var payload = $$"""{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"Vendor","DeviceName":"Device","RequiresEula":false,"DriverDate":"{{value}}"}],"Warnings":[]}""";
+        var payload = $$"""{"IsComplete":true,"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"Vendor","DeviceName":"Device","RequiresEula":false,"DriverDate":"{{value}}"}],"Warnings":[]}""";
 
         var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
 
@@ -108,7 +110,7 @@ public sealed class WindowsUpdateServiceTests
     [Fact]
     public void DriverWithMissingTargetAndDateRemainsExplicitButIsNotInstallable()
     {
-        var payload = """{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"","DeviceName":null,"RequiresEula":false,"DriverDate":null}],"Warnings":[]}""";
+        var payload = """{"IsComplete":true,"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"","DeviceName":null,"RequiresEula":false,"DriverDate":null}],"Warnings":[]}""";
 
         var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
 
@@ -128,7 +130,7 @@ public sealed class WindowsUpdateServiceTests
         var payload = System.Text.Json.JsonSerializer.Serialize(new
         {
             Updates = new[] { new { Id = "9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2", Title = "Driver", Manufacturer = "Vendor", DeviceName = "Device", RequiresEula = false, DriverDate = "2025-11-04" } },
-            Warnings = Array.Empty<string>(), ServerSelection = selection, ServiceId = serviceId
+            IsComplete = true, Warnings = Array.Empty<string>(), ServerSelection = selection, ServiceId = serviceId
         });
 
         var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
@@ -140,7 +142,7 @@ public sealed class WindowsUpdateServiceTests
     [Fact]
     public void MicrosoftUpdateServiceIdIsAcceptedButUnrelatedAdditionalServiceIsNot()
     {
-        var microsoftPayload = $$"""{"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"Vendor","DeviceName":"Device","RequiresEula":false,"DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":3,"ServiceId":"{{Zeus.Core.WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId}}"}""";
+        var microsoftPayload = $$"""{"IsComplete":true,"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","Manufacturer":"Vendor","DeviceName":"Device","RequiresEula":false,"DriverDate":"2025-11-04"}],"Warnings":[],"ServerSelection":3,"ServiceId":"{{Zeus.Core.WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId}}"}""";
         var unrelatedPayload = microsoftPayload.Replace(Zeus.Core.WindowsUpdateSourcePolicy.MicrosoftUpdateServiceId,
             "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", StringComparison.OrdinalIgnoreCase);
 
@@ -148,7 +150,22 @@ public sealed class WindowsUpdateServiceTests
         var blocked = WindowsUpdateService.ParseDriverUpdatesPayload(unrelatedPayload);
 
         Assert.DoesNotContain(accepted.Warnings, warning => warning.Contains("não é reconhecida", StringComparison.OrdinalIgnoreCase));
+        Assert.True(accepted.IsComplete);
         Assert.Contains(blocked.Warnings, warning => warning.Contains("não é reconhecida", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void IncompleteDriverSearchRemainsExplicitEvenWhenItReturnsCandidates()
+    {
+        var payload = """{"IsComplete":false,"Updates":[{"Id":"9d1fa4a8-a21a-4cc9-84a1-42d7428a46d8:2","Title":"Driver","RequiresEula":false}],"Warnings":["fonte parcial"]}""";
+
+        var result = WindowsUpdateService.ParseDriverUpdatesPayload(payload);
+
+        Assert.False(result.IsComplete);
+        Assert.Single(result.Updates);
+        Assert.Contains("fonte parcial", result.Warnings);
+        Assert.Throws<InvalidDataException>(() => WindowsUpdateService.ParseDriverUpdatesPayload(
+            """{"Updates":[],"Warnings":[]}"""));
     }
 
     [Fact]
