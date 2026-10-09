@@ -959,5 +959,7 @@ public partial class MainWindow
     private void OpenWindowsColors_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:personalization-colors", "cores");
     private void OpenWindowsStart_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:personalization-start", "Iniciar");
     private void OpenWindowsTaskbar_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:taskbar", "barra de tarefas");
+    private void OpenWindowsSound_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:sound", "som");
+    private void OpenWindowsLockScreen_Click(object sender, RoutedEventArgs e) => OpenWindowsPersonalizationSettings("ms-settings:lockscreen", "tela de bloqueio");
     private bool Confirm(string text, string title) => MessageBox.Show(this, text, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 }

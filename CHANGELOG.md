@@ -2,7 +2,7 @@
 
 ## Não lançado
 
-- A área Perfil e plano agora abre as páginas oficiais do Windows para temas, cores, menu Iniciar e barra de tarefas, deixando explícito que essas alterações são controladas pelo Windows e não são revertidas pelo ZEUS.
+- A área Perfil e plano agora abre páginas oficiais do Windows para temas, cores, menu Iniciar, barra de tarefas, som e tela de bloqueio, deixando explícito que essas alterações são controladas pelo Windows e não são revertidas pelo ZEUS.
 - O ciclo automatizado do MSI abre a janela principal da versão instalada após a atualização e valida o encerramento antes da desinstalação.
 - A aba de drivers identifica separadamente o fabricante do dispositivo e o fabricante do driver, e oferece consulta de atualizações em fontes oficiais.
 - A interface acompanha a ativação e a desativação do alto contraste do Windows enquanto está aberta.

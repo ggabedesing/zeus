@@ -170,7 +170,9 @@ public sealed class WpfExperienceTests
             (Name: "OpenWindowsThemesButton", AutomationId: "open-windows-themes", Uri: "ms-settings:themes"),
             (Name: "OpenWindowsColorsButton", AutomationId: "open-windows-colors", Uri: "ms-settings:personalization-colors"),
             (Name: "OpenWindowsStartButton", AutomationId: "open-windows-start", Uri: "ms-settings:personalization-start"),
-            (Name: "OpenWindowsTaskbarButton", AutomationId: "open-windows-taskbar", Uri: "ms-settings:taskbar")
+            (Name: "OpenWindowsTaskbarButton", AutomationId: "open-windows-taskbar", Uri: "ms-settings:taskbar"),
+            (Name: "OpenWindowsSoundButton", AutomationId: "open-windows-sound", Uri: "ms-settings:sound"),
+            (Name: "OpenWindowsLockScreenButton", AutomationId: "open-windows-lock-screen", Uri: "ms-settings:lockscreen")
         };
         foreach (var entry in windowsSettingsButtons)
         {
