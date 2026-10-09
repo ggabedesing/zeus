@@ -1,0 +1,41 @@
+{
+  "milestone": "driver-active-observation",
+  "recordedAtUtc": "2026-10-09T22:18:45.6626841+00:00",
+  "sourceCommit": "f41f4e357220ef0540866fae3468f8378acce655",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "signedRelease": false,
+  "build": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "tests": {
+    "passed": 653,
+    "skipped": 11,
+    "total": 664,
+    "failed": 0
+  },
+  "schema": {
+    "report": 12,
+    "sqlite": 7
+  },
+  "verification": {
+    "eulaHash": "actual script block executed with Unicode fixture on Windows PowerShell 5",
+    "portableMainWindow": "opened, responded, closed cleanly",
+    "compiledInstallerScript": "parsed with Windows PowerShell; baseline checkpoint and WUA marker ordering checked",
+    "realReadOnlyDriverChecks": 3
+  },
+  "package": {
+    "exeSha256": "1cea14751facf7536e13f94ad725905e0314b49f81857c6d7b4beda4d962b9d1",
+    "zipSha256": "54960af4e805d35f44625426fdfad0abe48e56bcfa251a04f70bdbd66ee2fa6b",
+    "folder": "artifacts/driver-active-exe/zeus-win-x64-f41f4e357220-20261009T221802043Z-3456fbd3",
+    "zip": "artifacts/driver-active-exe/zeus-win-x64.zip"
+  },
+  "limitations": [
+    "No driver installed or reverted in this milestone",
+    "No actual restart or elevated installer flow verified",
+    "Observed INF/version binding does not prove package activation, functionality or performance gain",
+    "Secondary checkpoint recovery remains manual"
+  ]
+}
