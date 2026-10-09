@@ -37,6 +37,18 @@ public sealed class WpfExperienceTests
         }
     }
 
+    [Theory]
+    [InlineData(519.9, 1)]
+    [InlineData(520, 2)]
+    [InlineData(839.9, 2)]
+    [InlineData(840, 3)]
+    [InlineData(double.NaN, 3)]
+    [InlineData(double.PositiveInfinity, 3)]
+    public void HardwareOverviewCardsChooseColumnsForAvailableWidth(double width, int expectedColumns)
+    {
+        Assert.Equal(expectedColumns, MainWindow.ResolveHardwareCardColumns(width));
+    }
+
     [Fact]
     public void WindowMinimumSizeFitsSmallWorkAreasWithoutContradictingMaximumSize()
     {
@@ -575,6 +587,9 @@ public sealed class WpfExperienceTests
         await RenderAsync(window, "zeus-complete-overview.png");
         window.Width = 900;
         window.Height = 650;
+        await Task.Delay(50);
+        window.UpdateLayout();
+        Assert.Equal(2, window.HardwareCardColumns);
         Assert.True(window.WorkspaceTabs.ActualWidth > 0 && window.WorkspaceTabs.ActualHeight > 0,
             "The workspaces must remain available at the minimum supported viewport.");
         AssertControlFitsWindow(window, technicalModeToggle);
@@ -596,6 +611,9 @@ public sealed class WpfExperienceTests
         await RenderAsync(window, "zeus-compact-viewport.png");
         window.Width = 1440;
         window.Height = 1024;
+        await Task.Delay(50);
+        window.UpdateLayout();
+        Assert.Equal(3, window.HardwareCardColumns);
         window.SelectedTheme = DesktopTheme.Minimal;
         window.IsMinimal = true;
         Assert.Equal(Visibility.Collapsed, window.DetailedVisibility);

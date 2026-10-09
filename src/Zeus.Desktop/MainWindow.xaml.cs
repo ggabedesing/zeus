@@ -69,6 +69,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
     private bool _networkResetReviewed, _networkResetRecoveryReady;
     private bool _wingetAuditReadable = true;
+    private int _hardwareCardColumns = 3;
     private bool _closingAfterActivityDrain;
     private bool _isClosing;
     private int _activityStorageWarningShown;
@@ -131,6 +132,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     internal static Size ClampMinimumWindowSize(Size configuredMinimum, Size workArea) => new(
         Math.Max(1, Math.Min(configuredMinimum.Width, Math.Max(1, workArea.Width))),
         Math.Max(1, Math.Min(configuredMinimum.Height, Math.Max(1, workArea.Height))));
+
+    internal static int ResolveHardwareCardColumns(double availableWidth) =>
+        !double.IsFinite(availableWidth) || availableWidth <= 0 ? 3 : availableWidth < 520 ? 1 : availableWidth < 840 ? 2 : 3;
 
     public HardwareSnapshot? Snapshot => _snapshot;
     public string BuildVersion { get; } = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Indisponível";
@@ -195,6 +199,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ? $"{value:0.##} ms"
         : "indisponível";
     public ObservableCollection<HardwareCard> HardwareCards { get; } = [];
+    public int HardwareCardColumns { get => _hardwareCardColumns; private set => Set(ref _hardwareCardColumns, value); }
     public ObservableCollection<RecommendationRow> Recommendations { get; } = [];
     public ObservableCollection<DeviceRow> GraphicsRows { get; } = [];
     public ObservableCollection<DeviceRow> DiskRows { get; } = [];
@@ -458,6 +463,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         finally { SetBusy(false); }
         await RefreshDiagnosticsAsync();
+    }
+
+    private void HardwareCardsList_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var width = e.NewSize.Width;
+        if (!double.IsFinite(width) || width <= 0) return;
+        HardwareCardColumns = ResolveHardwareCardColumns(width);
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshDiagnosticsAsync();
