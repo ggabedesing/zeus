@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- A tela Meu PC agora lista até 30 serviços e tarefas agendadas com seus estados reportados; o relatório continua contendo a coleção completa e nenhuma entrada é executada ou alterada.
 - A assinatura de release usa o certificado fixado no repositório `CurrentUser\My`, sem passar a senha PFX na linha de comando do SignTool; variáveis secretas e entradas de certificado temporárias são removidas, inclusive em caso de falha.
 - O CI Windows agora gera um certificado descartável de assinatura, testa a importação/limpeza do PFX e assina uma cópia temporária de um executável pelo thumbprint sem usar credenciais de produção.
 - A personalização de papel de parede agora aplica uma imagem estática aos monitores conectados com cópia e restauração independentes por monitor; slideshows são preservados e conflitos externos/topologia alterada bloqueiam a reversão automática.

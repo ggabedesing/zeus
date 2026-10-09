@@ -569,8 +569,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ExtendedHardwareRows.Add(new("Inicialização segura", inventory.SecurityState?.SecureBootEnabled is { } secureBoot ? (secureBoot ? "Ativada" : "Desativada") : "Indisponível"));
             ExtendedHardwareRows.Add(new("TPM", inventory.SecurityState?.TpmPresent is { } tpm ? (tpm ? $"Presente · {(inventory.SecurityState.TpmReady == true ? "pronto" : inventory.SecurityState.TpmReady == false ? "não pronto" : "estado indisponível")}" : "Não detectado") : "Indisponível"));
             ExtendedHardwareRows.Add(new("Reinicialização pendente", FormatRestartState(WindowsRestartStateParser.Evaluate(inventory.RestartIndicators))));
-            ExtendedHardwareRows.Add(new("Tarefas agendadas", $"{inventory.ScheduledTasks.Count} entradas inventariadas; nomes e estados completos ficam no relatório exportado."));
-            ExtendedHardwareRows.Add(new("Serviços", $"{inventory.Services.Count} entradas inventariadas; nenhuma foi alterada."));
+            var scheduledTasks = inventory.ScheduledTasks
+                .OrderBy(task => task.Path, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(task => task.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+            ExtendedHardwareRows.Add(new("Tarefas agendadas", $"{scheduledTasks.Length} entradas inventariadas; até 30 são exibidas abaixo. Nenhuma foi alterada."));
+            foreach (var task in scheduledTasks.Take(30))
+                ExtendedHardwareRows.Add(new($"Tarefa · {Available(task.Name)}", $"Pasta: {Available(task.Path)} · Estado reportado: {Available(task.State)}"));
+            if (scheduledTasks.Length > 30)
+                ExtendedHardwareRows.Add(new("Tarefas agendadas · restante", $"Mais {scheduledTasks.Length - 30} entradas permanecem no relatório completo."));
+            var services = inventory.Services
+                .OrderBy(service => service.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(service => service.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+            ExtendedHardwareRows.Add(new("Serviços", $"{services.Length} entradas inventariadas; até 30 são exibidas abaixo. Nenhum foi iniciado ou parado."));
+            foreach (var service in services.Take(30))
+                ExtendedHardwareRows.Add(new($"Serviço · {Available(service.DisplayName)}", $"Nome: {Available(service.Name)} · Estado: {Available(service.Status)} · Inicialização: {Available(service.StartType)}"));
+            if (services.Length > 30)
+                ExtendedHardwareRows.Add(new("Serviços · restante", $"Mais {services.Length - 30} entradas permanecem no relatório completo."));
             var software = inventory.InstalledSoftware.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
             ExtendedHardwareRows.Add(new("Programas instalados", $"{software.Length} entradas Win32/Appx-MSIX; a fonte Winget é consultada separadamente e nada foi instalado."));
             foreach (var item in software.Take(30))
