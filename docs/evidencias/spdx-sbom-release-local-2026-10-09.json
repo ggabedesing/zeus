@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "spdx-sbom-release-package",
+  "recordedAtUtc": "2026-10-09T08:35:00Z",
+  "sourceCommit": "a036f21d8441378d66b281c8f277e0ace164ee97",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "outcome": "success",
+  "sbom": {
+    "file": "SBOM.spdx.json",
+    "specVersion": "SPDX-2.3",
+    "components": 16,
+    "relationships": 21,
+    "allRelationshipTargetsResolve": true,
+    "spdxIdsAreUnique": true,
+    "sha256": "453698092ade6b6ed6788af866e3cf320bf92876fcf45fc51c58ec590ea12d35",
+    "includedInBuildInfoFileHashManifest": true
+  },
+  "portablePackage": {
+    "file": "artifacts/spdx-sbom-final/zeus-win-x64-a036f21d8441-20261009T083416226Z-0a347816.zip",
+    "sha256": "c35466dab8809cb50b884bf35636ae56134f2c8dd6e928033eb2146f7cf156ec",
+    "fileCount": 431,
+    "applicationSmoke": { "opened": true, "responded": true, "closedCleanly": true }
+  },
+  "installer": {
+    "file": "artifacts/spdx-sbom-final/msi/Zeus.Installer.msi",
+    "sha256": "e7f66f080ea196f640bb617129a79fe5ed3738271944b735cac3c9d672698675",
+    "compiled": true,
+    "containsDesktopExe": true,
+    "containsBuildInfo": true,
+    "containsSbom": true,
+    "installedOnUserPc": false,
+    "warnings": ["WiX WIX1101: SQLite native library has no language resource; installer build succeeded."]
+  },
+  "limitations": [
+    "The SBOM describes first-party projects and dependencies represented in the published .deps.json manifests; it is not a source-file-level inventory or an inventory of undeclared external tools.",
+    "The development package is not Authenticode signed for production."
+  ]
+}
