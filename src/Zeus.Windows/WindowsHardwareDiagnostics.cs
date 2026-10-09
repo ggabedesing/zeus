@@ -175,6 +175,19 @@ $inventory = [pscustomobject]@{
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (payload?.Inventory is not { } inventory) return null;
         var warnings = (payload.Warnings ?? []).ToList();
+        try
+        {
+            var runtime = await ReadScheduledTaskRuntimeAsync(token);
+            inventory = inventory with { ScheduledTasks = MergeScheduledTaskRuntime(inventory.ScheduledTasks, runtime) };
+            var missing = inventory.ScheduledTasks.Count(task => task.RuntimeInfoAvailable != true);
+            if (missing > 0)
+                warnings.Add($"Tarefas agendadas: informações de execução indisponíveis para {missing} entrada(s); inventário básico preservado.");
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception error)
+        {
+            warnings.Add($"Tarefas agendadas: informações de execução indisponíveis ({error.GetType().Name}); inventário básico preservado.");
+        }
         var winHttpProxy = WinHttpProxyReader.Read();
         if (!winHttpProxy.IsAvailable)
             warnings.Add("Proxy WinHTTP padrão: API de configuração indisponível nesta coleta.");
@@ -182,6 +195,39 @@ $inventory = [pscustomobject]@{
         if (!firmwareBoot.IsAvailable)
             warnings.Add("Modo de inicialização firmware: GetFirmwareType indisponível nesta coleta.");
         return inventory with { Warnings = warnings, WinHttpProxyConfiguration = winHttpProxy, FirmwareBoot = firmwareBoot };
+    }
+
+    private static async Task<IReadOnlyList<ScheduledTaskInfo>> ReadScheduledTaskRuntimeAsync(CancellationToken token)
+    {
+        // Separate subprocess deadline preserves the basic inventory if the scheduler provider stalls.
+        const string script = @"
+function Read-TaskDate($date) { if ($null -ne $date -and $date.Year -gt 1900) { $date.ToUniversalTime().ToString('o') } else { $null } }
+$tasks = @(Get-ScheduledTask -ErrorAction Stop | Select-Object -First 500)
+$result = @($tasks | ForEach-Object {
+ $task = $_; $info = $null
+ try { $info = Get-ScheduledTaskInfo -InputObject $task -ErrorAction Stop } catch { }
+ [pscustomobject]@{Name=[string]$task.TaskName;Path=[string]$task.TaskPath;State=[string]$task.State;
+  RuntimeInfoAvailable=($null -ne $info);LastTaskResult=$(if ($null -ne $info -and $null -ne $info.LastTaskResult) {[uint32]$info.LastTaskResult} else {$null});
+  LastRunTime=$(if ($null -ne $info) {Read-TaskDate $info.LastRunTime} else {$null});
+  NextRunTime=$(if ($null -ne $info) {Read-TaskDate $info.NextRunTime} else {$null});
+  MissedRuns=$(if ($null -ne $info -and $null -ne $info.NumberOfMissedRuns) {[uint32]$info.NumberOfMissedRuns} else {$null})}
+})
+ConvertTo-Json -InputObject $result -Depth 4 -Compress";
+        using var json = await RunPowerShellJsonAsync(script, token, TimeSpan.FromSeconds(12), WindowsPowerShellModule.Utility);
+        return JsonSerializer.Deserialize<ScheduledTaskInfo[]>(json.RootElement.GetRawText(),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+    }
+
+    internal static IReadOnlyList<ScheduledTaskInfo> MergeScheduledTaskRuntime(
+        IReadOnlyList<ScheduledTaskInfo> tasks, IReadOnlyList<ScheduledTaskInfo> runtime)
+    {
+        static string Key(ScheduledTaskInfo task) => task.Path + "\0" + task.Name;
+        var unique = runtime.GroupBy(Key, StringComparer.OrdinalIgnoreCase).Where(group => group.Count() == 1)
+            .ToDictionary(group => group.Key, group => group.Single(), StringComparer.OrdinalIgnoreCase);
+        return tasks.Select(task => unique.TryGetValue(Key(task), out var info)
+            ? task with { LastTaskResult = info.LastTaskResult, LastRunTime = info.LastRunTime,
+                NextRunTime = info.NextRunTime, MissedRuns = info.MissedRuns, RuntimeInfoAvailable = info.RuntimeInfoAvailable }
+            : task).ToArray();
     }
 
     private static ManagementObjectCollection Query(string query)

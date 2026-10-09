@@ -945,7 +945,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 : $"{scheduledTasks.Length} entradas inventariadas; até 30 são exibidas abaixo.";
             ExtendedHardwareRows.Add(new("Tarefas agendadas", scheduledTasksSummary + " Nenhuma foi alterada."));
             foreach (var task in scheduledTasks.Take(30))
-                ExtendedHardwareRows.Add(new($"Tarefa · {Available(task.Name)}", $"Pasta: {Available(task.Path)} · Estado reportado: {Available(task.State)}"));
+                ExtendedHardwareRows.Add(new($"Tarefa · {Available(task.Name)}", $"Pasta: {Available(task.Path)} · Estado reportado: {Available(task.State)}\n{ScheduledTaskDiagnostics.Describe(task)}"));
             if (scheduledTasks.Length > 30)
                 ExtendedHardwareRows.Add(new("Tarefas agendadas · restante", $"Mais {scheduledTasks.Length - 30} entradas permanecem no relatório completo."));
             var services = inventory.Services

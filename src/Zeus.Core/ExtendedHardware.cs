@@ -69,7 +69,9 @@ public sealed record PnpDeviceInfo(string Name, string Class, string Status, str
 public sealed record ProcessInfo(string Name, int Id, double? CpuSeconds, ulong? WorkingSetBytes);
 public sealed record ServiceInfo(string Name, string DisplayName, string Status, string StartType,
     string[]? Dependencies = null, bool? DependenciesAvailable = null);
-public sealed record ScheduledTaskInfo(string Name, string Path, string State);
+public sealed record ScheduledTaskInfo(string Name, string Path, string State,
+    uint? LastTaskResult = null, DateTimeOffset? LastRunTime = null, DateTimeOffset? NextRunTime = null,
+    uint? MissedRuns = null, bool? RuntimeInfoAvailable = null);
 public sealed record InstalledSoftwareInfo(string Name, string Version, string Publisher, string? Source = null);
 public sealed record WindowsEventInfo(DateTimeOffset Time, string Log, string Provider, int Id, string Level, string Message);
 public sealed record WindowsSecurityState(bool? SecureBootEnabled, bool? TpmPresent, bool? TpmReady);

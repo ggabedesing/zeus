@@ -117,6 +117,18 @@ public sealed class WindowsInventoryTests
             if (service.DependenciesAvailable == true) Assert.NotNull(service.Dependencies);
         });
         Assert.InRange(snapshot.WindowsInventory.ScheduledTasks.Count, 0, 500);
+        Assert.All(snapshot.WindowsInventory.ScheduledTasks, task =>
+        {
+            if (task.RuntimeInfoAvailable != true)
+            {
+                Assert.Null(task.LastTaskResult);
+                Assert.Null(task.LastRunTime);
+                Assert.Null(task.NextRunTime);
+                Assert.Null(task.MissedRuns);
+            }
+            if (task.LastRunTime is { } lastRun) Assert.True(lastRun.Year > 1900);
+            if (task.NextRunTime is { } nextRun) Assert.True(nextRun.Year > 1900);
+        });
         if (snapshot.WindowsInventory.Warnings.Any(warning => warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase)))
             Assert.Equal(500, snapshot.WindowsInventory.ScheduledTasks.Count);
         Assert.Contains(snapshot.WindowsInventory.Warnings, warning => warning.Contains("WinHTTP", StringComparison.OrdinalIgnoreCase));

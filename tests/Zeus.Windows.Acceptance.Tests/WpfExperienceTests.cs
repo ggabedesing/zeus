@@ -734,6 +734,9 @@ public sealed class WpfExperienceTests
         var taskInventoryLimited = inventory.Warnings.Any(warning => warning.StartsWith("Tarefas agendadas: amostra limitada a 500", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(taskInventoryLimited, scheduledTasksRow.Detail.Contains("amostra está incompleta", StringComparison.Ordinal));
         Assert.Equal(Math.Min(inventory.ScheduledTasks.Count, 30), window.ExtendedHardwareRows.Count(row => row.Title.StartsWith("Tarefa · ", StringComparison.Ordinal)));
+        Assert.All(window.ExtendedHardwareRows.Where(row => row.Title.StartsWith("Tarefa · ", StringComparison.Ordinal)), row =>
+            Assert.True(row.Detail.Contains("Último resultado:", StringComparison.Ordinal) ||
+                row.Detail.Contains("Informações de execução indisponíveis", StringComparison.Ordinal), row.Detail));
         var processInventoryRow = Assert.Single(window.ExtendedHardwareRows, row => row.Title == "Processos do Windows");
         Assert.Equal(inventory.Warnings.Any(warning => warning.StartsWith("Processos: amostra limitada aos 200", StringComparison.OrdinalIgnoreCase)),
             processInventoryRow.Detail.Contains("Amostra incompleta", StringComparison.Ordinal));
