@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "collectedAtUtc": "2026-10-09T14:16:21.9629002Z",
+  "sourceCommit": "3dfd1c5c807884b5a7602428fef5bfe3dc286efd",
+  "sourceDirty": false,
+  "change": "Launched the current portable Windows executable directly and confirmed that its main window appeared, remained responsive, and closed normally.",
+  "verification": {
+    "portablePackage": {
+      "runtime": "win-x64",
+      "developmentBuild": true,
+      "opened": true,
+      "windowTitle": "ZEUS · Otimização e diagnóstico",
+      "responsive": true,
+      "closedCleanly": true,
+      "exitCode": 0,
+      "exeSha256": "7C97F3FCA48B438100C9B05584EFEE40434E0527559A47FBDF856E42B500922D",
+      "zipSha256": "D6D3EC002B62574CDB9B2E031BCD135959738A5F2F4DCD2E39D7C0FA73EE0A16"
+    }
+  },
+  "systemChanges": {
+    "windowsPreferencesChanged": false,
+    "productionAuthenticodeSigned": false
+  }
+}
