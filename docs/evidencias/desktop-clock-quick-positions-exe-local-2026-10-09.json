@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "collectedAtUtc": "2026-10-09T14:22:24.6686870Z",
+  "sourceCommit": "cc9b7ae12c9412f87992f31c857cb3dce88d4961",
+  "sourceDirty": false,
+  "change": "Added four one-click positions for the optional desktop clock on the primary display; selection remains a preview until saved and can be canceled.",
+  "verification": {
+    "focusedWpfAcceptance": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        "Four anchors calculate within a negative-origin monitor work area at a 16-DIP inset.",
+        "The live WPF acceptance verifies the top-left button, clock repositioning, and cancel restoring the saved coordinates."
+      ]
+    },
+    "portablePackage": {
+      "runtime": "win-x64",
+      "productVersion": "1.0.0",
+      "developmentBuild": true,
+      "sourceDirty": false,
+      "opened": true,
+      "responsive": true,
+      "closedCleanly": true,
+      "maintenanceHelperIncluded": true,
+      "packageFiles": 431,
+      "zipSha256": "7F2CFA052F3423ED859F79DF2928773FDCDE3893397D974A1FB21700C9F46229",
+      "exeSha256": "8EB0D588FDD34445D306EDA8C3FD7C85BD498D88877B7AA671A4FC1472CFC1F6"
+    }
+  },
+  "systemChanges": {
+    "windowsPreferencesChanged": false,
+    "productionAuthenticodeSigned": false
+  }
+}
