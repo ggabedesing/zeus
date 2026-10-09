@@ -51,6 +51,14 @@ public sealed class WpfExperienceTests
             MainWindow.FormatMemoryInterleave(new MemoryModuleInfo("DIMM 1", 8UL * 1024 * 1024 * 1024, null, "Fabricante")));
     }
 
+    [Fact]
+    public void PhysicalDiskNumberFormattingKeepsUnknownExplicitAndSupportsMultipleDisks()
+    {
+        Assert.Equal("indisponível", MainWindow.FormatPhysicalDiskNumbers(null));
+        Assert.Equal("indisponível", MainWindow.FormatPhysicalDiskNumbers([]));
+        Assert.Equal("#0, #2", MainWindow.FormatPhysicalDiskNumbers([0, 2]));
+    }
+
     [Theory]
     [InlineData("#1D4ED8", "#080D19")]
     [InlineData("#176B87", "#141C27")]
@@ -664,6 +672,17 @@ public sealed class WpfExperienceTests
         Assert.NotNull(window.Snapshot.Cpu);
         Assert.NotNull(window.Snapshot.Memory);
         Assert.NotEmpty(window.Snapshot.Disks);
+        foreach (var volume in window.Snapshot.Disks)
+        {
+            var row = Assert.Single(window.DiskRows, item => item.Title.StartsWith(volume.DriveLetter + " · ", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains($"Discos físicos: {MainWindow.FormatPhysicalDiskNumbers(volume.PhysicalDiskNumbers)}", row.Detail, StringComparison.Ordinal);
+        }
+        foreach (var physicalDisk in window.Snapshot.PhysicalDisks ?? [])
+        {
+            var row = Assert.Single(window.ExtendedHardwareRows, item => item.Title == (string.IsNullOrWhiteSpace(physicalDisk.Name) ? "Indisponível" : physicalDisk.Name) && item.Detail.StartsWith("Disco físico:", StringComparison.Ordinal));
+            var expectedNumber = physicalDisk.DiskNumber is { } number ? $"Disco físico: #{number}" : "Disco físico: número indisponível";
+            Assert.Contains(expectedNumber, row.Detail, StringComparison.Ordinal);
+        }
         if (window.Snapshot.MemoryModules is { } memoryModules)
         {
             var memorySummary = Assert.Single(window.ExtendedHardwareRows, row => row.Title == "RAM · Slots e canais");

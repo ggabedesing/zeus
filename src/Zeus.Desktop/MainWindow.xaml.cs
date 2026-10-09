@@ -1378,7 +1378,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static string FormatDiskErrors(ulong? total, ulong? uncorrected) => total is null && uncorrected is null
         ? "indisponíveis"
         : $"{total?.ToString() ?? "indisponível"} total / {uncorrected?.ToString() ?? "indisponível"} não corrigidos";
-    private static string FormatPhysicalDiskNumbers(IReadOnlyList<int>? numbers) => numbers is { Count: > 0 }
+    internal static string FormatPhysicalDiskNumbers(IReadOnlyList<int>? numbers) => numbers is { Count: > 0 }
         ? string.Join(", ", numbers.Select(number => $"#{number}"))
         : "indisponível";
     internal static string FormatMemoryInterleave(MemoryModuleInfo module) => module.InterleaveDataDepth switch
