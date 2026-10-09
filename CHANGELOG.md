@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O modo técnico agora é uma preferência independente do tema visual: ele mantém os detalhes visíveis mesmo no tema mínimo e persiste junto às demais preferências locais.
 - A área Perfil e plano agora abre páginas oficiais do Windows para temas, cores, menu Iniciar, barra de tarefas, som e tela de bloqueio, deixando explícito que essas alterações são controladas pelo Windows e não são revertidas pelo ZEUS.
 - O ciclo automatizado do MSI abre a janela principal da versão instalada após a atualização e valida o encerramento antes da desinstalação.
 - A aba de drivers identifica separadamente o fabricante do dispositivo e o fabricante do driver, e oferece consulta de atualizações em fontes oficiais.

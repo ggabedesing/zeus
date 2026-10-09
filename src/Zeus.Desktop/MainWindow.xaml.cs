@@ -52,6 +52,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private CleanupScan? _cleanupScan;
     private bool _isBusy, _isExecuting, _loaded, _historyReadable = true;
     private bool _firstRunSetupComplete = true;
+    private bool _isTechnicalMode;
     private DesktopTheme _selectedTheme = DesktopTheme.Complete;
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
@@ -255,9 +256,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
     public string CleanupSelectedText => $"{CleanupFiles.Count(f => f.IsSelected)} arquivo(s) · {ByteFormatting.Format(CleanupFiles.Where(f => f.IsSelected).Aggregate(0UL, (sum, f) => sum + f.SizeBytes))} selecionados";
-    public Visibility DetailedVisibility => IsMinimal ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility DetailedVisibility => IsMinimal && !IsTechnicalMode ? Visibility.Collapsed : Visibility.Visible;
     public string LayoutDescription => ThemeOptions.First(t => t.Value == SelectedTheme).Name;
     public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
+    public bool IsTechnicalMode { get => _isTechnicalMode; set { if (Set(ref _isTechnicalMode, value)) { Notify(nameof(DetailedVisibility)); QueuePreferencesSave(); } } }
     public DesktopTheme SelectedTheme
     {
         get => _selectedTheme;
@@ -293,6 +295,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 var p = await _storage.ReadPreferencesAsync();
                 SelectedTheme = p.IsMinimal ? DesktopTheme.Minimal : p.Theme;
                 SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency;
+                IsTechnicalMode = p.IsTechnicalMode;
                 FirstRunSetupComplete = p.FirstRunSetupComplete;
                 NeedsBluetooth = p.NeedsBluetooth; NeedsPrinting = p.NeedsPrinting; NeedsCloudSync = p.NeedsCloudSync; NeedsVirtualization = p.NeedsVirtualization;
             }
@@ -583,7 +586,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var title in new[] { "Processador", "Memória RAM", "Placas de vídeo", "Armazenamento", "Microsoft Defender", "Placa-mãe" }) HardwareCards.Add(new(title, "Aguardando leitura", "Dados locais do Windows"));
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
-    private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete);
+    private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode);
     private void QueuePreferencesSave() { if (_loaded) _ = SavePreferencesAsync(); }
     private async Task SavePreferencesAsync()
     {

@@ -106,6 +106,10 @@ public sealed class WpfExperienceTests
         Assert.Equal("Tema do aplicativo", themeSelectorPeer.GetName());
         var expandCollapse = Assert.IsAssignableFrom<IExpandCollapseProvider>(themeSelectorPeer.GetPattern(PatternInterface.ExpandCollapse));
         Assert.Equal(3, themeSelector.Items.Count);
+        var technicalModeToggle = Assert.IsType<CheckBox>(window.FindName("TechnicalModeToggle"));
+        Assert.Equal("technical-mode-toggle", AutomationProperties.GetAutomationId(technicalModeToggle));
+        Assert.Equal("Modo técnico: mostrar detalhes adicionais", AutomationProperties.GetName(technicalModeToggle));
+        Assert.False(window.IsTechnicalMode);
         expandCollapse.Expand();
         Assert.True(themeSelector.IsDropDownOpen);
         expandCollapse.Collapse();
@@ -324,6 +328,23 @@ public sealed class WpfExperienceTests
         await RenderAsync(window, "zeus-complete-overview.png");
         window.SelectedTheme = DesktopTheme.Minimal;
         window.IsMinimal = true;
+        Assert.Equal(Visibility.Collapsed, window.DetailedVisibility);
+        technicalModeToggle.IsChecked = true;
+        Assert.True(window.IsTechnicalMode);
+        Assert.Equal(Visibility.Visible, window.DetailedVisibility);
+        var technicalPreferencesDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        DesktopPreferences persistedPreferences;
+        do
+        {
+            await Task.Delay(25);
+            persistedPreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        } while (!persistedPreferences.IsTechnicalMode && DateTimeOffset.UtcNow < technicalPreferencesDeadline);
+        Assert.True(persistedPreferences.IsTechnicalMode, "Technical mode must persist in the SQLite-backed app settings.");
+        window.SelectedTheme = DesktopTheme.MacInspired;
+        Assert.True(window.IsTechnicalMode, "Changing the application theme must not change the technical-mode preference.");
+        Assert.Equal(Visibility.Visible, window.DetailedVisibility);
+        window.SelectedTheme = DesktopTheme.Minimal;
+        technicalModeToggle.IsChecked = false;
         Assert.Equal(Visibility.Collapsed, window.DetailedVisibility);
         await RenderAsync(window, "zeus-minimal-overview.png");
         window.IsMinimal = false;
