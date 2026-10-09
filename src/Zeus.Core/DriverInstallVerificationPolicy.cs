@@ -36,7 +36,7 @@ public static class DriverInstallVerificationPolicy
     {
         if (!queryComplete || !sourceSelectionMatches || exactUpdateMarkedInstalled is null)
             return new(StepOutcome.Succeeded, MaintenanceVerificationStatus.Pending,
-                "A reconsulta após reinicialização não confirmou o estado do pacote. A pendência foi preservada; confira Windows Update e o dispositivo manualmente. Nenhuma nova instalação foi iniciada.");
+                "A reconsulta não confirmou o estado atual do pacote. A pendência foi preservada; confira Windows Update e o dispositivo manualmente. Nenhuma nova instalação foi iniciada.");
 
         if (exactUpdateMarkedInstalled.Value)
             return new(StepOutcome.Succeeded, MaintenanceVerificationStatus.ProviderConfirmed,

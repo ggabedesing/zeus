@@ -46,7 +46,8 @@ public sealed record MaintenanceStepResult(
     int? UpdateServerSelection = null,
     string? UpdateServiceId = null,
     WindowsImageHealthState ImageHealthState = WindowsImageHealthState.Unknown,
-    SfcVerificationState SystemFilesState = SfcVerificationState.Unknown);
+    SfcVerificationState SystemFilesState = SfcVerificationState.Unknown,
+    DriverActiveEvidence? ActiveDriver = null);
 
 public sealed record MaintenanceReport(
     Guid SessionId,

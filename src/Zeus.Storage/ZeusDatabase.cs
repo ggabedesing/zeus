@@ -24,7 +24,8 @@ public sealed record StoredMaintenanceStep(
     int? UpdateServerSelection = null,
     string? UpdateServiceId = null,
     string ImageHealthState = "Unknown",
-    string SystemFilesState = "Unknown");
+    string SystemFilesState = "Unknown",
+    string? ActiveDriverJson = null);
 
 public sealed record StoredMaintenanceSession(
     string SessionId,
@@ -58,7 +59,7 @@ public sealed record DatabaseHealth(
 /// <summary>Local, versioned SQLite storage for user configuration, activity and maintenance history.</summary>
 public sealed class ZeusDatabase
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
     private const int ActivityRetentionLimit = 10_000;
     private const int PerformanceSessionRetentionLimit = 200;
     private const int PerformanceSampleRetentionLimit = 4_000;
@@ -282,6 +283,11 @@ public sealed class ZeusDatabase
                 await UpgradeSchemaV6Async(connection, cancellationToken);
                 version = 6;
             }
+            if (version == 6)
+            {
+                await UpgradeSchemaV7Async(connection, cancellationToken);
+                version = 7;
+            }
             if (version != CurrentSchemaVersion) throw new InvalidDataException("A versão do esquema do banco não é reconhecida. O arquivo foi preservado.");
             await ValidateSchemaAsync(connection, cancellationToken);
             _initialized = true;
@@ -431,14 +437,15 @@ public sealed class ZeusDatabase
         {
             var session = sessions[index];
             await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT sequence,action,outcome,message,log_file,target_id,verification_status,update_server_selection,update_service_id,image_health_state,system_files_state FROM maintenance_steps WHERE session_id=$id ORDER BY sequence;";
+            command.CommandText = "SELECT sequence,action,outcome,message,log_file,target_id,verification_status,update_server_selection,update_service_id,image_health_state,system_files_state,active_driver_json FROM maintenance_steps WHERE session_id=$id ORDER BY sequence;";
             command.Parameters.AddWithValue("$id", session.SessionId);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             var steps = new List<StoredMaintenanceStep>();
             while (await reader.ReadAsync(cancellationToken))
                 steps.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
                     reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetString(6),
-                    reader.IsDBNull(7) ? null : reader.GetInt32(7), reader.IsDBNull(8) ? null : reader.GetString(8), reader.GetString(9), reader.GetString(10)));
+                    reader.IsDBNull(7) ? null : reader.GetInt32(7), reader.IsDBNull(8) ? null : reader.GetString(8), reader.GetString(9), reader.GetString(10),
+                    reader.IsDBNull(11) ? null : reader.GetString(11)));
             sessions[index] = session with { Steps = steps };
         }
         return sessions;
@@ -781,6 +788,22 @@ public sealed class ZeusDatabase
         await transaction.CommitAsync(cancellationToken);
     }
 
+    private static async Task UpgradeSchemaV7Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        using var transaction = connection.BeginTransaction();
+        if (!await HasColumnAsync(connection, transaction, "maintenance_steps", "active_driver_json", cancellationToken))
+            await ExecuteAsync(connection, transaction,
+                "ALTER TABLE maintenance_steps ADD COLUMN active_driver_json TEXT NULL CHECK(active_driver_json IS NULL OR (json_valid(active_driver_json) AND length(CAST(active_driver_json AS BLOB)) <= 262144));", cancellationToken);
+        await using (var command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = "INSERT OR IGNORE INTO schema_migrations(version,applied_utc) VALUES(7,$applied); PRAGMA user_version=7;";
+            command.Parameters.AddWithValue("$applied", Utc(DateTimeOffset.UtcNow));
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static Task ValidateSchemaV1Async(SqliteConnection connection, CancellationToken cancellationToken) =>
         ValidateSchemaTablesAsync(connection, cancellationToken,
             "schema_migrations", "app_settings", "app_metadata", "activity_entries", "maintenance_sessions", "maintenance_steps");
@@ -796,6 +819,9 @@ public sealed class ZeusDatabase
         command.CommandText = "SELECT (SELECT COUNT(*) FROM pragma_table_info('maintenance_sessions') WHERE name='verification_of_session_id') + (SELECT COUNT(*) FROM pragma_table_info('maintenance_steps') WHERE name IN ('image_health_state','system_files_state'));";
         if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) != 3)
             throw new InvalidDataException("As colunas de verificação de integridade estão ausentes. O arquivo foi preservado.");
+        command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('maintenance_steps') WHERE name='active_driver_json';";
+        if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) != 1)
+            throw new InvalidDataException("A coluna de evidência de driver ativo está ausente. O arquivo foi preservado.");
     }
 
     private static async Task ValidateSchemaTablesAsync(SqliteConnection connection, CancellationToken cancellationToken, params string[] tables)
@@ -847,7 +873,7 @@ public sealed class ZeusDatabase
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "INSERT INTO maintenance_steps(session_id,sequence,action,outcome,message,log_file,target_id,verification_status,update_server_selection,update_service_id,image_health_state,system_files_state) VALUES($id,$sequence,$action,$outcome,$message,$log,$target,$verification,$server,$service,$imageHealth,$systemFiles);";
+        command.CommandText = "INSERT INTO maintenance_steps(session_id,sequence,action,outcome,message,log_file,target_id,verification_status,update_server_selection,update_service_id,image_health_state,system_files_state,active_driver_json) VALUES($id,$sequence,$action,$outcome,$message,$log,$target,$verification,$server,$service,$imageHealth,$systemFiles,$activeDriver);";
         command.Parameters.AddWithValue("$id", sessionId);
         command.Parameters.AddWithValue("$sequence", step.Sequence);
         command.Parameters.AddWithValue("$action", step.Action);
@@ -860,6 +886,7 @@ public sealed class ZeusDatabase
         command.Parameters.AddWithValue("$service", (object?)step.UpdateServiceId ?? DBNull.Value);
         command.Parameters.AddWithValue("$imageHealth", step.ImageHealthState);
         command.Parameters.AddWithValue("$systemFiles", step.SystemFilesState);
+        command.Parameters.AddWithValue("$activeDriver", (object?)step.ActiveDriverJson ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

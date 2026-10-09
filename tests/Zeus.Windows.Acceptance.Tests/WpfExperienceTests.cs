@@ -602,7 +602,7 @@ public sealed class WpfExperienceTests
             for (var index = 0; index < expectedEventRows.Length; index++)
                 Assert.Equal(expectedEventRows[index].Detail, window.EventDiagnosticRows[index].Detail);
             var exportedEventReport = window.CreateExportDocument();
-            Assert.Equal(11, exportedEventReport.SchemaVersion);
+            Assert.Equal(12, exportedEventReport.SchemaVersion);
             Assert.Equal(eventReport.Summary, exportedEventReport.EventDiagnostics!.Summary);
             Assert.Equal(eventReport.Findings, exportedEventReport.EventDiagnostics.Findings);
         }
@@ -1311,7 +1311,7 @@ public sealed class WpfExperienceTests
             Assert.Contains("intervalo do processo:", row.Detail);
         });
         var processIoExport = window.CreateExportDocument();
-        Assert.Equal(11, processIoExport.SchemaVersion);
+        Assert.Equal(12, processIoExport.SchemaVersion);
         Assert.Equal(window.Performance.IoProcesses, processIoExport.Performance!.IoProcesses);
         var savedPerformanceSession = Assert.Single(await new DesktopStorage(fixture).ReadPerformanceSessionsAsync(),
             session => session.Label == "Medição manual · Jogo teste + OBS");

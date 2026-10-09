@@ -403,7 +403,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool CanInstallDriver => !_isBusy && DriverCandidates.Count(d => d.IsSelected) == 1 && DriverCandidates.Where(d => d.IsSelected).All(d => d.CanSelectForInstall && d.LicenseReady);
     public bool CanVerifyPendingDriverUpdates => !_isBusy && _historyReadable && _reports.Any(report =>
         report.Steps.Any(step => step.Action == MaintenanceActionId.InstallDriverUpdate &&
-            step.Verification == MaintenanceVerificationStatus.Pending && step.UpdateServerSelection is not null));
+            (step.Verification == MaintenanceVerificationStatus.Pending || step.ActiveDriver is not null) && step.UpdateServerSelection is not null));
     private DriverRollbackChoice? _selectedRollbackDriver;
     public DriverRollbackChoice? SelectedRollbackDriver { get => _selectedRollbackDriver; set { if (Set(ref _selectedRollbackDriver, value)) NotifyActionState(); } }
     public bool CanRollbackDriver => !_isBusy && SelectedRollbackDriver is not null && MaintenanceRequestProtocol.TryParsePnpInstanceId(SelectedRollbackDriver.InstanceId);

@@ -31,6 +31,7 @@ internal sealed class DesktopStorage
         Converters = { new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false) }
     };
     private static readonly JsonSerializerOptions PerformanceJsonOptions = new(JsonOptions) { WriteIndented = false };
+    private static readonly JsonSerializerOptions ActiveDriverJsonOptions = new(JsonOptions) { WriteIndented = false };
 
     public async Task<IReadOnlyList<MaintenanceReport>> ReadHistoryAsync()
     {
@@ -78,6 +79,15 @@ internal sealed class DesktopStorage
                     throw new InvalidDataException("Somente uma etapa de instalação de driver pode registrar a origem do Windows Update.");
                 if (step.Action == MaintenanceActionId.RollbackDriver && !MaintenanceRequestProtocol.TryParsePnpInstanceId(step.TargetId))
                     throw new InvalidDataException("O histórico contém uma identidade PnP inválida para reversão de driver.");
+                if (step.ActiveDriver is not null)
+                {
+                    if (step.Action != MaintenanceActionId.InstallDriverUpdate)
+                        throw new InvalidDataException("Somente uma instalação de driver pode registrar evidência de driver ativo.");
+                    try { DriverActiveStatePolicy.Validate(step.ActiveDriver); }
+                    catch (ArgumentException exception)
+                    { throw new InvalidDataException("O histórico contém evidência de driver ativo inválida.", exception); }
+                    _ = SerializeActiveDriver(step.ActiveDriver);
+                }
             }
         }
     }
@@ -252,7 +262,7 @@ internal sealed class DesktopStorage
         report.SessionId.ToString("D"), report.StartedAt, report.FinishedAt, report.RestorePointConfirmed, report.IsComplete, report.Error,
         report.Steps.Select((step, index) => new StoredMaintenanceStep(index, step.Action.ToString(), step.Outcome.ToString(), step.Message,
             step.LogFile, step.TargetId, step.Verification.ToString(), step.UpdateServerSelection, step.UpdateServiceId,
-            step.ImageHealthState.ToString(), step.SystemFilesState.ToString())).ToArray(),
+            step.ImageHealthState.ToString(), step.SystemFilesState.ToString(), SerializeActiveDriver(step.ActiveDriver))).ToArray(),
         report.RestorePointSequenceNumber, report.VerificationOfSessionId?.ToString("D"));
 
     private static MaintenanceReport FromStored(StoredMaintenanceSession session)
@@ -269,9 +279,33 @@ internal sealed class DesktopStorage
         var steps = session.Steps.OrderBy(step => step.Sequence).Select(step => new MaintenanceStepResult(
             ParseEnum<MaintenanceActionId>(step.Action), ParseEnum<StepOutcome>(step.Outcome), step.Message, step.LogFile, step.TargetId,
             ParseEnum<MaintenanceVerificationStatus>(step.Verification), step.UpdateServerSelection, step.UpdateServiceId,
-            ParseEnum<WindowsImageHealthState>(step.ImageHealthState), ParseEnum<SfcVerificationState>(step.SystemFilesState))).ToArray();
+            ParseEnum<WindowsImageHealthState>(step.ImageHealthState), ParseEnum<SfcVerificationState>(step.SystemFilesState),
+            DeserializeActiveDriver(step.ActiveDriverJson))).ToArray();
         return new(id, session.StartedAt, session.FinishedAt, session.RestorePointConfirmed, steps, session.Error, session.IsComplete,
             session.RestorePointSequenceNumber, verificationOf);
+    }
+
+    private static string? SerializeActiveDriver(DriverActiveEvidence? evidence)
+    {
+        if (evidence is null) return null;
+        var json = JsonSerializer.Serialize(evidence, ActiveDriverJsonOptions);
+        if (System.Text.Encoding.UTF8.GetByteCount(json) > 256 * 1024)
+            throw new InvalidDataException("A evidência de driver ativo excede o limite de 256 KiB.");
+        return json;
+    }
+
+    private static DriverActiveEvidence? DeserializeActiveDriver(string? json)
+    {
+        if (json is null) return null;
+        if (System.Text.Encoding.UTF8.GetByteCount(json) > 256 * 1024)
+            throw new InvalidDataException("A evidência de driver ativo excede o limite de 256 KiB.");
+        try
+        {
+            return JsonSerializer.Deserialize<DriverActiveEvidence>(json, JsonOptions)
+                ?? throw new InvalidDataException("A evidência de driver ativo não pode ser nula em JSON.");
+        }
+        catch (JsonException exception)
+        { throw new InvalidDataException("O banco contém JSON inválido de evidência de driver ativo.", exception); }
     }
 
     private static T ParseEnum<T>(string value) where T : struct, Enum =>

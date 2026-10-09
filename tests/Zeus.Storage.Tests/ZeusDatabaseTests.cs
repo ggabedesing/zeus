@@ -364,7 +364,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         Assert.Equal("Unknown", step.SystemFilesState);
         Assert.Equal("Succeeded", step.Outcome);
         Assert.Equal("Scan completed", step.Message);
-        Assert.Equal(6, (await upgraded.CheckHealthAsync()).SchemaVersion);
+        Assert.Equal(ZeusDatabase.CurrentSchemaVersion, (await upgraded.CheckHealthAsync()).SchemaVersion);
         await upgraded.InitializeAsync();
         Assert.Equal("Unknown", Assert.Single(Assert.Single(await upgraded.ReadMaintenanceHistoryAsync()).Steps).ImageHealthState);
     }
@@ -391,7 +391,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         Assert.Equal("Unknown", restored.Steps[0].SystemFilesState);
         Assert.Equal("IntegrityViolationsDetected", restored.Steps[1].SystemFilesState);
         Assert.Equal("Unknown", restored.Steps[1].ImageHealthState);
-        Assert.Equal(6, (await database.CheckHealthAsync()).SchemaVersion);
+        Assert.Equal(ZeusDatabase.CurrentSchemaVersion, (await database.CheckHealthAsync()).SchemaVersion);
     }
 
     [Fact]
@@ -418,7 +418,7 @@ public sealed class ZeusDatabaseTests : IDisposable
         var restored = Assert.Single(await database.ReadMaintenanceHistoryAsync());
         Assert.Null(restored.VerificationOfSessionId);
         Assert.Equal("Unknown", Assert.Single(restored.Steps).SystemFilesState);
-        Assert.Equal(6, (await database.CheckHealthAsync()).SchemaVersion);
+        Assert.Equal(ZeusDatabase.CurrentSchemaVersion, (await database.CheckHealthAsync()).SchemaVersion);
     }
 
     [Fact]
@@ -439,6 +439,53 @@ public sealed class ZeusDatabaseTests : IDisposable
         await using var read = readerConnection.CreateCommand();
         read.CommandText = "SELECT json_value FROM app_settings WHERE setting_key='preferences';";
         Assert.Equal("\"keep\"", await read.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task SchemaSixMigrationAndRestoreKeepLegacyDriverEvidenceNull()
+    {
+        var sourcePath = Path.Combine(_root, "schema-six.db");
+        var source = new ZeusDatabase(sourcePath);
+        await source.SaveMaintenanceHistoryAsync([new(Guid.NewGuid().ToString("D"), DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow, false, true, null, [new(0, "InstallDriverUpdate", "Succeeded", "Legacy provider", null, null)])]);
+        SqliteConnectionClear();
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={sourcePath};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "ALTER TABLE maintenance_steps DROP COLUMN active_driver_json; DELETE FROM schema_migrations WHERE version=7; PRAGMA user_version=6;";
+            await command.ExecuteNonQueryAsync();
+        }
+        var original = await File.ReadAllBytesAsync(sourcePath);
+        var database = CreateDatabase();
+        await database.RestoreFromAsync(sourcePath);
+        Assert.Equal(original, await File.ReadAllBytesAsync(sourcePath));
+        var step = Assert.Single(Assert.Single(await database.ReadMaintenanceHistoryAsync()).Steps);
+        Assert.Null(step.ActiveDriverJson);
+        Assert.Equal("Legacy provider", step.Message);
+        Assert.Equal(7, (await database.CheckHealthAsync()).SchemaVersion);
+        var upgradedSource = new ZeusDatabase(sourcePath);
+        Assert.Null(Assert.Single(Assert.Single(await upgradedSource.ReadMaintenanceHistoryAsync()).Steps).ActiveDriverJson);
+        Assert.Equal(7, (await upgradedSource.CheckHealthAsync()).SchemaVersion);
+    }
+
+    [Fact]
+    public async Task ActiveDriverJsonRoundTripsAndRejectsInvalidOrOversizedJson()
+    {
+        var database = CreateDatabase();
+        var session = new StoredMaintenanceSession(Guid.NewGuid().ToString("D"), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
+            false, true, null, [new(0, "InstallDriverUpdate", "Succeeded", "Observed", null, null, ActiveDriverJson: "{\"Before\":null}")]);
+        await database.SaveMaintenanceHistoryAsync([session]);
+        var backup = Path.Combine(_root, "active-driver-backup.db");
+        await database.BackupToAsync(backup);
+        await database.SaveMaintenanceHistoryAsync([]);
+        await database.RestoreFromAsync(backup);
+        Assert.Equal(session.Steps[0].ActiveDriverJson, Assert.Single(Assert.Single(await database.ReadMaintenanceHistoryAsync()).Steps).ActiveDriverJson);
+        var malformed = session with { Steps = [session.Steps[0] with { ActiveDriverJson = "not-json" }] };
+        await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => database.SaveMaintenanceHistoryAsync([malformed]));
+        var oversized = session with { Steps = [session.Steps[0] with { ActiveDriverJson = "\"" + new string('é', 140_000) + "\"" }] };
+        await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => database.SaveMaintenanceHistoryAsync([oversized]));
+        Assert.Equal(session.Steps[0].ActiveDriverJson, Assert.Single(Assert.Single(await database.ReadMaintenanceHistoryAsync()).Steps).ActiveDriverJson);
     }
 
     public void Dispose()

@@ -447,7 +447,7 @@ public sealed class WindowsUpdateService
                 warnings.Add($"A oferta '{driver.Title.Trim()}' não identifica fabricante e modelo do dispositivo; ela não poderá ser instalada pelo ZEUS.");
 
             drivers.Add(new DriverUpdateCandidate(driver.Id!, driver.Title.Trim(), Optional(driver.Manufacturer),
-                Optional(driver.DeviceName), Optional(driver.DriverVersion), driver.RequiresEula, Optional(driver.EulaText),
+                Optional(driver.DeviceName), Optional(driver.DriverVersion), driver.RequiresEula, string.IsNullOrWhiteSpace(driver.EulaText) ? null : driver.EulaText,
                 Optional(driver.DriverProvider), Optional(driver.DriverClass), driverDate, result.ServerSelection, result.ServiceId));
         }
         warnings.Add("As ofertas seguem as fontes configuradas no Windows Update. Em notebooks, confira a recomendação do fabricante antes de instalar.");

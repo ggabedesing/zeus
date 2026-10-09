@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using Zeus.Core;
 using Zeus.Windows;
 
@@ -187,9 +188,10 @@ internal static class CommandRunner
         if (!MaintenanceRequestProtocol.TryParseDriverIdentity(request.TargetId, out var updateId, out var revision))
             throw new ArgumentException("Identidade de driver inválida.", nameof(request));
         var sourceSummary = WindowsUpdateSourcePolicy.Describe(request.UpdateServerSelection, request.UpdateServiceId);
+        DriverActiveEvidence? activeEvidence = null;
         MaintenanceStepResult DriverResult(StepOutcome outcome, string message, string? logFile, MaintenanceVerificationStatus verification) =>
             new(request.Action, outcome, message, logFile, request.TargetId, verification,
-                request.UpdateServerSelection, request.UpdateServiceId);
+                request.UpdateServerSelection, request.UpdateServiceId, ActiveDriver: activeEvidence);
 
         // Export only through the system PnPUtil to the session's protected, fixed child directory.
         // This never accepts an arbitrary source, destination, INF path or executable from the desktop.
@@ -209,12 +211,31 @@ internal static class CommandRunner
         // The interpolated data has already been parsed to GUIDs, integers and a boolean.
         // Installation re-queries the exact WUA identity and server selection; titles are never matched.
         var expectedServerSelection = request.UpdateServerSelection!.Value;
+        var activeLogName = $"driver-{updateId:N}-{revision}-active.json";
+        using (SessionStore.CreateLog(sessionId, activeLogName)) { }
+        var activeLogPath = Path.Combine(SessionStore.GetSessionDirectory(sessionId), activeLogName);
+        var encodedActivePath = Convert.ToBase64String(Encoding.UTF8.GetBytes(activeLogPath));
         var expectedServiceId = request.UpdateServiceId is null ? string.Empty : Guid.Parse(request.UpdateServiceId).ToString("D");
-        var script = $"$expectedId = '{updateId:D}'; $expectedRevision = {revision}; $expectedServerSelection = {expectedServerSelection}; $expectedServiceId = '{expectedServiceId}'; $acceptEula = " +
+        var script = "$activeObservationPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('" + encodedActivePath + "')); " +
+            $"$expectedId = '{updateId:D}'; $expectedRevision = {revision}; $expectedServerSelection = {expectedServerSelection}; $expectedServiceId = '{expectedServiceId}'; $acceptEula = " +
             (request.EulaAccepted ? "$true; " : "$false; ") +
             "$expectedEulaTextSha256 = '" + (request.EulaTextSha256 ?? string.Empty) + "'; " + DriverInstallScript;
         var result = await RunAsync(sessionId, $"driver-{updateId:N}-{revision}.log",
             TrustedPowerShell.Create(script, WindowsPowerShellModule.Utility), Timeout.InfiniteTimeSpan);
+        try
+        {
+            var activeFile = new FileInfo(activeLogPath);
+            if ((activeFile.Attributes & FileAttributes.ReparsePoint) != 0 || activeFile.Length > 256 * 1024)
+                throw new InvalidDataException("Arquivo de observação inválido ou grande demais.");
+            var candidateEvidence = JsonSerializer.Deserialize<DriverActiveEvidence>(await File.ReadAllTextAsync(activeLogPath));
+            if (candidateEvidence is not null) activeEvidence = DriverActiveStatePolicy.BoundForPersistence(candidateEvidence);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        { /* Missing or invalid active-state evidence never confirms device activation. */ }
+        if (result.Output.Contains("ZEUS_DRIVER_BASELINE_BLOCKED", StringComparison.Ordinal))
+            return DriverResult(StepOutcome.Skipped,
+                "Instalação bloqueada antes do download: captura anterior de dispositivo/INF/versão incompleta. Confira o log e a observação; nenhuma instalação foi solicitada.",
+                result.LogFile, MaintenanceVerificationStatus.NotStarted);
         if (result.LogError is not null)
             return DriverResult(StepOutcome.Failed,
                 $"A instalação terminou com código {result.ExitCode}, mas o log falhou: {result.LogError}. Origem selecionada: {sourceSummary}. Confira o Windows Update e os registros do Windows.", result.LogFile,
@@ -230,7 +251,7 @@ internal static class CommandRunner
             exactUpdateMarkedInstalled, restart);
         var message = $"{verification.Message} Origem confirmada: {sourceSummary}. Backup dos drivers anteriores preservado na sessão." +
             (restart ? " O Windows solicitou reinicialização; salve seu trabalho e reinicie quando conveniente." : "") +
-            " Confira o dispositivo e o problema original após a operação.";
+            " Confira o dispositivo e o problema original após a operação. A captura por dispositivo é exibida separadamente no Histórico.";
         return DriverResult(verification.Outcome, message, result.LogFile, verification.Verification);
     }
 
@@ -274,7 +295,18 @@ internal static class CommandRunner
         }
     }
 
-    private const string DriverInstallScript = """
+    private static readonly string DriverInstallScript = DriverActiveStateReader.CaptureFunctionScript + "\n" + """
+        function Save-ZeusDriverObservation($hardwareId, $before, $after) {
+            $json = [pscustomobject]@{ HardwareId=$hardwareId; Before=$before; After=$after; Latest=$null } | Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 12 -Compress
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+            if ($bytes.Length -gt 262144) { throw 'Observacao de driver excedeu o limite seguro.' }
+            $temporary = $activeObservationPath + '.pending'
+            try {
+                $stream = [System.IO.FileStream]::new($temporary, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+                try { $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+                [System.IO.File]::Replace($temporary,$activeObservationPath,$null)
+            } finally { if ([System.IO.File]::Exists($temporary)) { [System.IO.File]::Delete($temporary) } }
+        }
         $session = [System.Activator]::CreateInstance([System.Type]::GetTypeFromProgID('Microsoft.Update.Session'));
         $session.ClientApplicationID = 'ZEUS';
         $installer = $session.CreateUpdateInstaller();
@@ -304,12 +336,23 @@ internal static class CommandRunner
             $driverDate.Year -lt 1980 -or $driverDate.Date -gt [datetime]::Today) {
             throw 'Fabricante, modelo ou data do driver ausente, inválido ou futuro na oferta atual. Nenhum download ou instalação foi iniciado.';
         };
+        $activeHardwareId = [string]$update.DriverHardwareID
+        $activeBefore = Get-ZeusActiveDriverSnapshot $activeHardwareId
+        Save-ZeusDriverObservation $activeHardwareId $activeBefore $null
+        if (-not $activeBefore.IsComplete -or @($activeBefore.Devices).Count -eq 0 -or
+            @($activeBefore.Devices | Microsoft.PowerShell.Core\Where-Object { $_.IsPresent -ne $true -or [string]::IsNullOrWhiteSpace($_.InfName) -or [string]::IsNullOrWhiteSpace($_.Version) }).Count -gt 0) {
+            [Console]::WriteLine('ZEUS_DRIVER_BASELINE_BLOCKED')
+            throw 'Nao foi confirmada uma captura anterior completa dos dispositivos e drivers. Instalacao bloqueada; nenhum download ou instalacao iniciado.'
+        }
+        $frozenDeviceIds = @($activeBefore.Devices | Microsoft.PowerShell.Core\ForEach-Object { $_.DeviceInstanceId })
         if (-not [bool]$update.EulaAccepted) {
             if (-not $acceptEula -or [string]::IsNullOrWhiteSpace([string]$update.EulaText)) {
                 throw 'A licença ainda não foi explicitamente aceita após exibição na interface. Use uma nova busca ou o Windows Update.';
             };
             $eulaBytes = [System.Text.Encoding]::UTF8.GetBytes([string]$update.EulaText);
-            $actualEulaTextSha256 = [System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($eulaBytes));
+            $eulaHasher = [System.Security.Cryptography.SHA256]::Create()
+            try { $actualEulaTextSha256 = [System.BitConverter]::ToString($eulaHasher.ComputeHash($eulaBytes)).Replace('-','') }
+            finally { $eulaHasher.Dispose() }
             if (-not [string]::Equals($actualEulaTextSha256, $expectedEulaTextSha256, [System.StringComparison]::OrdinalIgnoreCase)) {
                 throw 'O texto da licença mudou desde a revisão. Nenhum aceite ou instalação foi solicitado; faça uma nova busca e revise os termos atuais.';
             };
@@ -334,6 +377,12 @@ internal static class CommandRunner
         $installedItem = $installation.GetUpdateResult(0);
         [Console]::WriteLine('ZEUS_DRIVER_INSTALL_RESULT ' + [int]$installation.ResultCode + ' ITEM ' + [int]$installedItem.ResultCode + ' HRESULT ' + $installedItem.HResult);
         [Console]::WriteLine('ZEUS_DRIVER_REBOOT_REQUIRED ' + ([bool]$installation.RebootRequired).ToString().ToLowerInvariant());
+        try {
+            $activeAfter = Get-ZeusActiveDriverSnapshot $activeHardwareId $frozenDeviceIds
+            Save-ZeusDriverObservation $activeHardwareId $activeBefore $activeAfter
+        } catch {
+            [Console]::WriteLine('ZEUS_DRIVER_ACTIVE_CAPTURE_INCOMPLETE: observacao posterior indisponivel; checkpoint anterior preservado.')
+        }
         if ([int]$installation.ResultCode -ne 2 -or [int]$installedItem.ResultCode -ne 2) {
             throw 'Windows Update não confirmou sucesso sem erros. Um resultado parcialmente bem-sucedido precisa ser revisado nos registros.';
         };

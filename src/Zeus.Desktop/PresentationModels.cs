@@ -219,7 +219,8 @@ public sealed record HistoryRow(Guid SessionId, string Title, string Summary, st
                 : "Esta sessão não confirmou um ponto de restauração.";
         return new(report.SessionId, report.StartedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss"), summary,
             protection,
-            report.Steps.Select(step => $"{MaintenanceCatalog.Get(step.Action).Title}{(step.TargetId is null ? "" : $" [{step.TargetId}]")} — {OutcomeTitle(step.Outcome)} · {VerificationTitle(step.Verification)}: {step.Message}").ToArray(),
+            report.Steps.Select(step => $"{MaintenanceCatalog.Get(step.Action).Title}{(step.TargetId is null ? "" : $" [{step.TargetId}]")} — {OutcomeTitle(step.Outcome)} · {VerificationTitle(step.Verification)}: {step.Message}" +
+                (step.Action == MaintenanceActionId.InstallDriverUpdate ? " " + DriverActiveStatePolicy.Describe(step.ActiveDriver) : "")).ToArray(),
             report.Error ?? string.Empty, report.Steps.Any(step => !string.IsNullOrWhiteSpace(step.LogFile)),
             PostRepairVerification.CreatePlan(report).Count > 0,
             report.VerificationOfSessionId is { } parent ? $"Verificação posterior do reparo na sessão {parent:D}." : string.Empty);

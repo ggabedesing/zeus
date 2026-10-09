@@ -1098,7 +1098,7 @@ public partial class MainWindow
                 (ReportIndex: reportIndex, StepIndex: stepIndex, SessionId: report.SessionId,
                     InstallationFinishedAt: report.FinishedAt, Step: step)))
             .Where(item => item.Step.Action == MaintenanceActionId.InstallDriverUpdate &&
-                item.Step.Verification == MaintenanceVerificationStatus.Pending && item.Step.UpdateServerSelection is not null)
+                (item.Step.Verification == MaintenanceVerificationStatus.Pending || item.Step.ActiveDriver is not null) && item.Step.UpdateServerSelection is not null)
             .ToArray();
         if (pending.Length == 0) return;
 
@@ -1115,6 +1115,26 @@ public partial class MainWindow
                     item.Step.UpdateServerSelection, item.Step.UpdateServiceId, item.InstallationFinishedAt, token);
                 foreach (var warning in result.Warnings) AppendLog(warning);
                 var decision = DriverInstallVerificationPolicy.ResolvePostRestart(result.IsComplete, result.SourceMatches == true, result.IsInstalled);
+                var activeEvidence = item.Step.ActiveDriver;
+                if (activeEvidence is not null)
+                {
+                    var latest = await DriverActiveStateReader.CaptureAsync(activeEvidence.HardwareId, token,
+                        activeEvidence.Before.Devices.Select(device => device.DeviceInstanceId).ToArray());
+                    try
+                    {
+                        var updatedEvidence = activeEvidence with { Latest = latest };
+                        activeEvidence = DriverActiveStatePolicy.BoundForPersistence(updatedEvidence);
+                    }
+                    catch (ArgumentException) { AppendLog("A nova captura de driver não passou na validação temporal; evidência anterior preservada."); }
+                }
+                var steps = updatedReports[item.ReportIndex].Steps.ToArray();
+                steps[item.StepIndex] = item.Step with
+                {
+                    Verification = decision.Verification == MaintenanceVerificationStatus.ProviderConfirmed ? decision.Verification : item.Step.Verification,
+                    ActiveDriver = activeEvidence,
+                    Message = item.Step.Message
+                };
+                updatedReports[item.ReportIndex] = updatedReports[item.ReportIndex] with { Steps = steps };
 
                 if (decision.Verification != MaintenanceVerificationStatus.ProviderConfirmed)
                 {
@@ -1128,14 +1148,6 @@ public partial class MainWindow
                     continue;
                 }
 
-                var steps = updatedReports[item.ReportIndex].Steps.ToArray();
-                steps[item.StepIndex] = item.Step with
-                {
-                    Outcome = decision.Outcome,
-                    Verification = decision.Verification,
-                    Message = item.Step.Message + $" Reconsulta somente leitura em {result.CheckedAt.ToLocalTime():dd/MM/yyyy HH:mm:ss}: {decision.Message} A seleção padrão não revela o servidor efetivo."
-                };
-                updatedReports[item.ReportIndex] = updatedReports[item.ReportIndex] with { Steps = steps };
                 confirmed++;
                 QueueActivity(new(result.CheckedAt, "windows-update-driver", "post-restart-package-confirmed", "info",
                     decision.Message,
@@ -1143,7 +1155,7 @@ public partial class MainWindow
                     item.SessionId.ToString("D")));
             }
 
-            if (confirmed > 0)
+            if (pending.Length > 0)
             {
                 await _storage.SaveHistoryAsync(updatedReports);
                 _reports.Clear();
@@ -1318,7 +1330,7 @@ public partial class MainWindow
     }
 
     internal ExportDocument CreateExportDocument() =>
-        new(11, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
+        new(12, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
             new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(),
             _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan,
             _performanceSessionExports, EventPatternAnalyzer.AnalyzeInventory(_snapshot?.WindowsInventory));

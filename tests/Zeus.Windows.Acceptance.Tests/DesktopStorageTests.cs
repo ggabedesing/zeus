@@ -11,6 +11,94 @@ public sealed class DesktopStorageTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "zeus-desktop-storage-tests-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public async Task ActiveDriverBeforeAfterAndLatestRoundTripThroughSqlite()
+    {
+        var storage = new DesktopStorage(_root);
+        var now = DateTimeOffset.UtcNow;
+        var before = new ActiveDriverSnapshot(now, true, [new("PCI\\VEN_10DE&DEV_1401\\1", "oem1.inf", "1.0", "NVIDIA")], []);
+        var after = new ActiveDriverSnapshot(now.AddSeconds(1), false, [new("PCI\\VEN_10DE&DEV_1401\\1", "oem2.inf", "2.0", "NVIDIA")], ["Reinício ainda não observado"]);
+        var latest = after with { CheckedAt = now.AddSeconds(2), IsComplete = true, Warnings = [] };
+        var evidence = new DriverActiveEvidence("PCI\\VEN_10DE&DEV_1401", before, after, latest);
+        var report = new MaintenanceReport(Guid.NewGuid(), now, now.AddSeconds(2), false,
+            [new(MaintenanceActionId.InstallDriverUpdate, StepOutcome.Succeeded, "Provider result",
+                TargetId: "12345678-1234-1234-1234-123456789abc:1", ActiveDriver: evidence)]);
+        await storage.SaveHistoryAsync([report]);
+        var restored = Assert.Single(Assert.Single(await storage.ReadHistoryAsync()).Steps).ActiveDriver!;
+        Assert.Equal(evidence.HardwareId, restored.HardwareId);
+        Assert.Equal(before.CheckedAt, restored.Before.CheckedAt);
+        Assert.Equal(before.Devices[0], Assert.Single(restored.Before.Devices));
+        Assert.Equal(after.Devices[0], Assert.Single(restored.After!.Devices));
+        Assert.False(restored.After.IsComplete);
+        Assert.Equal(after.Warnings[0], Assert.Single(restored.After.Warnings));
+        Assert.True(restored.Latest!.IsComplete);
+        Assert.Equal(latest.CheckedAt, restored.Latest.CheckedAt);
+        Assert.Equal(latest.Devices[0], Assert.Single(restored.Latest.Devices));
+        Assert.Equal(7, (await storage.CheckHealthAsync()).SchemaVersion);
+    }
+
+    [Fact]
+    public async Task ActiveDriverUsesCompactJsonAtThePersistenceByteBoundary()
+    {
+        var compactOptions = new JsonSerializerOptions(DesktopStorage.JsonOptions) { WriteIndented = false };
+        var now = DateTimeOffset.UtcNow;
+        DriverActiveEvidence? evidence = null;
+        string? expected = null;
+        for (var length = 900; length <= 1020; length++)
+        {
+            var value = new string('x', length);
+            var snapshot = new ActiveDriverSnapshot(now, true,
+                Enumerable.Range(0, 21).Select(index => new ActiveDriverDevice($"PCI\\{index:D2}\\{value}", value, value, value)).ToArray(), []);
+            var candidate = new DriverActiveEvidence("PCI\\VEN_10DE&DEV_1401", snapshot,
+                snapshot with { CheckedAt = now.AddSeconds(1) }, snapshot with { CheckedAt = now.AddSeconds(2) });
+            var compact = JsonSerializer.Serialize(candidate, compactOptions);
+            if (System.Text.Encoding.UTF8.GetByteCount(compact) <= 256 * 1024 &&
+                System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(candidate, DesktopStorage.JsonOptions)) > 256 * 1024)
+            {
+                evidence = candidate;
+                expected = compact;
+                break;
+            }
+        }
+        Assert.NotNull(evidence);
+        DriverActiveStatePolicy.Validate(evidence);
+        var storage = new DesktopStorage(_root);
+        var report = new MaintenanceReport(Guid.NewGuid(), now, now.AddSeconds(2), false,
+            [new(MaintenanceActionId.InstallDriverUpdate, StepOutcome.Succeeded, "Provider",
+                TargetId: "12345678-1234-1234-1234-123456789abc:1", ActiveDriver: evidence)]);
+        await storage.SaveHistoryAsync([report]);
+        var stored = Assert.Single(Assert.Single(await new ZeusDatabase(Path.Combine(_root, "zeus.db")).ReadMaintenanceHistoryAsync()).Steps);
+        Assert.Equal(expected, stored.ActiveDriverJson);
+        Assert.DoesNotContain('\n', stored.ActiveDriverJson!);
+        Assert.Equal(21, Assert.Single(await storage.ReadHistoryAsync()).Steps[0].ActiveDriver!.Latest!.Devices.Count);
+    }
+
+    [Fact]
+    public async Task ActiveDriverRejectsWrongActionMalformedSnapshotAndCorruptedStoredJson()
+    {
+        var storage = new DesktopStorage(_root);
+        var now = DateTimeOffset.UtcNow;
+        var evidence = new DriverActiveEvidence("PCI\\VEN_10DE&DEV_1401", new(now, true, [], []));
+        var report = new MaintenanceReport(Guid.NewGuid(), now, now, false,
+            [new(MaintenanceActionId.InstallDriverUpdate, StepOutcome.Succeeded, "Provider", TargetId: "12345678-1234-1234-1234-123456789abc:1", ActiveDriver: evidence)]);
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with {
+            Steps = [report.Steps[0] with { Action = MaintenanceActionId.VerifySystemFiles }] }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with {
+            Steps = [report.Steps[0] with { ActiveDriver = evidence with { Before = null! } }] }]));
+        Assert.Throws<InvalidDataException>(() => DesktopStorage.ValidateHistory([report with {
+            Steps = [report.Steps[0] with { ActiveDriver = evidence with { HardwareId = new string('x', 1025) } }] }]));
+        await storage.SaveHistoryAsync([report]);
+        await using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(_root, "zeus.db")};Pooling=False");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE maintenance_steps SET active_driver_json='null';";
+        await command.ExecuteNonQueryAsync();
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadHistoryAsync());
+        command.CommandText = "UPDATE maintenance_steps SET active_driver_json='{\"HardwareId\":\"PCI\",\"Before\":null}';";
+        await command.ExecuteNonQueryAsync();
+        await Assert.ThrowsAsync<InvalidDataException>(() => storage.ReadHistoryAsync());
+    }
+
+    [Fact]
     public async Task IntegrityStatesAndLinkedVerificationPersistWithoutRequiringParentHistory()
     {
         var storage = new DesktopStorage(_root);
@@ -25,7 +113,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(SfcVerificationState.Unknown, restored.Steps[0].SystemFilesState);
         Assert.Equal(SfcVerificationState.IntegrityViolationsDetected, restored.Steps[1].SystemFilesState);
         Assert.Equal(WindowsImageHealthState.Unknown, restored.Steps[1].ImageHealthState);
-        Assert.Equal(6, (await storage.CheckHealthAsync()).SchemaVersion);
+        Assert.Equal(ZeusDatabase.CurrentSchemaVersion, (await storage.CheckHealthAsync()).SchemaVersion);
     }
 
     [Fact]
@@ -113,6 +201,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(WindowsImageHealthState.Unknown, migratedHistory.Steps[0].ImageHealthState);
         Assert.Equal(SfcVerificationState.Unknown, migratedHistory.Steps[0].SystemFilesState);
         Assert.Null(migratedHistory.VerificationOfSessionId);
+        Assert.Null(migratedHistory.Steps[0].ActiveDriver);
         Assert.True(migratedPreferences.IsMinimal);
         Assert.Equal(DesktopDensity.Comfortable, migratedPreferences.Density);
         Assert.False(migratedPreferences.ReduceZeusMotion, "Older preference JSON keeps the existing motion behavior by default.");
