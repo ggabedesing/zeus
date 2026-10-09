@@ -1185,6 +1185,19 @@ public sealed class WpfExperienceTests
         Assert.Equal(changedTheme, (await storage.ReadPreferencesAsync()).Theme);
 
         state.ConfirmRestore = true;
+        state.RestorePath = Path.Combine(fixture, "corrupt-backup.db");
+        await File.WriteAllTextAsync(state.RestorePath, "not a SQLite database");
+        restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, restoreButton));
+        var invalidRestoreDeadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (window.StatusTitle != "Operação não concluída" && DateTimeOffset.UtcNow < invalidRestoreDeadline)
+            await Task.Delay(25);
+        Assert.Equal("Operação não concluída", window.StatusTitle);
+        Assert.False(state.RestartRequested);
+        Assert.False(Directory.Exists(Path.Combine(fixture, "recovery")));
+        Assert.Equal(changedTheme, (await storage.ReadPreferencesAsync()).Theme);
+        Assert.Equal(2, state.ConfirmationCount);
+
+        state.RestorePath = state.BackupPath;
         restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, restoreButton));
         var restoreDeadline = DateTimeOffset.UtcNow.AddSeconds(20);
         while (!state.RestartRequested && DateTimeOffset.UtcNow < restoreDeadline)
@@ -1203,14 +1216,16 @@ public sealed class WpfExperienceTests
         public DatabaseRecoveryTestState(string backupPath)
         {
             BackupPath = backupPath;
+            RestorePath = backupPath;
             Callbacks = new(
                 () => BackupPath,
-                () => BackupPath,
+                () => RestorePath,
                 _ => { ConfirmationCount++; return ConfirmRestore; },
                 () => RestartRequested = true);
         }
 
         public string BackupPath { get; }
+        public string RestorePath { get; set; }
         public bool ConfirmRestore { get; set; }
         public int ConfirmationCount { get; private set; }
         public bool RestartRequested { get; private set; }
