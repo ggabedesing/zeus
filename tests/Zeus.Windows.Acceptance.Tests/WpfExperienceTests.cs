@@ -101,6 +101,15 @@ public sealed class WpfExperienceTests
                         Assert.Equal(450, constrainedWindow.MaxHeight);
                         constrainedWindow.Close();
                         Assert.Empty(bindingErrors.Errors);
+                        var restoredWindow = new MainWindow(fixture, _ => { }) { Width = 1200, Height = 850 };
+                        restoredWindow.Show();
+                        var restoreDeadline = DateTimeOffset.UtcNow.AddSeconds(30);
+                        while (restoredWindow.StatusTitle != "Diagnóstico concluído" && DateTimeOffset.UtcNow < restoreDeadline)
+                            await Task.Delay(50);
+                        Assert.Equal("Diagnóstico concluído", restoredWindow.StatusTitle);
+                        Assert.Equal("aurora", restoredWindow.SelectedVisualLayoutPreset.Id);
+                        restoredWindow.Close();
+                        Assert.Empty(bindingErrors.Errors);
                         completion.TrySetResult();
                     }
                     catch (Exception error) { completion.TrySetException(error); }
