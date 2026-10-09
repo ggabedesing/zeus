@@ -464,6 +464,7 @@ public sealed class UserOptimizationService
                 }
                 var currentById = currentStates.ToDictionary(state => state.MonitorId, StringComparer.OrdinalIgnoreCase);
                 var targetIds = document.NewWallpaperMonitorIds?.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var positionBeforeRestore = currentPosition;
                 foreach (var previous in previousStates)
                 {
                     var currentHash = ComputeWallpaperHash(currentById[previous.MonitorId].Path);
@@ -482,27 +483,39 @@ public sealed class UserOptimizationService
                     if (!string.Equals(currentHash, previous.PreviousSha256, StringComparison.OrdinalIgnoreCase) &&
                         !wallpaperPlatform.SetWallpaperPath(previous.MonitorId, previous.BackupPath))
                     {
-                        await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
-                        return Failure("O Windows não confirmou a restauração de todos os monitores. Revise o estado no histórico.", document.Id);
+                        var compensated = TryCompensateWallpaperRestore(previousStates, currentStates, targetIds, positionBeforeRestore, document.PreviousWallpaperPosition);
+                        await SetChangeStatusAsync(document, compensated ? UserChangeStatus.Applied : UserChangeStatus.NeedsReview);
+                        return Failure(compensated
+                            ? "O Windows recusou a restauração em um monitor; os monitores já alterados voltaram ao estado anterior à tentativa. Você pode tentar novamente pelo histórico."
+                            : "O Windows não confirmou a restauração em todos os monitores nem a recuperação do estado anterior à tentativa. Revise o histórico e o estado atual.", document.Id);
                     }
                 }
                 if (document.PreviousWallpaperPosition is { } originalPosition)
                 {
                     if (currentPosition != originalPosition && !wallpaperPlatform.SetWallpaperPosition(originalPosition))
                     {
-                        await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
-                        return Failure("O Windows não confirmou a restauração do ajuste do papel de parede. Revise o estado no histórico.", document.Id);
+                        var compensated = TryCompensateWallpaperRestore(previousStates, currentStates, targetIds, positionBeforeRestore, document.PreviousWallpaperPosition);
+                        await SetChangeStatusAsync(document, compensated ? UserChangeStatus.Applied : UserChangeStatus.NeedsReview);
+                        return Failure(compensated
+                            ? "O Windows recusou o ajuste; os monitores voltaram ao estado anterior à tentativa. Você pode tentar novamente pelo histórico."
+                            : "O Windows recusou o ajuste e não confirmou a recuperação do estado anterior à tentativa. Revise o histórico e o estado atual.", document.Id);
                     }
                     if (wallpaperPlatform.GetWallpaperPosition() != originalPosition)
                     {
-                        await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
-                        return Failure("A verificação não confirmou o ajuste anterior do papel de parede.", document.Id);
+                        var compensated = TryCompensateWallpaperRestore(previousStates, currentStates, targetIds, positionBeforeRestore, document.PreviousWallpaperPosition);
+                        await SetChangeStatusAsync(document, compensated ? UserChangeStatus.Applied : UserChangeStatus.NeedsReview);
+                        return Failure(compensated
+                            ? "A verificação do ajuste falhou; os monitores voltaram ao estado anterior à tentativa. Você pode tentar novamente pelo histórico."
+                            : "A verificação do ajuste falhou e não foi possível confirmar a recuperação do estado anterior à tentativa. Revise o histórico e o estado atual.", document.Id);
                     }
                 }
                 if (!WallpaperStatesMatch(previousStates, wallpaperPlatform.GetAttachedMonitorWallpapers()))
                 {
-                    await SetChangeStatusAsync(document, UserChangeStatus.NeedsReview);
-                    return Failure("A verificação não confirmou as imagens anteriores em todos os monitores.", document.Id);
+                    var compensated = TryCompensateWallpaperRestore(previousStates, currentStates, targetIds, positionBeforeRestore, document.PreviousWallpaperPosition);
+                    await SetChangeStatusAsync(document, compensated ? UserChangeStatus.Applied : UserChangeStatus.NeedsReview);
+                    return Failure(compensated
+                        ? "A verificação das imagens falhou; os monitores voltaram ao estado anterior à tentativa. Você pode tentar novamente pelo histórico."
+                        : "A verificação das imagens falhou e não foi possível confirmar a recuperação do estado anterior à tentativa. Revise o histórico e o estado atual.", document.Id);
                 }
                 return null;
             }
@@ -797,6 +810,52 @@ public sealed class UserOptimizationService
             if (currentPosition != previousPosition && !wallpaperPlatform.SetWallpaperPosition(previousPosition)) return false;
             return wallpaperPlatform.GetWallpaperPosition() == previousPosition &&
                 WallpaperStatesMatch(previousStates, wallpaperPlatform.GetAttachedMonitorWallpapers());
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or Win32Exception or ArgumentException or COMException)
+        { return false; }
+    }
+
+    private bool TryCompensateWallpaperRestore(IReadOnlyList<WallpaperMonitorBackup> backups,
+        IReadOnlyList<WallpaperMonitorState> beforeRestore, IReadOnlySet<string>? targetMonitorIds,
+        WallpaperPosition? positionBeforeRestore, WallpaperPosition? allowedRestoredPosition)
+    {
+        try
+        {
+            if (wallpaperPlatform.IsSlideshowConfigured()) return false;
+            var current = wallpaperPlatform.GetAttachedMonitorWallpapers();
+            if (!SameMonitorSet(beforeRestore.Select(state => state.MonitorId), current.Select(state => state.MonitorId))) return false;
+            var beforeById = beforeRestore.ToDictionary(state => state.MonitorId, StringComparer.OrdinalIgnoreCase);
+            var backupById = backups.ToDictionary(state => state.MonitorId, StringComparer.OrdinalIgnoreCase);
+            var currentById = current.ToDictionary(state => state.MonitorId, StringComparer.OrdinalIgnoreCase);
+            foreach (var before in beforeRestore)
+            {
+                var currentHash = ComputeWallpaperHash(currentById[before.MonitorId].Path);
+                var beforeHash = ComputeWallpaperHash(before.Path);
+                var isTarget = targetMonitorIds is null || targetMonitorIds.Contains(before.MonitorId);
+                if (!string.Equals(currentHash, beforeHash, StringComparison.OrdinalIgnoreCase) &&
+                    (!isTarget || !backupById.TryGetValue(before.MonitorId, out var backup) ||
+                     !string.Equals(currentHash, backup.PreviousSha256, StringComparison.OrdinalIgnoreCase))) return false;
+            }
+            if (positionBeforeRestore is { } expectedPosition)
+            {
+                var currentPosition = wallpaperPlatform.GetWallpaperPosition();
+                if (currentPosition != expectedPosition && currentPosition != allowedRestoredPosition) return false;
+            }
+            foreach (var before in beforeRestore)
+            {
+                var currentHash = ComputeWallpaperHash(currentById[before.MonitorId].Path);
+                var beforeHash = ComputeWallpaperHash(before.Path);
+                if (!string.Equals(currentHash, beforeHash, StringComparison.OrdinalIgnoreCase) &&
+                    !wallpaperPlatform.SetWallpaperPath(before.MonitorId, before.Path)) return false;
+            }
+            if (positionBeforeRestore is { } expectedRestoredPosition && wallpaperPlatform.GetWallpaperPosition() != expectedRestoredPosition &&
+                !wallpaperPlatform.SetWallpaperPosition(expectedRestoredPosition)) return false;
+            var verified = wallpaperPlatform.GetAttachedMonitorWallpapers();
+            if (!SameMonitorSet(beforeById.Keys, verified.Select(state => state.MonitorId))) return false;
+            var verifiedById = verified.ToDictionary(state => state.MonitorId, StringComparer.OrdinalIgnoreCase);
+            return beforeRestore.All(before => string.Equals(ComputeWallpaperHash(verifiedById[before.MonitorId].Path),
+                       ComputeWallpaperHash(before.Path), StringComparison.OrdinalIgnoreCase)) &&
+                   (positionBeforeRestore is null || wallpaperPlatform.GetWallpaperPosition() == positionBeforeRestore);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or Win32Exception or ArgumentException or COMException)
         { return false; }

@@ -426,6 +426,41 @@ public sealed class WallpaperChangeTests
     }
 
     [WindowsFact]
+    public async Task WallpaperRestoreCompensatesEarlierMonitorWhenAnotherMonitorRejectsRestore()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperCompensationTests.{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previousOne = Path.Combine(root, "previous-one.bmp");
+        var previousTwo = Path.Combine(root, "previous-two.bmp");
+        var selected = Path.Combine(root, "selected.bmp");
+        await File.WriteAllBytesAsync(previousOne, Bmp(1, 2, 3));
+        await File.WriteAllBytesAsync(previousTwo, Bmp(7, 8, 9));
+        await File.WriteAllBytesAsync(selected, Bmp(4, 5, 6));
+        var platform = new FixtureWallpaperPlatform(new Dictionary<string, string>
+        {
+            ["DISPLAY-1"] = previousOne,
+            ["DISPLAY-2"] = previousTwo
+        });
+        try
+        {
+            var service = new UserOptimizationService(Path.Combine(root, "history"), platform);
+            var applied = await service.ApplyWallpaperAsync(selected);
+            Assert.True(applied.Succeeded, applied.Message);
+            platform.RejectOnSetCallNumber = 4; // Apply: calls 1-2; restore: call 4 fails after monitor 1 changed.
+
+            var restored = await service.RestoreAsync(applied.SessionId);
+
+            Assert.False(restored.Succeeded);
+            Assert.Contains("voltaram ao estado anterior à tentativa", restored.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.All(platform.MonitorPaths.Values, path => Assert.Equal(Hash(selected), Hash(path)));
+            var journal = Assert.Single(await service.ListChangesAsync());
+            Assert.False(journal.Restored);
+            Assert.Equal(UserChangeStatus.Applied, journal.Status);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [WindowsFact]
     public async Task WallpaperRestoreBlocksWhenMonitorTopologyChanges()
     {
         var root = Path.Combine(Path.GetTempPath(), $"Zeus.WallpaperTests.{Guid.NewGuid():N}");
@@ -519,6 +554,8 @@ public sealed class WallpaperChangeTests
         public bool Slideshow { get; set; }
         public WallpaperPosition Position { get; set; } = WallpaperPosition.Fill;
         public bool RejectPositionChanges { get; set; }
+        public int? RejectOnSetCallNumber { get; set; }
+        private int SetCallCount { get; set; }
         public bool IsSlideshowConfigured() => Slideshow;
         public IReadOnlyList<WallpaperMonitorState> GetAttachedMonitorWallpapers() => MonitorPaths.Select(pair => new WallpaperMonitorState(pair.Key, pair.Value)).ToArray();
         public WallpaperPosition GetWallpaperPosition() => Position;
@@ -530,6 +567,8 @@ public sealed class WallpaperChangeTests
         }
         public bool SetWallpaperPath(string monitorId, string path)
         {
+            SetCallCount++;
+            if (SetCallCount == RejectOnSetCallNumber) return false;
             if (!MonitorPaths.ContainsKey(monitorId) || !File.Exists(path)) return false;
             MonitorPaths[monitorId] = Path.GetFullPath(path);
             return true;

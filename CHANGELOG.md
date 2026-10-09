@@ -71,3 +71,4 @@
 - O pacote portátil inclui este histórico de versões.
 - Consultas de atualização do ZEUS agora registram respostas HTTP malsucedidas como inconclusivas, sem oferecer o link de release como resultado confirmado.
 - Comparações antes/depois do Observador agora mostram os rótulos declarados das sessões e alertam quando os nomes diferem; rótulos continuam sem comprovar condições equivalentes.
+- A reversão de papéis de parede em vários monitores agora compensa mudanças parciais quando o Windows rejeita uma etapa; o histórico continua como aplicada quando o estado anterior à tentativa é confirmado, e exige revisão se a compensação não puder ser verificada.
