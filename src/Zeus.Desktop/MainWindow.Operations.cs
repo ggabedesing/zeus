@@ -690,8 +690,8 @@ public partial class MainWindow
     {
         if (!CanApplyWallpaper || SelectedWallpaperPath is not { } imagePath) return;
         var fileName = Path.GetFileName(imagePath);
-        if (!Confirm($"Aplicar “{fileName}” como papel de parede do Windows?\n\nO ZEUS guardará uma cópia do papel de parede atual no histórico e verificará o resultado. Se o papel de parede for alterado depois fora do ZEUS, a restauração será bloqueada para preservar a escolha mais recente.", "Revisar papel de parede")) return;
-        await RunOperationAsync("Aplicando papel de parede", "Guardando e verificando uma cópia local do estado atual antes de alterar o Windows.", async token =>
+        if (!Confirm($"Aplicar “{fileName}” a todos os monitores conectados?\n\nO ZEUS guardará a imagem anterior de cada monitor no histórico e verificará o resultado. Apresentações de slides ficam intactas. Se algum monitor ou papel de parede mudar depois fora do ZEUS, a restauração será bloqueada para preservar a escolha mais recente.", "Revisar papel de parede")) return;
+        await RunOperationAsync("Aplicando papel de parede", "Guardando e verificando o estado por monitor antes de alterar o Windows.", async token =>
         {
             var result = await _userOptimization.ApplyWallpaperAsync(imagePath, token);
             await RefreshUserChangesAsync();

@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- A personalização de papel de parede agora aplica uma imagem estática aos monitores conectados com cópia e restauração independentes por monitor; slideshows são preservados e conflitos externos/topologia alterada bloqueiam a reversão automática.
 - O pipeline de release agora bloqueia versões sem certificado fixado e testes completos; tags validadas podem gerar apenas um rascunho, com binários e MSI assinados, hashes atualizados e revisão manual antes da publicação.
 - A aba Atualizações permite consultar manualmente a versão estável publicada do ZEUS no GitHub; comparar versão não baixa nem instala arquivos, e a abertura da publicação pede confirmação.
 - A aparência do ZEUS agora permite escolher entre seis cores de destaque além do padrão de cada tema; a preferência é salva no SQLite e o alto contraste do Windows continua prevalecendo.

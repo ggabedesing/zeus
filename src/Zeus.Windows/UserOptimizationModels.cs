@@ -26,10 +26,11 @@ public sealed record UserChangeResult(Guid SessionId, bool Succeeded, string Mes
 public sealed record PowerPlanInfo(Guid Id, string Name, bool IsActive);
 
 /// <summary>Current-user desktop wallpaper access; kept injectable so rollback can be tested without changing the desktop.</summary>
+public sealed record WallpaperMonitorState(string MonitorId, string Path);
+
 public interface IWallpaperPlatform
 {
     bool IsSlideshowConfigured();
-    bool HasUniformWallpaper();
-    string GetWallpaperPath();
-    bool SetWallpaperPath(string path);
+    IReadOnlyList<WallpaperMonitorState> GetAttachedMonitorWallpapers();
+    bool SetWallpaperPath(string monitorId, string path);
 }
