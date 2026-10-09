@@ -217,13 +217,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         new(DesktopTheme.GamingNeon, "Gamer Neon · foco em jogos", "Interface escura com acento verde neon; não altera jogos, drivers ou configurações de desempenho."),
         new(DesktopTheme.Cyberpunk, "Cyberpunk · criação", "Interface escura com acento rosa; não altera jogos, drivers ou configurações de desempenho.")
     ];
-    public IReadOnlyList<VisualLayoutPreset> VisualLayoutPresets { get; } =
-    [
-        new("windows-moderno", "Windows Moderno", DesktopTheme.Complete, AppAccentColor.ThemeDefault, "Interface ZEUS completa com a cor padrão do tema."),
-        new("minimalista", "Minimalista", DesktopTheme.Minimal, AppAccentColor.ThemeDefault, "Interface ZEUS compacta; detalhes avançados continuam acessíveis no modo técnico."),
-        new("produtividade", "Produtividade", DesktopTheme.Light, AppAccentColor.Blue, "Interface clara para leitura e trabalho, com destaque azul."),
-        new("aurora", "Aurora", DesktopTheme.MacInspired, AppAccentColor.Violet, "Interface escura com cartões suaves e destaque violeta.")
-    ];
+    public IReadOnlyList<VisualLayoutPreset> VisualLayoutPresets { get; } = VisualLayoutCatalog.Load();
     public IReadOnlyList<AppearanceCapabilityRow> AppearanceCapabilities { get; } =
     [
         new("Tema e cor de destaque", "Neste aplicativo", "Aplica a paleta escolhida na interface ZEUS e salva a preferência localmente."),

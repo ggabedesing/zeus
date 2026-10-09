@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Text.Json;
 using Zeus.Desktop;
 using Zeus.Windows;
 
@@ -16,6 +17,23 @@ namespace Zeus.Windows.Acceptance.Tests;
 
 public sealed class WpfExperienceTests
 {
+    [Fact]
+    public void VisualLayoutCatalogLoadsVersionedDataAndRejectsExecutableFields()
+    {
+        var presets = VisualLayoutCatalog.Load();
+
+        Assert.Equal(4, presets.Count);
+        Assert.Equal(4, presets.Select(preset => preset.Id).Distinct(StringComparer.Ordinal).Count());
+        Assert.All(presets, preset => Assert.Equal("zeus-ui", preset.Scope));
+        Assert.Contains(presets, preset => preset.Name == "Windows Moderno");
+        Assert.Contains(presets, preset => preset.Name == "Minimalista");
+        Assert.Contains(presets, preset => preset.Name == "Produtividade");
+        Assert.Contains(presets, preset => preset.Name == "Aurora");
+
+        const string unexpectedCommand = """{"schemaVersion":1,"presets":[{"id":"teste","name":"Teste","theme":"Complete","accent":"ThemeDefault","description":"Perfil de teste","scope":"zeus-ui","command":"powershell"}]}""";
+        Assert.Throws<JsonException>(() => VisualLayoutCatalog.Parse(unexpectedCommand));
+    }
+
     [Fact]
     public void DesktopClockKeepsSecondaryMonitorPositionAndClampsOffscreenCoordinates()
     {

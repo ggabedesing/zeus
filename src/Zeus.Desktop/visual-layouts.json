@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "presets": [
+    {"id":"windows-moderno","name":"Windows Moderno","theme":"Complete","accent":"ThemeDefault","description":"Interface ZEUS completa com a cor padrão do tema.","scope":"zeus-ui"},
+    {"id":"minimalista","name":"Minimalista","theme":"Minimal","accent":"ThemeDefault","description":"Interface ZEUS compacta; detalhes avançados continuam acessíveis no modo técnico.","scope":"zeus-ui"},
+    {"id":"produtividade","name":"Produtividade","theme":"Light","accent":"Blue","description":"Interface clara para leitura e trabalho, com destaque azul.","scope":"zeus-ui"},
+    {"id":"aurora","name":"Aurora","theme":"MacInspired","accent":"Violet","description":"Interface escura com cartões suaves e destaque violeta.","scope":"zeus-ui"}
+  ]
+}

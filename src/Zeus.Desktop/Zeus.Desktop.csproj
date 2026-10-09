@@ -9,6 +9,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="visual-layouts.json" />
     <ProjectReference Include="../Zeus.Core/Zeus.Core.csproj" />
     <ProjectReference Include="../Zeus.Cleanup/Zeus.Cleanup.csproj" />
     <ProjectReference Include="../Zeus.Windows/Zeus.Windows.csproj" />

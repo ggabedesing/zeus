@@ -19,7 +19,7 @@ public sealed record ThemeOption(DesktopTheme Value, string Name, string Descrip
 {
     public override string ToString() => Name;
 }
-public sealed record VisualLayoutPreset(string Id, string Name, DesktopTheme Theme, AppAccentColor Accent, string Description);
+public sealed record VisualLayoutPreset(string Id, string Name, DesktopTheme Theme, AppAccentColor Accent, string Description, string Scope);
 public sealed record AppearanceCapabilityRow(string Name, string Status, string Detail);
 public sealed record CustomizationResourceOption(string Id, string Name, string Summary, string Caution, string OfficialUri);
 public sealed record AccentColorOption(AppAccentColor Value, string Name)
