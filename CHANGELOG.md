@@ -2,6 +2,8 @@
 
 ## Não lançado
 
+- A aparência do ZEUS agora permite escolher entre seis cores de destaque além do padrão de cada tema; a preferência é salva no SQLite e o alto contraste do Windows continua prevalecendo.
+- Novo tema claro para leitura, com cores próprias para avisos, registros e botões.
 - A experiência do PC agora oferece prévia e organização reversível de arquivos comuns soltos na Área de Trabalho, agrupando imagens, vídeos, documentos, áudio e compactados. Pastas, atalhos, executáveis, itens ocultos/de sistema, formatos desconhecidos e diretórios OneDrive identificados são preservados; cada movimento é registrado antes de ocorrer e a restauração confere hash e conflitos.
 - O ZEUS agora gera um pacote ZIP de diagnóstico com relatório, instruções de privacidade e manifesto SHA-256; mostra o conteúdo sensível antes de salvar e não envia dados.
 - A navegação das áreas agora rola verticalmente em janelas baixas; a validação WPF confere a última aba no tamanho mínimo e mantém os controles principais dentro da janela.
