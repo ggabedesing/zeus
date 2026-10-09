@@ -227,8 +227,8 @@ internal sealed record DesktopClockPreferences(bool Enabled = false, bool ShowDa
     public bool Use24HourFormat { get; init; } = true;
 }
 
-internal enum DesktopClockSize { Compact, Medium, Large }
-internal sealed record DesktopClockSizeOption(string Label, DesktopClockSize Value);
+public enum DesktopClockSize { Compact, Medium, Large }
+public sealed record DesktopClockSizeOption(string Label, DesktopClockSize Value);
 
 // Export deliberately excludes startup command strings, raw logs and process environment.
 internal sealed record ExportDocument(int SchemaVersion, DateTimeOffset ExportedAt, HardwareSnapshot? Diagnostics,
