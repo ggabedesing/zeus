@@ -13,7 +13,9 @@ internal sealed class DesktopClockWindow : Window
     private readonly Border _surface = new() { Background = new SolidColorBrush(Color.FromArgb(225, 20, 28, 39)), BorderBrush = new SolidColorBrush(Color.FromArgb(100, 130, 160, 185)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(18, 10, 18, 11) };
     private readonly Action _positionChanged;
     private readonly DispatcherTimer _timer = new();
+    private readonly DispatcherTimer _fullscreenTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private bool _showDate = true, _showSeconds, _use24HourFormat = true;
+    private bool _alwaysOnTop, _hideDuringFullscreen = true;
 
     public DesktopClockWindow(Action positionChanged)
     {
@@ -27,15 +29,19 @@ internal sealed class DesktopClockWindow : Window
         Content = _surface;
         MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) { DragMove(); _positionChanged(); } };
         _timer.Tick += (_, _) => { _timer.Stop(); UpdateTime(); };
+        _fullscreenTimer.Tick += (_, _) => RefreshFullscreenVisibility();
         Loaded += (_, _) => UpdateTime();
-        Closed += (_, _) => _timer.Stop();
+        Loaded += (_, _) => { RefreshFullscreenVisibility(); _fullscreenTimer.Start(); };
+        Closed += (_, _) => { _timer.Stop(); _fullscreenTimer.Stop(); };
     }
 
     internal TimeSpan NextUpdateInterval => _timer.Interval;
 
-    public void Configure(bool showDate, bool showSeconds, bool use24HourFormat, bool alwaysOnTop, double opacity, DesktopClockSize size, Brush accentBrush, bool highContrast)
+    public void Configure(bool showDate, bool showSeconds, bool use24HourFormat, bool alwaysOnTop, double opacity, DesktopClockSize size, Brush accentBrush, bool highContrast, bool hideDuringFullscreen = true)
     {
-        _showDate = showDate; _showSeconds = showSeconds; _use24HourFormat = use24HourFormat; Topmost = alwaysOnTop; Opacity = highContrast ? 1 : Math.Clamp(opacity, 0.45, 1);
+        _showDate = showDate; _showSeconds = showSeconds; _use24HourFormat = use24HourFormat;
+        _alwaysOnTop = alwaysOnTop; _hideDuringFullscreen = hideDuringFullscreen; Topmost = alwaysOnTop;
+        Opacity = highContrast ? 1 : Math.Clamp(opacity, 0.45, 1);
         var (timeSize, dateSize, width, height, padding) = size switch
         {
             DesktopClockSize.Compact => (24d, 10d, 180d, 70d, new Thickness(12, 7, 12, 8)),
@@ -60,7 +66,16 @@ internal sealed class DesktopClockWindow : Window
         Left = position.X;
         Top = position.Y;
         UpdateTime();
+        RefreshFullscreenVisibility();
     }
+
+    internal void RefreshFullscreenVisibility()
+    {
+        if (IsLoaded) Visibility = ResolveFullscreenVisibility(_alwaysOnTop, _hideDuringFullscreen, FullscreenWindowDetector.IsForegroundFullscreen());
+    }
+
+    internal static Visibility ResolveFullscreenVisibility(bool alwaysOnTop, bool hideDuringFullscreen, bool foregroundIsFullscreen) =>
+        alwaysOnTop && hideDuringFullscreen && foregroundIsFullscreen ? Visibility.Hidden : Visibility.Visible;
 
     internal static Point ClampPosition(double left, double top, double width, double height, Rect bounds) => new(
         Math.Clamp(left, bounds.Left, Math.Max(bounds.Left, bounds.Right - width)),

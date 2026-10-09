@@ -232,7 +232,7 @@ internal sealed record DesktopPreferences(bool IsMinimal, DesktopTheme Theme = D
 
 internal sealed record DesktopClockPreferences(bool Enabled = false, bool ShowDate = true, bool ShowSeconds = false,
     bool AlwaysOnTop = false, double Opacity = 0.88, double Left = 40, double Top = 80,
-    DesktopClockSize? Size = null)
+    DesktopClockSize? Size = null, bool HideDuringFullscreen = true)
 {
     public bool Use24HourFormat { get; init; } = true;
 }

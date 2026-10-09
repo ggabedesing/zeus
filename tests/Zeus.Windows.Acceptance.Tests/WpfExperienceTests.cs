@@ -59,6 +59,21 @@ public sealed class WpfExperienceTests
     }
 
     [Fact]
+    public void DesktopClockHidesOnlyWhenTopmostAndAnotherWindowCoversItsMonitor()
+    {
+        var monitor = new Rect(-1920, 0, 1920, 1080);
+
+        Assert.True(FullscreenWindowDetector.CoversMonitor(monitor, monitor));
+        Assert.False(FullscreenWindowDetector.CoversMonitor(new Rect(-1920, 0, 1920, 1040), monitor),
+            "A normal maximized window that leaves the taskbar area visible is not fullscreen.");
+        Assert.False(FullscreenWindowDetector.CoversMonitor(new Rect(-1700, 40, 1600, 900), monitor));
+        Assert.Equal(Visibility.Hidden, DesktopClockWindow.ResolveFullscreenVisibility(true, true, true));
+        Assert.Equal(Visibility.Visible, DesktopClockWindow.ResolveFullscreenVisibility(false, true, true));
+        Assert.Equal(Visibility.Visible, DesktopClockWindow.ResolveFullscreenVisibility(true, false, true));
+        Assert.Equal(Visibility.Visible, DesktopClockWindow.ResolveFullscreenVisibility(true, true, false));
+    }
+
+    [Fact]
     public async Task ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme()
     {
         Assert.True(OperatingSystem.IsWindows(), "WPF acceptance requires an actual Windows desktop.");
@@ -652,6 +667,9 @@ public sealed class WpfExperienceTests
         } while (clockPreferences.Clock?.Enabled != true && DateTimeOffset.UtcNow < clockDeadline);
         Assert.Equal(new DesktopClockPreferences(true, false, true, true, 0.72, clockPreferences.Clock!.Left, clockPreferences.Clock.Top, DesktopClockSize.Large) { Use24HourFormat = false }, clockPreferences.Clock);
         var desktopClock = Assert.Single(Application.Current!.Windows.OfType<DesktopClockWindow>());
+        var hideFullscreenToggle = Assert.IsType<CheckBox>(window.FindName("DesktopClockHideDuringFullscreenToggle"));
+        Assert.Equal("clock-hide-fullscreen", AutomationProperties.GetAutomationId(hideFullscreenToggle));
+        Assert.True(hideFullscreenToggle.IsChecked);
         Assert.Equal(42, Assert.IsType<TextBlock>(desktopClock.Content is Border clockBorder ? (clockBorder.Child as StackPanel)?.Children[0] : null).FontSize);
         var clockSizeSelector = Assert.IsType<ComboBox>(window.FindName("DesktopClockSizeSelector"));
         Assert.Equal("Tamanho do relógio", AutomationProperties.GetName(clockSizeSelector));
