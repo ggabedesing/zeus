@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-09",
+  "feature": "regression coverage for driver search summary",
+  "sourceCommit": "633c9523870b4d1fb92ff6636daea34cecfe430b",
+  "sourceTreeDirty": false,
+  "focusedTest": {
+    "name": "WpfExperienceTests.DriverSearchSummaryDistinguishesCompleteEmptyResultsFromPartialResultsAndUnknownSource",
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "assertions": [
+      "complete search with zero candidates is labeled complete",
+      "partial search with candidates is labeled incomplete",
+      "default source remains explicitly unknown"
+    ]
+  },
+  "localReleaseSuite": {
+    "passed": 521,
+    "failed": 0,
+    "skipped": 10,
+    "total": 531
+  },
+  "portablePackage": {
+    "runtime": "win-x64",
+    "sourceTreeDirty": false,
+    "portableExeSmoke": "main window opened, remained responsive, and closed cleanly",
+    "zip": "artifacts/driver-search-summary-final/zeus-win-x64.zip",
+    "zipSha256": "F18CE0DC770ED8EB288D03274C544FC7C18B21F9478F38B2E06CB98827FD8776",
+    "exeSha256": "9E4A328CB9AB3F131F5BCB7902C0C101CE2F014F5470F1D7CE90AB461DA22606",
+    "productionAuthenticodeSignature": false
+  },
+  "scope": "The test uses synthetic search results. It does not query Windows Update, download or install drivers, or change Windows settings."
+}
