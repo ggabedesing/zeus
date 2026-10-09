@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O Observador explica na própria tela a diferença entre CPU do computador e núcleos equivalentes, e esclarece que uso medido não comprova gargalo.
 - A comparação do Observador agora apresenta núcleos equivalentes com unidade própria, sem formatá-los como porcentagem.
 - A comparação de desempenho por processo agora inclui núcleos equivalentes usados e a cobertura dessas leituras em cada sessão, além da porcentagem da máquina.
 - O Observador agora mostra também núcleos equivalentes usados por processo; a amostragem adaptativa considera esse sinal para detectar carga alta em um núcleo mesmo em CPUs com muitos processadores lógicos.

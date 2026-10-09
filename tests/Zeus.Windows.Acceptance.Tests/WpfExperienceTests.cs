@@ -203,6 +203,10 @@ public sealed class WpfExperienceTests
         Assert.True((await new DesktopStorage(fixture).ReadPreferencesAsync()).FirstRunSetupComplete);
         Assert.Same(window, window.DataContext);
         Assert.False(string.IsNullOrWhiteSpace(window.BuildVersion));
+        var cpuUnitsExplanation = Assert.IsType<TextBlock>(window.FindName("ProcessCpuUnitsExplanation"));
+        Assert.Equal("process-cpu-units-explanation", AutomationProperties.GetAutomationId(cpuUnitsExplanation));
+        Assert.Contains("1,0 equivale ao tempo de um núcleo ocupado", cpuUnitsExplanation.Text, StringComparison.Ordinal);
+        Assert.Contains("não confirmam um gargalo", cpuUnitsExplanation.Text, StringComparison.Ordinal);
         var performanceLabel = Assert.IsType<TextBox>(window.FindName("PerformanceActivityLabelTextBox"));
         Assert.Equal("performance-activity-label", AutomationProperties.GetAutomationId(performanceLabel));
         Assert.Equal(80, performanceLabel.MaxLength);
