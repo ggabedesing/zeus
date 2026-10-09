@@ -1,0 +1,45 @@
+{
+  "evidenceType": "wallpaper-mode-preview-and-portable-package",
+  "date": "2026-10-09",
+  "sourceCommit": "500cbf8f6d6b78397241e3eb6d960f2c8f232a5f",
+  "sourceTreeCleanAtPackageBuild": true,
+  "changes": [
+    "Wallpaper preview now reflects Fill, Fit, Stretch, Center, Tile, and Span placement modes.",
+    "Preview aspect ratio uses the selected monitor rectangle or combined attached monitor rectangle when available.",
+    "Fallback aspect ratio, illustrative Tile scale, Center scale caveat, and missing physical Span boundaries are stated explicitly."
+  ],
+  "tests": {
+    "wpfExperienceTests": {
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "coverage": [
+        "six wallpaper placement modes",
+        "monitor aspect ratio and bounded preview size",
+        "unknown mode and unavailable target rectangle",
+        "preview control accessibility name and UI summary"
+      ]
+    },
+    "wallpaperChangeTests": {
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "portablePackage": {
+    "path": "artifacts/wallpaper-preview-package/zeus-win-x64.zip",
+    "sha256": "44fca68250fadd6b910f475616fc4e0c986078857115306f5377a746373077ef",
+    "desktopExePath": "artifacts/wallpaper-preview-package/zeus-win-x64-500cbf8f6d6b-20261009T102500871Z-a4b390fa/Zeus.Desktop.exe",
+    "desktopExeSha256": "2fd9d38cedbaeb0384430191a4c84afb5361713fed675774c1b9bf386e136c9a",
+    "runtime": "win-x64",
+    "developmentBuild": true,
+    "sourceDirty": false,
+    "smoke": "main window opened, responded, and closed cleanly"
+  },
+  "limitations": [
+    "No wallpaper mode was applied to the real desktop during validation.",
+    "The preview was not validated against a captured source image in every mode; tile scale and center scale are illustrative.",
+    "The complete test suite and administrative recovery validations were not run for this increment.",
+    "The development package is not signed with a production Authenticode certificate."
+  ]
+}
