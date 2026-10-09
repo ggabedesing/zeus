@@ -44,6 +44,21 @@ public sealed class OptimizationPlannerTests
     }
 
     [Fact]
+    public void FormalRulesAreReviewOnlyAndCannotCarryExecutableActions()
+    {
+        Assert.All(ruleEngine.GetDefinitions(), rule => Assert.True(rule.IsReviewOnly));
+        var executableDefinition = ruleEngine.GetDefinitions().Single(rule => rule.Id == "memory.pressure") with { IsReviewOnly = false };
+
+        var error = Assert.Throws<ArgumentException>(() => new OptimizationRuleEngine([executableDefinition]));
+
+        Assert.Contains("somente de revisão", error.Message, StringComparison.OrdinalIgnoreCase);
+        var triggered = ruleEngine.Evaluate(HealthySnapshot() with { Memory = new MemoryInfo(10 * GiB, GiB) }, OptimizationProfile.General,
+            new OptimizationWorkloadEvidence(null, 8, false, false, null, null, null, true, 6, 12));
+        Assert.Contains(triggered.Rules, result => result.Triggered);
+        Assert.All(triggered.Rules, result => Assert.Null(result.Action));
+    }
+
+    [Fact]
     public void FormalPlanCarriesReviewEvidenceAndDoesNotPromoteItToAction()
     {
         var snapshot = HealthySnapshot() with { Memory = new MemoryInfo(10 * GiB, GiB) };

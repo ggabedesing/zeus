@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- As regras formais do motor de otimização agora são obrigatoriamente somente para revisão; o plano nunca propaga ações executáveis, que permanecem nos fluxos separados de consentimento e transação.
 - Comparações de desempenho usam até cinco amostras de uma única sessão por período, exigem pelo menos três e mostram os horários das sessões; amostras de sessões distintas não são combinadas.
 - O Centro de Reparos esclarece que a consulta de eventos inclui níveis crítico, erro e aviso, limita-se a até 20 por log e pode ser incompleta; padrões repetidos mostram o intervalo observado sem inferir causa.
 - A tela Meu PC agora lista até 30 serviços e tarefas agendadas com seus estados reportados; a coleta de tarefas detecta quando excede 500 e sinaliza que a amostra está incompleta. Nenhuma entrada é executada ou alterada.

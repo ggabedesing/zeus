@@ -336,3 +336,7 @@ A coleta passa a consultar 201 processos e 301 rotas para detectar quando excede
 ### Comparação de desempenho por sessão — 2026-10-09
 
 O ZEUS usa até cinco amostras da sessão mais recente para a referência e, depois, de uma sessão posterior. Cada botão exige ao menos três leituras nessa própria sessão; se a mais recente tiver só duas, o botão permanece desativado e não completa o conjunto com leituras de uma sessão anterior. A seleção posterior exclui amostras até o fim da referência, e o resultado mostra o horário final e a quantidade de amostras dos dois períodos. Testes do seletor confirmam que uma sessão nova com duas leituras não empresta amostras da sessão anterior e que o filtro posterior respeita o instante de corte. A referência não prova por si só que a carga rotulada pelo usuário é equivalente; o rótulo continua sendo informativo.
+
+### Isolamento entre recomendação formal e execução — 2026-10-09
+
+O construtor do `OptimizationRuleEngine` agora rejeita qualquer definição marcada como executável, porque este motor só cria recomendações para revisão. Mesmo quando uma recomendação dispara, `OptimizationRuleResult.Action` permanece nula; execução continua no mecanismo independente com consentimento. `FormalRulesAreReviewOnlyAndCannotCarryExecutableActions` passou junto com os testes do projeto Core. Isso verifica o contrato do motor; não executa nem autoriza alterações do Windows.

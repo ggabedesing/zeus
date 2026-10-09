@@ -219,7 +219,9 @@ public sealed class OptimizationRuleEngine
             var reason = matches.Length > 0
                 ? string.Join(" ", matches.Select(match => match.Reason))
                 : evidenceAvailable ? "A regra foi avaliada e não atingiu seu critério de revisão." : "Os dados necessários para avaliar esta regra não estão disponíveis.";
-            results.Add(new OptimizationRuleResult(definition, reason, evidenceAvailable, matches.Length > 0, matches.FirstOrDefault()?.Action));
+            // Formal plans explain and prioritize review; executable actions remain in the
+            // separate consent-gated transaction engine, even if a planner rule gains an action.
+            results.Add(new OptimizationRuleResult(definition, reason, evidenceAvailable, matches.Length > 0, null));
         }
 
         var applicable = results.Where(result => result.Rule.CompatibleProfiles.Contains(profile)).ToArray();
@@ -319,6 +321,9 @@ public sealed class OptimizationRuleEngine
         var ids = definitions.Select(definition => definition.Id).ToHashSet(StringComparer.Ordinal);
         foreach (var definition in definitions)
         {
+            if (!definition.IsReviewOnly)
+                throw new ArgumentException($"A regra {definition.Id} não é somente de revisão; ações devem usar o fluxo de transação com consentimento explícito.", nameof(definitions));
+
             if (definition.DependsOn is null || definition.CompatibleProfiles is null || definition.ConflictsWith?.Contains(definition.Id, StringComparer.Ordinal) == true ||
                 definition.DependsOn.Contains(definition.Id, StringComparer.Ordinal) ||
                 definition.DependsOn.Concat(definition.ConflictsWith ?? []).Any(id => !ids.Contains(id)))
