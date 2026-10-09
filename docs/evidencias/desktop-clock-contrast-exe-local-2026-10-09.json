@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "collectedAtUtc": "2026-10-09T14:09:02.7883586+00:00",
+  "sourceCommit": "3dfd1c5c807884b5a7602428fef5bfe3dc286efd",
+  "sourceDirty": false,
+  "change": "Clock styles now resolve low-contrast accent text to the higher-contrast black or white foreground; the UI warns that high transparency can reduce readability.",
+  "verification": {
+    "targetedContrastAndApplicationAcceptance": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0
+    },
+    "fullWpfAcceptance": {
+      "passed": 84,
+      "failed": 0,
+      "skipped": 2,
+      "skippedReason": "Protected session cases require administrator privileges."
+    },
+    "fullSolutionReleaseTests": {
+      "passed": 526,
+      "failed": 0,
+      "skipped": 10
+    },
+    "releaseBuild": {
+      "succeeded": true,
+      "warnings": 0,
+      "errors": 0
+    },
+    "portablePackage": {
+      "runtime": "win-x64",
+      "developmentBuild": true,
+      "opened": true,
+      "responsive": true,
+      "closedCleanly": true,
+      "zipSha256": "D6D3EC002B62574CDB9B2E031BCD135959738A5F2F4DCD2E39D7C0FA73EE0A16",
+      "exeSha256": "7C97F3FCA48B438100C9B05584EFEE40434E0527559A47FBDF856E42B500922D"
+    }
+  },
+  "systemChanges": {
+    "windowsPreferencesChanged": false,
+    "productionAuthenticodeSigned": false
+  }
+}
