@@ -64,6 +64,17 @@ function Assert-InstalledVersion([string]$Version) {
         !(Test-Path -LiteralPath (Join-Path $installDirectory 'Zeus.Maintenance.exe') -PathType Leaf)) {
         throw 'The installed application or maintenance helper is missing.'
     }
+    $requiredNotices = @(
+        'THIRD-PARTY-NOTICES.md',
+        'THIRD-PARTY-NOTICES.NET.txt',
+        'licenses\MIT.txt',
+        'licenses\Apache-2.0.txt'
+    )
+    foreach ($notice in $requiredNotices) {
+        if (!(Test-Path -LiteralPath (Join-Path $installDirectory $notice) -PathType Leaf)) {
+            throw "The installed application is missing its third-party notice: $notice"
+        }
+    }
     if (!(Test-Path -LiteralPath (Join-Path $shortcutDirectory 'ZEUS.lnk') -PathType Leaf)) {
         throw 'The Start menu shortcut is missing.'
     }
