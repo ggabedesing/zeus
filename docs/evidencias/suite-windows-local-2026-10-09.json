@@ -27,8 +27,20 @@
     "Seven cleanup security tests require symbolic-link creation, which Windows denied for this process.",
     "One existing visual-preferences test and one protected-session acceptance test require separate administrative conditions."
   ],
+  "elevatedWindowsCi": {
+    "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37898054061",
+    "sourceCommit": "a49f720a109a2f263a718f86a3d84e297d4be248",
+    "outcome": "success",
+    "gates": [
+      "all expected test projects pass with zero skipped tests",
+      "read-only Windows diagnostic succeeds",
+      "portable package opens and closes cleanly",
+      "MSI install, upgrade, and uninstall lifecycle succeeds"
+    ],
+    "nonBlockingBuildWarnings": "Four repeated WiX annotations concern the SQLite DLL LANGID 0 field; build and MSI lifecycle succeeded."
+  },
   "limitations": [
-    "The skipped symbolic-link tests still require execution by the elevated Windows acceptance job.",
+    "Local skipped administrative cases are covered by the elevated Windows acceptance job.",
     "This run does not apply Windows repairs, install drivers, or restart the PC."
   ]
 }
