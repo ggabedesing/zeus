@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "collectedAtLocal": "2026-10-09T12:59:50-03:00",
+  "sourceCommit": "4f3d0ab680afcbca9350d3873aaf7428f442bff2",
+  "sourceDirty": false,
+  "change": {
+    "setting": "ZEUS visual layout spacing",
+    "catalogSchemaVersion": 1,
+    "builtInCompactPresets": ["minimalista", "gamer-neon", "terminal"],
+    "optionalDensityPreservesCurrentPreference": true,
+    "customProfilesMayDeclareDensity": true,
+    "previewIsTemporaryUntilConfirmation": true,
+    "cancelRestoresSavedDensity": true,
+    "fontSizeReduced": false,
+    "windowsPreferencesChanged": false
+  },
+  "verification": {
+    "focusedWpfAcceptance": { "passed": 33, "failed": 0, "skipped": 0 },
+    "fullSolutionTests": { "total": 544, "passed": 533, "failed": 0, "skipped": 11 },
+    "wpfAcceptance": { "total": 91, "passed": 89, "failed": 0, "skipped": 2 },
+    "skippedReasons": ["administrator privileges required", "opt-in real Windows preference or wallpaper changes"],
+    "portablePackage": {
+      "runtime": "win-x64",
+      "sourceDirty": false,
+      "windowOpened": true,
+      "windowResponded": true,
+      "closedNormally": true,
+      "zip": "artifacts/visual-layout-density-exe/zeus-win-x64.zip",
+      "zipSha256": "032D85086FFB7BD03C3EABE555C1E976AC68A09DDC305807DCD47CF3CA83ECB9",
+      "executable": "artifacts/visual-layout-density-exe/zeus-win-x64-4f3d0ab680af-20261009T155938746Z-a488fe2a/Zeus.Desktop.exe",
+      "executableSha256": "0E98529580FCD9DBCD736E1E2EAC814BFDFD3DD6F6CDF441AC0E03F59C6425B1"
+    }
+  },
+  "productionAuthenticodeSignature": false
+}
