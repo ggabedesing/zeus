@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-09",
+  "feature": "accurate classification of ZEUS release check results",
+  "sourceCommit": "0a2019922f41015b26ee55520d3f471ecc5df220",
+  "sourceTreeDirty": false,
+  "behavior": {
+    "successfulHttpResponse": "recorded as a completed query",
+    "httpNotFound": "successful query confirming no stable release is published",
+    "otherHttpErrors": "inconclusive warning; no release page is offered as confirmed",
+    "automaticRetryIntervalHours": 24
+  },
+  "verification": {
+    "focusedTestsPassed": 6,
+    "focusedTestsFailed": 0,
+    "fullSuitePassed": 514,
+    "fullSuiteFailed": 0,
+    "fullSuiteSkipped": 10,
+    "http403Test": "synthetic handler response; confirmed inconclusive state and no release link",
+    "portableExeSmoke": "main window opened, responded, and closed cleanly"
+  },
+  "package": {
+    "runtime": "win-x64",
+    "zip": "artifacts/zeus-release-check-final/zeus-win-x64.zip",
+    "zipSha256": "C6C5DD7D5E3B032CC011B6A658794AF7E713C3B06C086C2BB84E5238CE43ABF9",
+    "exeSha256": "68C107B912B2EF07ABD7BA7D573D2191019D1215BD476F32F952DBF1246FE4E7",
+    "productionAuthenticodeSignature": false
+  }
+}

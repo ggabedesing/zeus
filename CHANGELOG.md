@@ -69,3 +69,4 @@
 - Instalações pendentes guardam a seleção lógica do Windows Update no SQLite versionado. Uma ação explícita pode reconsultar o pacote exato após reiniciar; confirmação atualiza o histórico, enquanto ausência/incompletude mantém a pendência sem reinstalação automática.
 - A reconsulta de driver só começa quando o tempo de inicialização do Windows indica uma reinicialização posterior à sessão de instalação.
 - O pacote portátil inclui este histórico de versões.
+- Consultas de atualização do ZEUS agora registram respostas HTTP malsucedidas como inconclusivas, sem oferecer o link de release como resultado confirmado.
