@@ -96,6 +96,16 @@ public sealed class WpfExperienceTests
         Assert.True((await new DesktopStorage(fixture).ReadPreferencesAsync()).FirstRunSetupComplete);
         Assert.Same(window, window.DataContext);
         Assert.False(string.IsNullOrWhiteSpace(window.BuildVersion));
+        var performanceLabel = Assert.IsType<TextBox>(window.FindName("PerformanceActivityLabelTextBox"));
+        Assert.Equal("performance-activity-label", AutomationProperties.GetAutomationId(performanceLabel));
+        Assert.Equal(80, performanceLabel.MaxLength);
+        performanceLabel.Text = "  Minecraft   + OBS\n  sessão ao vivo  ";
+        Assert.Equal("  Minecraft   + OBS\n  sessão ao vivo  ", window.PerformanceActivityLabel);
+        Assert.Equal("Medição manual · Minecraft + OBS sessão ao vivo",
+            MainWindow.BuildPerformanceSessionLabel("Medição manual", window.PerformanceActivityLabel));
+        Assert.Equal("Observador adaptativo",
+            MainWindow.BuildPerformanceSessionLabel("Observador adaptativo", " \t "));
+        Assert.Equal(80, MainWindow.BuildPerformanceSessionLabel("Referência", new string('x', 100))["Referência · ".Length..].Length);
         Assert.Same(Application.Current.Resources["BackgroundBrush"], window.Background);
         Assert.Same(Application.Current.Resources["TextBrush"], window.Foreground);
         var themeSelector = Assert.IsType<ComboBox>(window.FindName("ThemeSelector"));
@@ -518,6 +528,20 @@ public sealed class WpfExperienceTests
         Assert.Equal(Color.FromRgb(0xFF, 0x63, 0xD8), Assert.IsType<SolidColorBrush>(clockLabels[0].Foreground).Color);
         Assert.Equal(0.72, desktopClock.Opacity);
         window.DesktopClockEnabled = false;
+        performanceLabel.Text = "Jogo teste + OBS";
+        var measureButton = Assert.IsType<Button>(window.FindName("MeasurePerformanceButton"));
+        Assert.Equal("measure-performance", AutomationProperties.GetAutomationId(measureButton));
+        measureButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, measureButton));
+        var measurementDeadline = DateTimeOffset.UtcNow.AddSeconds(90);
+        while (window.StatusTitle == "Medindo carga real" && DateTimeOffset.UtcNow < measurementDeadline)
+            await Task.Delay(100);
+        Assert.True(window.StatusTitle == "Medição concluída",
+            $"A medição pela interface não terminou corretamente: {window.StatusTitle} · {window.StatusDetail}");
+        Assert.Contains("não confirma", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
+        var savedPerformanceSession = Assert.Single(await new DesktopStorage(fixture).ReadPerformanceSessionsAsync(),
+            session => session.Label == "Medição manual · Jogo teste + OBS");
+        Assert.Single(savedPerformanceSession.Samples);
+        Assert.Contains("Medição manual · Jogo teste + OBS", window.PerformanceSessionHistorySummary, StringComparison.Ordinal);
         Assert.All(window.MaintenanceChoices, choice => Assert.False(choice.IsSelected));
         Assert.False(window.CanExecute);
         // No button that repairs, installs a driver, deletes files, schedules a

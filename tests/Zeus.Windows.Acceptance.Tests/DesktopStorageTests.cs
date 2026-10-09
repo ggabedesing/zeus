@@ -74,12 +74,13 @@ public sealed class DesktopStorageTests : IDisposable
             [new("0 C:", 1200, 4, 1.2)],
             [new("Ethernet", 800, 1_000_000_000, 0, 3)],
             GpuMemory: [new("luid_0x1_phys_0", 1_024, 2_048, 3_072, 4_096)]);
-        await storage.StartPerformanceSessionAsync(id, "Referência", observation.CollectedAt.AddSeconds(-2));
+        await storage.StartPerformanceSessionAsync(id, "Referência de desempenho · jogo + OBS", observation.CollectedAt.AddSeconds(-2));
         await storage.AppendPerformanceObservationAsync(id, 0, observation);
         await storage.MarkPerformanceReferenceAsync(id);
         await storage.FinishPerformanceSessionAsync(id, observation.CollectedAt);
 
         var session = Assert.Single(await storage.ReadPerformanceSessionsAsync());
+        Assert.Equal("Referência de desempenho · jogo + OBS", session.Label);
         var sample = Assert.Single(session.Samples);
         var restored = Assert.IsType<PerformanceObservation>(JsonSerializer.Deserialize<PerformanceObservation>(sample.DetailsJson, DesktopStorage.JsonOptions));
         Assert.True(session.IsReference);
@@ -89,6 +90,33 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(1_024UL, Assert.Single(restored.GpuMemory!).DedicatedUsageBytes);
         Assert.Equal(4_096UL, Assert.Single(restored.GpuMemory!).DedicatedCapacityBytes);
         Assert.Equal(21.5, sample.CpuPercent!.Value);
+    }
+
+    [Fact]
+    public async Task LargePerformanceObservationIsSummarizedBeforeTheSqliteSampleLimit()
+    {
+        Directory.CreateDirectory(_root);
+        var storage = new DesktopStorage(_root);
+        var id = Guid.NewGuid();
+        var collectedAt = DateTimeOffset.UtcNow;
+        var gpuRows = Enumerable.Range(1, 512).Select(processId => new GpuProcessMemoryObservation(
+            $"pid_{processId}_luid_0x00000001_0x00000002_phys_0",
+            "luid_0x00000001_0x00000002_phys_0", processId, "graphics-process-" + new string('x', 120),
+            processId, (ulong)processId * 1024, 4096, 2048, 3072, 8192)).ToArray();
+        var observation = new PerformanceObservation(collectedAt, TimeSpan.FromSeconds(5), 12,
+            32_000, 16_000, [], ["aviso original"], GpuProcessMemory: gpuRows);
+        await storage.StartPerformanceSessionAsync(id, "Medição manual · carga de GPU", collectedAt);
+
+        await storage.AppendPerformanceObservationAsync(id, 0, observation);
+
+        var stored = Assert.Single(await storage.ReadPerformanceSessionsAsync());
+        var sample = Assert.Single(stored.Samples);
+        Assert.True(sample.DetailsJson.Length <= 65_536);
+        var restored = Assert.IsType<PerformanceObservation>(JsonSerializer.Deserialize<PerformanceObservation>(sample.DetailsJson, DesktopStorage.JsonOptions));
+        Assert.Equal(12, restored.GpuProcessMemory!.Count);
+        Assert.Contains("aviso original", restored.Warnings);
+        Assert.Contains(restored.Warnings, warning => warning.Contains("processos com memória GPU", StringComparison.Ordinal));
+        Assert.Contains(restored.Warnings, warning => warning.Contains("amostra ao vivo não foi reduzida", StringComparison.Ordinal));
     }
 
     [Fact]

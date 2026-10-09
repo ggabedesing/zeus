@@ -30,6 +30,7 @@ internal sealed class DesktopStorage
         RespectRequiredConstructorParameters = true,
         Converters = { new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false) }
     };
+    private static readonly JsonSerializerOptions PerformanceJsonOptions = new(JsonOptions) { WriteIndented = false };
 
     public async Task<IReadOnlyList<MaintenanceReport>> ReadHistoryAsync()
     {
@@ -117,7 +118,53 @@ internal sealed class DesktopStorage
         _database.AppendPerformanceSampleAsync(sessionId.ToString("D"), new(sequence, observation.CollectedAt,
             (int)Math.Clamp(observation.SamplingDuration.TotalMilliseconds, 0, 30_000), observation.CpuPercent,
             observation.TotalMemoryBytes, observation.AvailableMemoryBytes,
-            JsonSerializer.Serialize(observation, JsonOptions)));
+            SerializePerformanceObservation(observation)));
+
+    private static string SerializePerformanceObservation(PerformanceObservation observation)
+    {
+        const int maximumDetailsLength = 65_536;
+        var omissions = new List<string>();
+        var warnings = observation.Warnings.Take(24).Select(warning => warning.Length <= 512 ? warning : warning[..512]).ToList();
+        if (observation.Warnings.Count > warnings.Count || observation.Warnings.Take(24).Any(warning => warning.Length > 512))
+            omissions.Add("avisos técnicos limitados no histórico");
+
+        var bounded = observation with
+        {
+            Processes = LimitPerformanceItems(observation.Processes, 50, "processos", omissions)!,
+            GpuEngines = LimitPerformanceItems(observation.GpuEngines?.OrderByDescending(engine => engine.UtilizationPercent).ToArray(), 16, "engines GPU", omissions),
+            Disks = LimitPerformanceItems(observation.Disks?.OrderByDescending(disk => disk.ActivePercent ?? -1).ToArray(), 16, "discos", omissions),
+            Networks = LimitPerformanceItems(observation.Networks?.OrderByDescending(network => network.BytesPerSecond ?? 0).ToArray(), 16, "adaptadores de rede", omissions),
+            GpuMemory = LimitPerformanceItems(observation.GpuMemory?.OrderByDescending(memory => memory.DedicatedUsageBytes ?? 0).ToArray(), 8, "adaptadores de memória GPU", omissions),
+            GpuProcessMemory = LimitPerformanceItems(observation.GpuProcessMemory?
+                .OrderByDescending(memory => memory.DedicatedUsageBytes ?? 0)
+                .ThenByDescending(memory => memory.SharedUsageBytes ?? 0).ToArray(), 12, "processos com memória GPU", omissions),
+            Warnings = warnings
+        };
+        if (omissions.Count > 0)
+            bounded = bounded with { Warnings = [.. bounded.Warnings, $"Histórico local resumido para caber no limite: {string.Join(", ", omissions)}; a amostra ao vivo não foi reduzida."] };
+
+        var json = JsonSerializer.Serialize(bounded, PerformanceJsonOptions);
+        if (json.Length <= maximumDetailsLength) return json;
+
+        var compact = bounded with
+        {
+            Processes = bounded.Processes.Take(20).ToArray(),
+            GpuEngines = [], Disks = [], Networks = [], GpuMemory = [], GpuProcessMemory = [],
+            Warnings = [.. bounded.Warnings.Take(8), "Histórico local resumido adicionalmente para respeitar o limite de armazenamento; listas detalhadas foram omitidas desta amostra salva."]
+        };
+        json = JsonSerializer.Serialize(compact, PerformanceJsonOptions);
+        if (json.Length > maximumDetailsLength)
+            throw new InvalidDataException("A amostra local não coube no limite de armazenamento mesmo após resumir as listas detalhadas.");
+        return json;
+    }
+
+    private static IReadOnlyList<T>? LimitPerformanceItems<T>(IReadOnlyList<T>? items, int limit,
+        string label, ICollection<string> omissions)
+    {
+        if (items is null || items.Count <= limit) return items;
+        omissions.Add($"{label} limitados aos {limit} itens mais relevantes");
+        return items.Take(limit).ToArray();
+    }
 
     public Task FinishPerformanceSessionAsync(Guid sessionId, DateTimeOffset finishedAt) =>
         _database.FinishPerformanceSessionAsync(sessionId.ToString("D"), finishedAt);

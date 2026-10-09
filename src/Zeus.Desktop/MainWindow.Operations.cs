@@ -160,21 +160,22 @@ public partial class MainWindow
 
     private async void Performance_Click(object sender, RoutedEventArgs e)
     {
+        var sessionLabel = BuildPerformanceSessionLabel("Medição manual", PerformanceActivityLabel);
         await RunOperationAsync("Medindo carga real", "Amostrando CPU, memória e processos por cinco segundos.", async token =>
         {
             _performanceSessionId = Guid.NewGuid();
             var id = _performanceSessionId;
             var started = DateTimeOffset.UtcNow;
-            await BeginPerformanceSessionAsync(id, "Medição manual", started);
+            await BeginPerformanceSessionAsync(id, sessionLabel, started);
             try
             {
                 var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(5), token);
                 DisplayPerformanceObservation(observation);
                 await StorePerformanceObservationAsync(id, observation);
                 BuildPersonalPlan(); Notify(nameof(Performance));
-                StatusTitle = "Medição concluída"; StatusDetail = "A amostra registra esta carga. Repita durante a tarefa para comparar condições equivalentes.";
+                StatusTitle = "Medição concluída"; StatusDetail = $"Sessão “{sessionLabel}” concluída. A descrição foi informada por você; o rótulo não confirma se um jogo ou transmissão estava ativo. Confira em Sessões recentes se o histórico local foi gravado e repita a mesma atividade em condições semelhantes para comparar.";
             }
-            finally { await FinishPerformanceSessionAsync(id); }
+            finally { await FinishPerformanceSessionAsync(id); await RefreshPerformanceSessionHistoryAsync(); }
         }, cancellable: true);
     }
 
@@ -212,11 +213,12 @@ public partial class MainWindow
 
     private async void StartObserver_Click(object sender, RoutedEventArgs e)
     {
+        var sessionLabel = BuildPerformanceSessionLabel("Observador adaptativo", PerformanceActivityLabel);
         _performanceSessionId = Guid.NewGuid();
         await RunOperationAsync("Observando desempenho", "Amostras adaptativas de CPU, memória e processos. Use Cancelar leitura para encerrar.", async token =>
         {
             var id = _performanceSessionId;
-            await BeginPerformanceSessionAsync(id, "Observador adaptativo", DateTimeOffset.UtcNow);
+            await BeginPerformanceSessionAsync(id, sessionLabel, DateTimeOffset.UtcNow);
             try
             {
                 while (true)
@@ -225,7 +227,7 @@ public partial class MainWindow
                     {
                         await FinishPerformanceSessionAsync(id);
                         id = _performanceSessionId = Guid.NewGuid();
-                        await BeginPerformanceSessionAsync(id, "Observador adaptativo", DateTimeOffset.UtcNow);
+                        await BeginPerformanceSessionAsync(id, sessionLabel, DateTimeOffset.UtcNow);
                     }
                     var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(2), token);
                     DisplayPerformanceObservation(observation);
@@ -233,11 +235,11 @@ public partial class MainWindow
                     BuildPersonalPlan();
                     var interval = AdaptiveSamplingPolicy.NextInterval(observation);
                     PerformanceSummary += $" · próxima amostra em {interval.TotalSeconds:0} s";
-                    StatusDetail = $"Sessão {id:N} · {_performanceHistory.Snapshot().Count} amostras guardadas em memória. Cancele para encerrar.";
+                    StatusDetail = $"Sessão “{sessionLabel}” · {_performanceHistory.Snapshot().Count} amostras guardadas em memória. O rótulo é informado por você; não confirma jogo, OBS ou transmissão. Cancele para encerrar.";
                     await Task.Delay(interval, token);
                 }
             }
-            finally { await FinishPerformanceSessionAsync(id); }
+            finally { await FinishPerformanceSessionAsync(id); await RefreshPerformanceSessionHistoryAsync(); }
         }, cancellable: true);
     }
 
@@ -276,6 +278,31 @@ public partial class MainWindow
         catch (Exception error) when (IsStorageError(error)) { AddPerformanceStorageWarning(error); }
     }
 
+    internal static string BuildPerformanceSessionLabel(string mode, string? activity)
+    {
+        var normalized = string.Join(' ', (activity ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (normalized.Length > 80) normalized = normalized[..80].TrimEnd();
+        return normalized.Length == 0 ? mode : $"{mode} · {normalized}";
+    }
+
+    private async Task RefreshPerformanceSessionHistoryAsync()
+    {
+        try
+        {
+            var sessions = await _storage.ReadPerformanceSessionsAsync();
+            var recent = sessions.OrderByDescending(session => session.StartedAt).Take(5).ToArray();
+            PerformanceSessionHistorySummary = recent.Length == 0
+                ? "Nenhuma sessão de desempenho foi salva ainda."
+                : string.Join(Environment.NewLine, recent.Select(session =>
+                    $"{session.StartedAt.ToLocalTime():dd/MM HH:mm} · {session.Label} · {session.Samples.Count} amostras"));
+        }
+        catch (Exception error) when (IsStorageError(error))
+        {
+            PerformanceSessionHistorySummary = "Histórico de sessões indisponível nesta leitura; os registros locais foram preservados.";
+            AddPerformanceStorageWarning(error);
+        }
+    }
+
     private void AddPerformanceStorageWarning(Exception error)
     {
         const string warning = "O histórico de desempenho desta leitura não pôde ser gravado no SQLite; os dados ainda podem ser exportados enquanto o ZEUS estiver aberto.";
@@ -286,6 +313,11 @@ public partial class MainWindow
     private async Task LoadPerformanceSessionsAsync()
     {
         var sessions = await _storage.ReadPerformanceSessionsAsync();
+        var recentSessions = sessions.OrderByDescending(session => session.StartedAt).Take(5).ToArray();
+        PerformanceSessionHistorySummary = recentSessions.Length == 0
+            ? "Nenhuma sessão de desempenho foi salva ainda."
+            : string.Join(Environment.NewLine, recentSessions.Select(session =>
+                $"{session.StartedAt.ToLocalTime():dd/MM HH:mm} · {session.Label} · {session.Samples.Count} amostras"));
         var all = new List<(bool IsReference, PerformanceObservation Observation)>();
         foreach (var session in sessions.OrderBy(session => session.StartedAt))
         {
@@ -413,7 +445,8 @@ public partial class MainWindow
         StatusDetail = $"Referência definida com {observations.Length} amostras. Execute a mesma tarefa em condições semelhantes e colete ao menos três amostras posteriores.";
 
         var referenceId = Guid.NewGuid();
-        await BeginPerformanceSessionAsync(referenceId, "Referência de desempenho", observations[0].CollectedAt);
+        var referenceLabel = BuildPerformanceSessionLabel("Referência de desempenho", PerformanceActivityLabel);
+        await BeginPerformanceSessionAsync(referenceId, referenceLabel, observations[0].CollectedAt);
         for (var index = 0; index < observations.Length; index++)
             await StorePerformanceObservationAsync(referenceId, observations[index]);
         if (_persistedPerformanceSessions.Contains(referenceId))
@@ -422,6 +455,7 @@ public partial class MainWindow
             catch (Exception error) when (IsStorageError(error)) { AddPerformanceStorageWarning(error); }
         }
         await FinishPerformanceSessionAsync(referenceId);
+        await RefreshPerformanceSessionHistoryAsync();
     }
 
     private static string FormatBytesPerSecond(ulong? bytes) => bytes is { } value

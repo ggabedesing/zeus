@@ -252,3 +252,13 @@ Para conferir também o uso normal da interface:
 6. Exporte o JSON e confira os dados localmente. Revise nomes de computador, usuários e processos antes de compartilhar.
 
 Esse roteiro da interface só lê dados e guarda preferências da interface. Reparos, desativação de inicialização, exclusão, efeitos do Windows, instalação de drivers e verificação offline exigem ações separadas e revisão. A suíte de fixtures e a conferência no PC principal não confirmam os cenários administrativos ainda pendentes na matriz acima.
+
+## Rótulos das sessões do Observador — 2026-10-08
+
+A tela Hardware e carga aceita um rótulo opcional de até 80 caracteres, informado pelo usuário, para medição manual, Observador adaptativo e referência. Espaços repetidos e quebras de linha viram espaços simples; o rótulo aparece no histórico local junto com data e número de amostras. A interface explica que escrever “jogo + OBS” não comprova que esses programas estavam ativos. As sessões continuam usando o esquema SQLite existente.
+
+Na validação ponta a ponta, o teste preencheu a caixa da interface com `Jogo teste + OBS`, iniciou uma amostra real de cinco segundos no Windows e confirmou o rótulo e uma amostra no SQLite e na lista de sessões recentes. Um ensaio anterior detectou que 512 linhas de memória GPU por processo podiam superar o limite de 64 KiB por amostra do banco. A persistência agora serializa JSON compacto, limita listas auxiliares a 8–16 itens relevantes (processos até 50), limita avisos e grava aviso explícito sempre que resumiu detalhes. A observação exibida na hora permanece completa; o resumo no histórico não finge conter as linhas omitidas.
+
+Após a correção, passaram 3/3 testes focados no Windows, sem falhas ou ignorados: vínculo/acessibilidade WPF e medição real, persistência do rótulo no SQLite e fixture com 512 registros GPU. Build Release terminou sem avisos/erros. Esta validação não mede ganhos de desempenho e o rótulo não substitui detecção de jogo/OBS.
+
+O pacote de desenvolvimento autocontido `win-x64` foi gerado em `artifacts/phase3-session-label-release-check/zeus-win-x64.zip`; o smoke abriu a janela principal, confirmou resposta e fechou o `.exe` normalmente. É evidência de inicialização do executável, não uma release assinada nem confirmação de todos os fluxos do aplicativo.

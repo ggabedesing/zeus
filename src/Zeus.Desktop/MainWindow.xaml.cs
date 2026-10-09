@@ -85,6 +85,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _wingetSummary = "Consulte atualizações de programas identificadas pela fonte winget. A consulta não instala nada.";
     private string _zeusReleaseSummary = "Consulte manualmente se há uma versão mais recente do ZEUS. Nada será baixado ou instalado.";
     private string _performanceSummary = "Meça por cinco segundos durante a tarefa lenta para observar a carga real.";
+    private string _performanceActivityLabel = string.Empty;
+    private string _performanceSessionHistorySummary = "As sessões salvas aparecem aqui depois da primeira medição.";
     private string _networkProbeTarget = string.Empty;
     private string _networkProbeSummary = "A medição só começa quando você informa um IP ou host e solicita o teste.";
 
@@ -249,6 +251,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _windowsUpdateSummary = "A busca online só começa quando você solicitar. Não baixa nem instala atualizações.";
     public string WindowsUpdateSummary { get => _windowsUpdateSummary; private set => Set(ref _windowsUpdateSummary, value); }
     public string PerformanceSummary { get => _performanceSummary; private set => Set(ref _performanceSummary, value); }
+    public string PerformanceActivityLabel { get => _performanceActivityLabel; set => Set(ref _performanceActivityLabel, value ?? string.Empty); }
+    public string PerformanceSessionHistorySummary { get => _performanceSessionHistorySummary; private set => Set(ref _performanceSessionHistorySummary, value); }
     public string NetworkProbeTarget { get => _networkProbeTarget; set => Set(ref _networkProbeTarget, value); }
     public string NetworkProbeSummary { get => _networkProbeSummary; private set => Set(ref _networkProbeSummary, value); }
     public string CollectionDate => _snapshot is null ? "Leitura pendente" : _snapshot.CollectedAt.ToLocalTime().ToString("dd/MM HH:mm:ss");
