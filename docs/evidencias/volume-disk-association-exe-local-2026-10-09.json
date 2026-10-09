@@ -1,0 +1,51 @@
+{
+  "evidenceType": "windows-volume-to-physical-disk-association-and-portable-exe-smoke",
+  "date": "2026-10-09",
+  "sourceCommit": "646901856ef2266a9a22c81de9c68da3994ccfe8",
+  "sourceTreeDirtyAtBuild": false,
+  "implementation": {
+    "volumeMapping": "Associates drive-letter volumes with disk numbers returned by the Windows Storage provider; multiple physical disks per volume are retained.",
+    "physicalProviderMapping": "Associates Get-PhysicalDisk with Get-Disk only when numeric provider id and friendly name identify exactly one match.",
+    "unknownMapping": "Missing, invalid, virtual, dynamic, or ambiguous provider relationships remain unavailable and generate a warning where applicable.",
+    "ui": "Volume rows and physical disk rows disclose the associated disk numbers when confirmed."
+  },
+  "tests": {
+    "command": "dotnet test Zeus.slnx -c Release --no-restore",
+    "passed": 532,
+    "failed": 0,
+    "skipped": 10,
+    "total": 542,
+    "hardwareTestsPassed": 157,
+    "windowsAcceptancePassed": 88,
+    "windowsAcceptanceSkipped": 2,
+    "coverage": [
+      "Multiple disk numbers per volume, case-insensitive deduplication, and malformed mapping rows",
+      "Missing volume mapping stays unknown",
+      "Disk number persistence and compatibility with older inventory records"
+    ]
+  },
+  "localMachineSample": {
+    "confirmedVolumeMappings": 1,
+    "volumeMappings": ["C: to physical disk #0"],
+    "physicalProviderDiskNumbers": 1,
+    "smartTemperature": "unavailable",
+    "smartWear": "unavailable",
+    "smartPowerOnHours": "unavailable",
+    "smartReadWriteErrors": "unavailable",
+    "repairOrRestoreExecuted": false
+  },
+  "portablePackage": {
+    "path": "artifacts/volume-disk-mapping-6469018/zeus-win-x64.zip",
+    "sha256": "1A60C8B6856FFBFF92638BD53B7E6D04B0E20BC9EA756445162DD03802BF7845",
+    "desktopExePath": "artifacts/volume-disk-mapping-6469018/zeus-win-x64-646901856ef2-20261009T143850891Z-5edf9217/Zeus.Desktop.exe",
+    "desktopExeSha256": "339A2E195D69DC43EA3373FBF351ECEAB3BA366858886CFE52768A24CD0C0E0A",
+    "runtime": "win-x64",
+    "smoke": "Main window opened, responded, and closed cleanly.",
+    "productionAuthenticodeSigned": false
+  },
+  "limitations": [
+    "This PC exposes one volume mapping and one provider disk; multi-disk volume behavior is covered with tests only.",
+    "Storage reliability counters are not exposed by this PC's storage provider and are shown as unavailable.",
+    "The portable executable launch smoke does not measure storage performance or validate SMART counters."
+  ]
+}
