@@ -1,0 +1,23 @@
+{
+  "evidenceType": "desktop-wpf-real-application-acceptance",
+  "date": "2026-10-09",
+  "sourceCommit": "33d4d5212e427da5365e06a63722d110478f68d8",
+  "sourceDirty": false,
+  "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+  "testName": "WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+  "result": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "durationSeconds": 34
+  },
+  "verifiedBehavior": [
+    "The actual WPF application loaded local machine inventory and rendered its workspaces and themes.",
+    "The test produced 21 screenshots, including a compact viewport capture."
+  ],
+  "screenshotDirectory": "artifacts/exe-f15c862/wpf-acceptance-screenshots",
+  "limitations": [
+    "This focused acceptance does not validate every administrative action or measure performance gains.",
+    "No Windows repair, driver installation, or network reset was run."
+  ]
+}
