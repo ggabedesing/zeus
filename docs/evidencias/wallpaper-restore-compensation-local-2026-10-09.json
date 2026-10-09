@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-09",
+  "feature": "compensate partial multi-monitor wallpaper restores",
+  "sourceCommit": "e6a8efc8b5fa1bd13f36778e5ba893565f736ac4",
+  "sourceTreeDirty": false,
+  "focusedTest": {
+    "name": "WallpaperChangeTests.WallpaperRestoreCompensatesEarlierMonitorWhenAnotherMonitorRejectsRestore",
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "result": "After one monitor restored and the next rejected restoration, the first monitor returned to its exact pre-attempt image; journal remained Applied and retryable."
+  },
+  "localReleaseSuite": {
+    "command": "dotnet test Zeus.slnx --configuration Release --no-restore --nologo",
+    "passed": 518,
+    "failed": 0,
+    "skipped": 10,
+    "total": 528
+  },
+  "portablePackage": {
+    "runtime": "win-x64",
+    "sourceTreeDirty": false,
+    "portableExeSmoke": "main window opened, remained responsive, and closed cleanly",
+    "zip": "artifacts/wallpaper-restore-compensation/zeus-win-x64.zip",
+    "zipSha256": "A9F52D1B154BF868740C8B22A7F7B31A384AD43246BF450ED05A28B3E01FDB8E",
+    "exeSha256": "1E944608223060D4D5BD0B704604D4638B364F573410B0B9F92CC468FA1BA816",
+    "productionAuthenticodeSignature": false
+  },
+  "scope": "The multi-monitor rejection and compensation were simulated with fixture images. No real wallpaper, Windows repair, driver, or reboot was changed or run."
+}
