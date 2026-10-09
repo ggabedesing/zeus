@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "a011cf9b5ca97413c5b6d3ae514461f2dc6ebe00",
+  "sourceDirty": false,
+  "releaseBuild": {
+    "configuration": "Release",
+    "warnings": 0,
+    "errors": 0
+  },
+  "tests": {
+    "solution": "Zeus.slnx",
+    "passed": 521,
+    "failed": 0,
+    "skipped": 10,
+    "total": 531,
+    "details": [
+      {
+        "project": "Zeus.Cleanup.Tests",
+        "passed": 35,
+        "skipped": 7
+      },
+      {
+        "project": "Zeus.Core.Tests",
+        "passed": 115,
+        "skipped": 0
+      },
+      {
+        "project": "Zeus.Hardware.Tests",
+        "passed": 155,
+        "skipped": 0
+      },
+      {
+        "project": "Zeus.Maintenance.Protocol.Tests",
+        "passed": 75,
+        "skipped": 0
+      },
+      {
+        "project": "Zeus.Storage.Tests",
+        "passed": 18,
+        "skipped": 0
+      },
+      {
+        "project": "Zeus.UserOptimization.Tests",
+        "passed": 44,
+        "skipped": 1
+      },
+      {
+        "project": "Zeus.Windows.Acceptance.Tests",
+        "passed": 79,
+        "skipped": 2
+      }
+    ]
+  },
+  "wpfAcceptance": {
+    "test": "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+    "result": "passed",
+    "backupButtonUsed": true,
+    "restoreButtonUsed": true,
+    "confirmationRequired": true,
+    "deniedRestoreLeftCurrentStateUntouched": true,
+    "confirmedRestoreRecoveredBackup": true,
+    "preRestoreSafetyCopyVerified": true,
+    "restartRequestedAfterSuccess": true,
+    "restartActuallyPerformed": false
+  },
+  "portablePackage": {
+    "runtime": "win-x64",
+    "package": "artifacts/zeus-win-x64.zip",
+    "developmentBuild": true,
+    "sourceCommit": "a011cf9b5ca97413c5b6d3ae514461f2dc6ebe00",
+    "sourceDirty": false,
+    "zipSha256": "C7286958FD215CB0E31D409381ED3E3459FE558F8AF3304886AECB39B967F33F",
+    "desktopExeSha256": "7E786B56D07B2EEF3A3036FFBE3D1C74504B95352B803AE02BD0F2ED3B0A7C60",
+    "smoke": {
+      "result": "passed",
+      "openedMainWindow": true,
+      "responded": true,
+      "closedCleanly": true
+    }
+  },
+  "limitations": [
+    "File selection, confirmation and restart were injected for the WPF acceptance; native file picker and actual process restart were not exercised.",
+    "Ten tests were skipped for Windows privilege or explicit opt-in requirements.",
+    "Package is unsigned and is not a production release."
+  ]
+}
