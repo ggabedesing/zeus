@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "cd358fde1ffc5bea4fffb93fa063f11328f494dd",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "package": "artifacts/process-core-comparison/zeus-win-x64.zip",
+  "packageSha256": "e4955b046b46628bc2468306cc778b9c1dc9c3b072f438e27018acd165cba299",
+  "desktopExeSha256": "021d7fdb2397245185fb0e302c135b24d16db22cf47ffbdbf4d923652cb00cf6",
+  "portableExeSmoke": {
+    "result": "passed",
+    "openedMainWindow": true,
+    "responded": true,
+    "closedCleanly": true
+  },
+  "tests": {
+    "solution": "Zeus.slnx",
+    "configuration": "Release",
+    "passed": 469,
+    "failed": 0,
+    "skipped": 9,
+    "windowsAcceptancePassed": 57,
+    "focusedEquivalentCoreFormatting": "1 passed",
+    "focusedEquivalentCoreExport": "1 passed"
+  },
+  "notes": [
+    "Equivalent CPU cores are formatted as a count of cores, not as a percentage.",
+    "The localized formatter was verified in pt-BR for fractional, singular, plural, unavailable, and invalid values.",
+    "Package is a development build and is not Authenticode signed for production."
+  ]
+}
