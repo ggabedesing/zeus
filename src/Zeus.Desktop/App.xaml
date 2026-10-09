@@ -101,7 +101,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SelectedTabBrush}" /><Setter Property="Foreground" Value="{DynamicResource SelectedTabTextBrush}" /></Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter TargetName="Surface" Property="BorderThickness" Value="2" /></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>

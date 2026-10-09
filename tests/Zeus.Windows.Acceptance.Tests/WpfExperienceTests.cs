@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Input;
 using System.Text.Json;
 using Zeus.Core;
 using Zeus.Desktop;
@@ -279,6 +280,8 @@ public sealed class WpfExperienceTests
         var firstRunButton = Assert.IsType<Button>(window.FindName("CompleteFirstRunSetupButton"));
         Assert.Equal("complete-first-run-setup", AutomationProperties.GetAutomationId(firstRunButton));
         Assert.True(firstRunButton.IsEnabled);
+        Assert.True(firstRunButton.Focusable && firstRunButton.IsTabStop,
+            "The first-run action must participate in keyboard navigation when its workspace is selected.");
         firstRunButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, firstRunButton));
         var firstRunDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
         while (!window.FirstRunSetupComplete && DateTimeOffset.UtcNow < firstRunDeadline) await Task.Delay(25);
@@ -355,6 +358,11 @@ public sealed class WpfExperienceTests
         Assert.Equal("accent-color-selector", AutomationProperties.GetAutomationId(accentSelector));
         Assert.Equal("Cor de destaque do aplicativo", AutomationProperties.GetName(accentSelector));
         Assert.Equal(6, accentSelector.Items.Count);
+        Assert.True(Keyboard.Focus(themeSelector) == themeSelector, "The theme selector must accept keyboard focus.");
+        window.UpdateLayout();
+        var themeSurface = Assert.IsType<Border>(themeSelector.Template.FindName("ComboSurface", themeSelector));
+        Assert.Equal(new Thickness(2), themeSurface.BorderThickness);
+        Assert.Same(Application.Current.Resources["AccentBrush"], themeSurface.BorderBrush);
         var technicalModeToggle = Assert.IsType<CheckBox>(window.FindName("TechnicalModeToggle"));
         Assert.Equal("technical-mode-toggle", AutomationProperties.GetAutomationId(technicalModeToggle));
         Assert.Equal("Modo técnico: mostrar detalhes adicionais", AutomationProperties.GetName(technicalModeToggle));
@@ -381,6 +389,17 @@ public sealed class WpfExperienceTests
             if (theme == DesktopTheme.Monochrome)
                 Assert.Equal(Color.FromRgb(0xD9, 0xD9, 0xD9), Assert.IsType<SolidColorBrush>(Application.Current.Resources["AccentBrush"]).Color);
             await RenderAsync(window, $"zeus-theme-{theme}.png");
+        }
+        foreach (var theme in Enum.GetValues<DesktopTheme>())
+        foreach (var accent in Enum.GetValues<AppAccentColor>())
+        {
+            window.SelectedTheme = theme;
+            window.SelectedAccentColor = accent;
+            AssertThemeTextContrast("TextBrush", "PanelBrush", 4.5);
+            AssertThemeTextContrast("MutedBrush", "PanelBrush", 4.5);
+            AssertThemeTextContrast("ButtonTextBrush", "ButtonBrush", 4.5);
+            AssertThemeTextContrast("SelectedTabTextBrush", "SelectedTabBrush", 4.5);
+            AssertThemeTextContrast("PrimaryTextBrush", "PrimaryButtonBrush", 4.5);
         }
         foreach (var accent in Enum.GetValues<AppAccentColor>())
         {
@@ -918,6 +937,28 @@ public sealed class WpfExperienceTests
         Assert.False(window.IsVisible, "The main window must finish closing after its activity writes drain.");
         Assert.Empty(Application.Current.Windows.OfType<DesktopClockWindow>());
         Assert.Equal("aurora", (await new DesktopStorage(fixture).ReadPreferencesAsync()).VisualLayoutPresetId);
+    }
+
+    private static void AssertThemeTextContrast(string foregroundKey, string backgroundKey, double minimum)
+    {
+        var foreground = Assert.IsType<SolidColorBrush>(Application.Current.Resources[foregroundKey]).Color;
+        var background = Assert.IsType<SolidColorBrush>(Application.Current.Resources[backgroundKey]).Color;
+        var lighter = Math.Max(RelativeLuminance(foreground), RelativeLuminance(background));
+        var darker = Math.Min(RelativeLuminance(foreground), RelativeLuminance(background));
+        var ratio = (lighter + 0.05) / (darker + 0.05);
+        Assert.True(ratio >= minimum,
+            $"Theme text contrast {foregroundKey} on {backgroundKey} was {ratio:F2}:1; expected at least {minimum:F1}:1.");
+    }
+
+    private static double RelativeLuminance(Color color)
+    {
+        static double Linear(byte channel)
+        {
+            var value = channel / 255d;
+            return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * Linear(color.R) + 0.7152 * Linear(color.G) + 0.0722 * Linear(color.B);
     }
 
     private static async Task RenderAsync(MainWindow window, string fileName)

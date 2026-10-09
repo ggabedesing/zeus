@@ -1,0 +1,42 @@
+{
+  "evidenceType": "wpf-accessibility-contrast-and-portable-exe-smoke",
+  "date": "2026-10-09",
+  "sourceCommit": "bb9bae89c23ce8420a98df718cfb63b84f01864a",
+  "sourceTreeDirtyAtBuild": true,
+  "changes": [
+    "Keyboard focus on workspace tabs now uses a two-pixel accent outline.",
+    "WPF acceptance checks keyboard focus styling and text contrast for all 8 themes and 6 accent settings."
+  ],
+  "tests": {
+    "project": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+    "passed": 72,
+    "failed": 0,
+    "skipped": 2,
+    "total": 74,
+    "skippedReason": "Two protected-session acceptance cases require administrative privileges."
+  },
+  "contrastChecks": {
+    "themeAccentCombinations": 48,
+    "minimumTextContrastRatio": "4.5:1",
+    "pairs": [
+      "TextBrush on PanelBrush",
+      "MutedBrush on PanelBrush",
+      "ButtonTextBrush on ButtonBrush",
+      "SelectedTabTextBrush on SelectedTabBrush",
+      "PrimaryTextBrush on PrimaryButtonBrush"
+    ]
+  },
+  "portablePackage": {
+    "path": "artifacts/accessibility-package/zeus-win-x64.zip",
+    "sha256": "d57696cb02de82dc94a6c8c0e56bbe40d5cc3e6c1cb7f2261b230378563e3a79",
+    "desktopExePath": "artifacts/accessibility-package/zeus-win-x64-bb9bae89c23c-20261009T104417284Z-1e149d00/Zeus.Desktop.exe",
+    "desktopExeSha256": "87396e54c7f5df1d15856dd7294a8ebdf3e2fc0d915ee3ed1d0e119ff695fefe",
+    "runtime": "win-x64",
+    "smoke": "Main window opened, responded, and closed cleanly."
+  },
+  "limitations": [
+    "The package was built from a working tree containing the accessibility changes, before this evidence and code were committed.",
+    "The executable is an unsigned development build, not a production-signed release.",
+    "This acceptance does not validate administrative maintenance actions or measure system-performance gains."
+  ]
+}
