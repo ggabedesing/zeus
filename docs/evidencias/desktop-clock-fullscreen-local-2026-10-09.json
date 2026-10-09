@@ -1,7 +1,7 @@
 {
   "evidenceType": "desktop-clock-fullscreen-protection",
   "date": "2026-10-09",
-  "sourceCommit": "9ebae82d2f5e1dc1c6e5e0f03fa4ea8e94a84faf",
+  "sourceCommit": "3db2bbf32e4ecb6eadb64c9f95af650a0144b9f5",
   "sourceDirty": false,
   "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
   "tests": [
@@ -20,17 +20,18 @@
     "The clock hides only when it is topmost, fullscreen hiding is enabled, and another window covers its monitor.",
     "Legacy clock preferences without this setting default to hiding the clock during fullscreen.",
     "The real WPF acceptance enabled the clock, verified its settings and exercised local foreground window probing.",
-    "A ocultação só ocorre se a janela fullscreen estiver no mesmo monitor identificado para o relógio."
+    "A ocultação só ocorre se a janela fullscreen estiver no mesmo monitor identificado para o relógio.",
+    "A aceitação WPF injetou uma janela fullscreen simulada: verificou que o relógio fica Hidden e retorna a Visible ao sair de fullscreen."
   ],
   "portableExecutableSmoke": {
     "result": "passed",
     "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
     "runtime": "win-x64",
-    "packageDirectory": "artifacts/clock-fullscreen-exe/zeus-win-x64-9ebae82d2f5e-20261009T082640783Z-5b78802e",
+    "packageDirectory": "artifacts/clock-fullscreen-exe/zeus-win-x64-3db2bbf32e4e-20261009T082911156Z-7c98786e",
     "zipPath": "artifacts/clock-fullscreen-exe/zeus-win-x64.zip",
-    "sourceCommit": "9ebae82d2f5e1dc1c6e5e0f03fa4ea8e94a84faf",
+    "sourceCommit": "3db2bbf32e4ecb6eadb64c9f95af650a0144b9f5",
     "sourceDirty": false,
-    "zipSha256": "64721619378e12fee28c7f7ce334a2adeebe4a75509a8fb5ac41250f421c1618"
+    "zipSha256": "994e741d8cbff6cd44a1448670da4998ba04e0c25a0e202fa3a905c959aba6cd"
   },
   "limitations": [
     "Fullscreen geometry was tested with simulated monitor/window rectangles; no real game or video player fullscreen session was tested.",
