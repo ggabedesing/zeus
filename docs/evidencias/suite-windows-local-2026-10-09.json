@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "windows-solution-test-run",
+  "recordedAtUtc": "2026-10-09T07:15:48Z",
+  "sourceCommit": "2c6c4b78c7aafc32bef4fec51b90ab0b13aef1d0",
+  "sourceDirty": false,
+  "sdkVersion": "10.0.401",
+  "configuration": "Release",
+  "solution": "Zeus.slnx",
+  "outcome": "success-with-explicit-skips",
+  "testCounts": {
+    "total": 461,
+    "passed": 452,
+    "failed": 0,
+    "skipped": 9
+  },
+  "projects": [
+    { "name": "Zeus.Core.Tests", "passed": 102, "failed": 0, "skipped": 0 },
+    { "name": "Zeus.Maintenance.Protocol.Tests", "passed": 75, "failed": 0, "skipped": 0 },
+    { "name": "Zeus.Hardware.Tests", "passed": 130, "failed": 0, "skipped": 0 },
+    { "name": "Zeus.UserOptimization.Tests", "passed": 39, "failed": 0, "skipped": 1 },
+    { "name": "Zeus.Storage.Tests", "passed": 18, "failed": 0, "skipped": 0 },
+    { "name": "Zeus.Cleanup.Tests", "passed": 35, "failed": 0, "skipped": 7 },
+    { "name": "Zeus.Windows.Acceptance.Tests", "passed": 53, "failed": 0, "skipped": 1 }
+  ],
+  "skipReasons": [
+    "Seven cleanup security tests require symbolic-link creation, which Windows denied for this process.",
+    "One existing visual-preferences test and one protected-session acceptance test require separate administrative conditions."
+  ],
+  "limitations": [
+    "The skipped symbolic-link tests still require execution by the elevated Windows acceptance job.",
+    "This run does not apply Windows repairs, install drivers, or restart the PC."
+  ]
+}
