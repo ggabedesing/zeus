@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "wpf-shutdown-with-floating-clock",
+  "recordedAtUtc": "2026-10-09T07:04:09Z",
+  "sourceCommit": "672304e5e67205690f3bdd7cb6a5726d875bd0c4",
+  "outcome": "success",
+  "regression": {
+    "priorCommit": "0158e4ba1aadba0973d286284ddefaf120d11bcc",
+    "portableSmoke": "window opened and responded; process did not exit within 15 seconds after CloseMainWindow",
+    "cause": "second close after activity drain did not close the auxiliary desktop clock window"
+  },
+  "fixVerification": {
+    "wpfAcceptanceTest": { "passed": 1, "failed": 0 },
+    "clockWasEnabledDuringClose": true,
+    "mainWindowClosed": true,
+    "floatingClockClosed": true,
+    "releaseBuildWarnings": 0,
+    "releaseBuildErrors": 0,
+    "portableSmoke": "main window opened, responded, and process exited cleanly"
+  },
+  "package": {
+    "runtime": "win-x64",
+    "sourceDirty": false,
+    "productionAuthenticodeSigned": false
+  },
+  "limitations": [
+    "The smoke validates launch and shutdown on this Windows PC; it is not a full hardware, installer, or administrative maintenance acceptance."
+  ]
+}
