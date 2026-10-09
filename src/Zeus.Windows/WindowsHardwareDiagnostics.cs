@@ -53,7 +53,7 @@ public sealed class WindowsHardwareDiagnostics : IHardwareDiagnostics
         var cpuTask = Read<CpuInfo?>("Processador", ReadCpu, null);
         var memoryTask = Read<MemoryInfo?>("Memória", ReadMemory, null);
         var graphicsTask = Read<IReadOnlyList<GpuInfo>>("Placas de vídeo", ReadGraphics, []);
-        var disksTask = Read<IReadOnlyList<DiskInfo>>("Volumes", ReadDisks, []);
+        var disksTask = Read<IReadOnlyList<DiskInfo>>("Volumes", token => ReadDisks(token, warnings), []);
         var startupTask = Read<IReadOnlyList<StartupInfo>>("Inicialização", ReadStartup, []);
         var boardTask = Read<BoardInfo?>("Placa-mãe", ReadBoard, null);
         var biosTask = Read<BiosInfo?>("BIOS", ReadBios, null);
@@ -265,18 +265,47 @@ $inventory = [pscustomobject]@{
         return result;
     }
 
-    private static IReadOnlyList<DiskInfo> ReadDisks(CancellationToken token)
+    private static IReadOnlyList<DiskInfo> ReadDisks(CancellationToken token, ConcurrentQueue<string> warnings)
     {
         var result = new List<DiskInfo>();
-        foreach (var drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed))
+        var drives = DriveInfo.GetDrives();
+        if (drives.Any(drive => GetVolumeType(drive.DriveType) is null))
+            warnings.Enqueue("Volumes: unidades de rede, ópticas e outros tipos não são lidos nesta coleta.");
+        foreach (var drive in drives.Where(d => GetVolumeType(d.DriveType) is not null))
         {
             token.ThrowIfCancellationRequested();
-            if (!drive.IsReady) continue;
-            result.Add(new DiskInfo(string.IsNullOrWhiteSpace(drive.VolumeLabel) ? "Disco local" : drive.VolumeLabel,
-                drive.Name, (ulong)drive.TotalSize, (ulong)drive.AvailableFreeSpace, drive.DriveFormat));
+            try
+            {
+                if (!drive.IsReady)
+                {
+                    warnings.Enqueue($"Volume {drive.Name}: não está pronto; capacidades indisponíveis nesta coleta.");
+                    continue;
+                }
+                var totalBytes = drive.TotalSize;
+                var freeBytes = drive.AvailableFreeSpace;
+                if (totalBytes <= 0 || freeBytes < 0 || freeBytes > totalBytes)
+                {
+                    warnings.Enqueue($"Volume {drive.Name}: capacidade reportada inválida; omitido.");
+                    continue;
+                }
+                result.Add(new DiskInfo(string.IsNullOrWhiteSpace(drive.VolumeLabel) ? "Disco local" : drive.VolumeLabel,
+                    drive.Name, (ulong)totalBytes, (ulong)freeBytes, drive.DriveFormat,
+                    GetVolumeType(drive.DriveType)));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException)
+            {
+                warnings.Enqueue($"Volume {drive.Name}: leitura indisponível; os demais volumes continuam no inventário.");
+            }
         }
         return result;
     }
+
+    internal static string? GetVolumeType(DriveType driveType) => driveType switch
+    {
+        DriveType.Fixed => "Local fixo",
+        DriveType.Removable => "Removível",
+        _ => null
+    };
 
     private static IReadOnlyList<StartupInfo> ReadStartup(CancellationToken token)
     {

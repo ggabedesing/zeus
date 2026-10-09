@@ -77,6 +77,7 @@ public sealed class WindowsInventoryTests
             Assert.True(disk.TotalBytes > 0);
             Assert.InRange(disk.FreeBytes, 0UL, disk.TotalBytes);
             Assert.False(string.IsNullOrWhiteSpace(disk.DriveLetter));
+            Assert.Contains(disk.VolumeType, new[] { "Local fixo", "Removível" });
         });
         Assert.True(snapshot.WindowsInventory is not null, string.Join(" | ", snapshot.Warnings));
         Assert.NotEmpty(snapshot.WindowsInventory.Processes);

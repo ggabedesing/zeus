@@ -1,0 +1,47 @@
+{
+  "evidenceType": "fixed-and-removable-volume-inventory-and-portable-exe-smoke",
+  "date": "2026-10-09",
+  "sourceCommit": "ea6d7b0eb117e0c8a20930317279c5e2f4825b48",
+  "sourceTreeDirtyAtBuild": true,
+  "implementation": {
+    "includedVolumeTypes": ["Local fixo", "Removível"],
+    "excludedVolumeTypes": "Network, optical, and other drive types are excluded and disclosed when present",
+    "unreadyVolume": "Kept out of capacity results with an explicit warning",
+    "invalidCapacity": "Kept out of capacity results with an explicit warning",
+    "perVolumeReadFailure": "Warns for that volume and continues collecting others",
+    "legacyInventory": "Old JSON records without VolumeType deserialize with unknown type"
+  },
+  "tests": {
+    "solutionCommand": "dotnet test Zeus.slnx -c Release --no-restore",
+    "passed": 495,
+    "failed": 0,
+    "skipped": 10,
+    "total": 505,
+    "newCoverage": [
+      "DriveType fixed and removable are included; network, CD-ROM, and RAM drive types are excluded",
+      "VolumeType survives JSON round-trip and older records leave the type unknown",
+      "Actual Windows inventory renders only recognized volume types"
+    ],
+    "skippedReason": "Seven cleanup link tests, two protected-session tests, and one real Windows visual-preference test require privileges or opt-in."
+  },
+  "localMachineSample": {
+    "readyFixedVolumes": 1,
+    "readyRemovableVolumes": 0,
+    "notReadyRemovableVolumes": 0,
+    "excludedTypeVolumes": 0,
+    "note": "No removable volume was attached during this PC validation; removable behavior was verified by tests."
+  },
+  "portablePackage": {
+    "path": "artifacts/volume-inventory-package-final/zeus-win-x64.zip",
+    "sha256": "bd4598cf02b753616be7012185fd2d9dbb20ce6139fa166d727de9d4152b5dee",
+    "desktopExePath": "artifacts/volume-inventory-package-final/zeus-win-x64-ea6d7b0eb117-20261009T112653065Z-e8d0a8a5/Zeus.Desktop.exe",
+    "desktopExeSha256": "caff6af9f485df76d3480e121ba283765824dc6d22ef5551884e77c31658464d",
+    "runtime": "win-x64",
+    "smoke": "Main window opened, responded, and closed cleanly."
+  },
+  "limitations": [
+    "Network, optical, and other volume types remain outside this collector.",
+    "No removable volume was connected to the validation PC, so physical removable-media reading was not observed in this run.",
+    "The portable development build is not signed with a production Authenticode certificate."
+  ]
+}

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.IO;
 using System.Text.Json;
 using Zeus.Windows;
 
@@ -6,6 +7,15 @@ namespace Zeus.Hardware.Tests;
 
 public sealed class StorageProviderTests
 {
+    [Theory]
+    [InlineData(DriveType.Fixed, "Local fixo")]
+    [InlineData(DriveType.Removable, "Removível")]
+    [InlineData(DriveType.Network, null)]
+    [InlineData(DriveType.CDRom, null)]
+    [InlineData(DriveType.Ram, null)]
+    public void VolumeInventoryIncludesFixedAndRemovableTypesOnly(DriveType type, string? expected) =>
+        Assert.Equal(expected, WindowsHardwareDiagnostics.GetVolumeType(type));
+
     [Theory]
     [InlineData("null")]
     [InlineData("0")]

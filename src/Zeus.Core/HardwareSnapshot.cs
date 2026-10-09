@@ -11,7 +11,8 @@ public sealed record DiskInfo(
     string DriveLetter,
     ulong TotalBytes,
     ulong FreeBytes,
-    string FileSystem);
+    string FileSystem,
+    string? VolumeType = null);
 
 public sealed record StartupInfo(string Name, string Location, string User);
 

@@ -12,7 +12,7 @@ public sealed class HardwareCompatibilityTests
             {
               "CollectedAt": "2026-01-01T00:00:00Z", "OperatingSystem": "Windows",
               "ComputerName": "PC", "Cpu": null, "Memory": null, "Graphics": [],
-              "Disks": [], "Startup": [], "Security": null, "Warnings": [],
+              "Disks": [{"Name":"Dados","DriveLetter":"D:\\","TotalBytes":1000,"FreeBytes":250,"FileSystem":"NTFS"}], "Startup": [], "Security": null, "Warnings": [],
               "PhysicalDisks": [{"Name":"NVMe","MediaType":"SSD","BusType":"NVMe","SizeBytes":512000000000,"HealthStatus":"Healthy","TemperatureCelsius":null,"Wear":null}]
             }
             """;
@@ -28,12 +28,14 @@ public sealed class HardwareCompatibilityTests
         Assert.Null(snapshot.MemoryArraySlotsReported);
         Assert.Null(snapshot.WindowsInventory);
         Assert.Null(snapshot.WindowsVersion);
+        Assert.Null(snapshot.Disks[0].VolumeType);
     }
 
     [Fact]
     public void InventoryJsonPreservesUnknownSensorsAndObservedValues()
     {
-        var snapshot = new HardwareSnapshot(DateTimeOffset.UtcNow, "Windows", "PC", null, null, [], [], [], null, [],
+        var snapshot = new HardwareSnapshot(DateTimeOffset.UtcNow, "Windows", "PC", null, null, [],
+            [new DiskInfo("USB", "E:\\", 1000, 500, "exFAT", "Removível")], [], null, [],
             new BoardInfo("Fabricante", "Modelo"), new BiosInfo("Fabricante", "1.0", null),
             [new MemoryModuleInfo("ChannelA-DIMM0", 8UL * 1024 * 1024 * 1024, null, "Fabricante", 1, 2)],
             [new PhysicalDiskInfo("NVMe", "SSD", "NVMe", 512UL * 1024 * 1024 * 1024, "Healthy", null, null),
@@ -53,6 +55,7 @@ public sealed class HardwareCompatibilityTests
         Assert.Equal((ushort)2, restored.MemoryModules[0].InterleaveDataDepth);
         Assert.Null(restored.Batteries![0].ChargePercent);
         Assert.Equal(1_000_000_000UL, restored.NetworkAdapters![0].SpeedBitsPerSecond);
+        Assert.Equal("Removível", restored.Disks[0].VolumeType);
         Assert.Null(restored.Bios!.ReleaseDate);
         Assert.Equal(4, restored.MemoryArraySlotsReported);
     }
