@@ -1,0 +1,35 @@
+{
+  "evidenceType": "visual-style-catalog-and-portable-package",
+  "date": "2026-10-09",
+  "sourceCommit": "feb695f86a5e9fb241a113aa455e7f73586f6046",
+  "sourceTreeCleanAtPackageBuild": true,
+  "changes": [
+    "Expanded the ZEUS-only style catalog from four to nine reviewed presets.",
+    "Added RetroAmber and Monochrome palettes and Gamer Neon, Cyberpunk, Terminal green, Retro amber, and Monochrome presets.",
+    "Changing the theme or accent now updates the status message and keeps the ZEUS-only scope explicit."
+  ],
+  "tests": {
+    "project": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+    "cases": [
+      "WpfExperienceTests.VisualLayoutCatalogLoadsVersionedDataAndRejectsExecutableFields",
+      "WpfExperienceTests.ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme"
+    ],
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "renderedThemeScreenshots": 8,
+    "screenshotsRemainLocal": true
+  },
+  "portablePackage": {
+    "path": "artifacts/visual-style-final-package/zeus-win-x64.zip",
+    "sha256": "4052ac8feafc4167e17cfd17a9623aa14f552828eaa41b4d455721469bf59e82",
+    "desktopExeSha256": "ed28a7af6052948a12c8b94d8c4ddd531e946fd92e0287e396a5d948e4230b4c",
+    "runtime": "win-x64",
+    "developmentBuild": true,
+    "smoke": "main window opened, responded, and closed cleanly"
+  },
+  "limitations": [
+    "These presets change only the ZEUS interface; they do not modify Windows wallpaper, taskbar, Start, system animations, or other desktop settings.",
+    "The development package is not signed with a production Authenticode certificate."
+  ]
+}
