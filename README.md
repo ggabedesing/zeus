@@ -6,6 +6,8 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 
 O [histórico de versões](CHANGELOG.md) registra as mudanças entregues. A versão exibida no aplicativo vem dos metadados incorporados ao executável; o pacote também informa a versão, o commit de origem e os hashes em `build-info.json`.
 
+O [processo de release](docs/release-process.md) descreve como tags validadas podem gerar um rascunho de release com executáveis e MSI Authenticode assinados. Builds atuais continuam sendo de desenvolvimento; ainda não há certificado de produção configurado.
+
 ## Recursos
 
 | Área | O que o aplicativo faz |

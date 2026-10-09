@@ -3,6 +3,7 @@ name: Build and validate ZEUS
 on:
   push:
     branches: [main, 'feat/**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -281,3 +282,92 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not commit sanitized evidence.' }
           git push origin "HEAD:refs/heads/$branch"
           if ($LASTEXITCODE -ne 0) { throw 'Git evidence return failed; the Actions evidence artifact is still available.' }
+
+  release:
+    name: Sign and stage a ZEUS release
+    needs: [core, windows]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && needs.core.result == 'success' && needs.windows.result == 'success' }}
+    runs-on: windows-latest
+    environment: zeus-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Require a validated main-branch commit and derive release versions
+        shell: pwsh
+        run: |
+          git fetch origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Could not fetch main for release ancestry verification.' }
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Release tags must point to a commit already present on main.' }
+          if ($env:GITHUB_REF_NAME -notmatch '^v(?<version>(?<major>\d{1,3})\.(?<minor>\d{1,3})\.(?<patch>\d{1,3}))$') {
+            throw 'Release tags must use vMAJOR.MINOR.PATCH with numeric fields.'
+          }
+          foreach ($part in @($Matches.major, $Matches.minor, $Matches.patch)) {
+            if ([int]$part -gt 255) { throw 'Each Windows Installer version field must be 255 or lower.' }
+          }
+          $version = $Matches.version
+          $major = [int]$Matches.major
+          $minor = [int]$Matches.minor
+          $patch = [int]$Matches.patch
+          if ($major -gt 0) { $previous = "$($major - 1).255.255" }
+          elseif ($minor -gt 0) { $previous = "$major.$($minor - 1).255" }
+          elseif ($patch -gt 0) { $previous = "$major.$minor.$($patch - 1)" }
+          else { throw 'A release at v0.0.0 has no lower MSI version for upgrade validation.' }
+          "ZEUS_PRODUCT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ZEUS_PREVIOUS_VERSION=$previous" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build, sign, test, and create a draft release
+        shell: pwsh
+        env:
+          ZEUS_SIGNING_PFX_BASE64: ${{ secrets.ZEUS_SIGNING_PFX_BASE64 }}
+          ZEUS_SIGNING_PFX_PASSWORD: ${{ secrets.ZEUS_SIGNING_PFX_PASSWORD }}
+          ZEUS_SIGNING_CERTIFICATE_THUMBPRINT: ${{ vars.ZEUS_SIGNING_CERTIFICATE_THUMBPRINT }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          foreach ($name in @('ZEUS_SIGNING_PFX_BASE64', 'ZEUS_SIGNING_PFX_PASSWORD', 'ZEUS_SIGNING_CERTIFICATE_THUMBPRINT')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "The zeus-release environment must define $name before a signed release can be built."
+            }
+          }
+          $signingDirectory = Join-Path $env:RUNNER_TEMP 'zeus-signing-material'
+          New-Item -ItemType Directory -Path $signingDirectory -Force | Out-Null
+          $pfxPath = Join-Path $signingDirectory 'zeus-code-signing.pfx'
+          try {
+            $pfxBytes = [Convert]::FromBase64String($env:ZEUS_SIGNING_PFX_BASE64)
+            [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+            [Array]::Clear($pfxBytes, 0, $pfxBytes.Length)
+            $unsignedRoot = Join-Path $env:RUNNER_TEMP 'zeus-release-unsigned'
+            ./scripts/publish-windows.ps1 -Runtime win-x64 -ProductVersion $env:ZEUS_PRODUCT_VERSION -OutputRoot $unsignedRoot
+            if ($LASTEXITCODE -ne 0) { throw 'Release payload build or portable application smoke failed.' }
+            $payload = Get-ChildItem -LiteralPath $unsignedRoot -Directory -Filter 'zeus-win-x64-*' | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+            if ($null -eq $payload) { throw 'The clean x64 release payload was not generated.' }
+            $releaseDirectory = Join-Path $env:RUNNER_TEMP 'zeus-release-signed'
+            ./scripts/sign-windows-release.ps1 -PayloadDirectory $payload.FullName -ProductVersion $env:ZEUS_PRODUCT_VERSION `
+              -CertificatePath $pfxPath -CertificatePassword $env:ZEUS_SIGNING_PFX_PASSWORD `
+              -ExpectedThumbprint $env:ZEUS_SIGNING_CERTIFICATE_THUMBPRINT -OutputDirectory $releaseDirectory
+            if ($LASTEXITCODE -ne 0) { throw 'Authenticode signing, verification, timestamp, or signed MSI build failed.' }
+            $previousMsiDirectory = Join-Path $env:RUNNER_TEMP 'zeus-release-previous-msi'
+            ./scripts/build-installer.ps1 -PayloadDirectory $payload.FullName -ProductVersion $env:ZEUS_PREVIOUS_VERSION -OutputDirectory $previousMsiDirectory
+            if ($LASTEXITCODE -ne 0) { throw 'The previous-version MSI fixture could not be built.' }
+            $installerLogs = Join-Path $env:RUNNER_TEMP 'zeus-release-installer-smoke'
+            ./scripts/test-installer-windows.ps1 -PreviousInstaller (Join-Path $previousMsiDirectory 'Zeus.Installer.msi') `
+              -CurrentInstaller (Join-Path $releaseDirectory 'Zeus.Installer.msi') -ExpectedVersion $env:ZEUS_PRODUCT_VERSION -LogDirectory $installerLogs
+            if ($LASTEXITCODE -ne 0) { throw 'The signed MSI install, upgrade, launch, data-preservation, or uninstall check failed.' }
+            gh release create $env:GITHUB_REF_NAME `
+              (Join-Path $releaseDirectory 'zeus-win-x64.zip') `
+              (Join-Path $releaseDirectory 'zeus-win-x64.zip.sha256') `
+              (Join-Path $releaseDirectory 'Zeus.Installer.msi') `
+              (Join-Path $releaseDirectory 'Zeus.Installer.msi.sha256') `
+              (Join-Path $releaseDirectory 'build-info.json') `
+              --draft --title "ZEUS $env:ZEUS_PRODUCT_VERSION" --generate-notes --target $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the draft release; signed artifacts remain in the runner workspace.' }
+          }
+          finally {
+            if (Test-Path -LiteralPath $pfxPath) { Remove-Item -LiteralPath $pfxPath -Force }
+            if ($null -ne $pfxBytes) { [Array]::Clear($pfxBytes, 0, $pfxBytes.Length) }
+          }

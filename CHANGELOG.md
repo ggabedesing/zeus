@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- O pipeline de release agora bloqueia versões sem certificado fixado e testes completos; tags validadas podem gerar apenas um rascunho, com binários e MSI assinados, hashes atualizados e revisão manual antes da publicação.
 - A aba Atualizações permite consultar manualmente a versão estável publicada do ZEUS no GitHub; comparar versão não baixa nem instala arquivos, e a abertura da publicação pede confirmação.
 - A aparência do ZEUS agora permite escolher entre seis cores de destaque além do padrão de cada tema; a preferência é salva no SQLite e o alto contraste do Windows continua prevalecendo.
 - Novo tema claro para leitura, com cores próprias para avisos, registros e botões.
