@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "elevated-windows-acceptance",
+  "recordedAtUtc": "2026-10-09T16:26:00Z",
+  "sourceCommit": "9139a44694317ab6c623683dc6cac32fbfce5821",
+  "sourceDirty": false,
+  "administrator": true,
+  "sdk": "10.0.401",
+  "acceptance": {
+    "accepted": true,
+    "total": 544,
+    "passed": 544,
+    "failed": 0,
+    "skipped": 0,
+    "screenshots": 24,
+    "projects": {
+      "Zeus.Cleanup.Tests": 42,
+      "Zeus.Core.Tests": 115,
+      "Zeus.Hardware.Tests": 157,
+      "Zeus.Maintenance.Protocol.Tests": 75,
+      "Zeus.Storage.Tests": 18,
+      "Zeus.UserOptimization.Tests": 46,
+      "Zeus.Windows.Acceptance.Tests": 91
+    }
+  },
+  "releaseBuild": { "succeeded": true, "warnings": 0, "errors": 0 },
+  "realWindowsApplyRestoreTests": {
+    "visualPreferences": "passed; original animation and transparency values restored; active power plan unchanged",
+    "wallpaper": "passed; original wallpaper hashes on attached monitors and position restored",
+    "restoreSafety": "test finally paths retain recovery attempts and restore original values"
+  },
+  "maintenancePerformed": {
+    "temporaryUserVisualSettingsAppliedAndRestored": true,
+    "temporaryWallpaperAppliedAndRestored": true,
+    "systemRepair": false,
+    "driverInstallOrRollback": false,
+    "restorePoint": false,
+    "offlineScan": false,
+    "restart": false
+  },
+  "limitations": [
+    "The test script reused Release binaries built before this run; a separate Release build of this exact source commit also passed with zero warnings and errors.",
+    "Passing tests validate these scenarios on this Windows installation, not every device model, Windows build, policy, wallpaper arrangement, or driver class.",
+    "The acceptance report does not validate system repair results, driver installation, restart recovery, or performance gains."
+  ]
+}
