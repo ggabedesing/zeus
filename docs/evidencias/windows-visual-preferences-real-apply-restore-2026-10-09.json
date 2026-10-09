@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-09",
+  "test": "WindowsVisualPreferencesTests.RealUserVisualSettingsAreBackedUpAppliedAndRestored",
+  "project": "tests/Zeus.UserOptimization.Tests/Zeus.UserOptimization.Tests.csproj",
+  "sourceCommit": "1399f258036c1c55e6ff47922d9aa9819b1aaf17",
+  "focusedResult": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "observed": {
+    "realCurrentUserAnimationSetting": "captured before apply and matched after restore",
+    "realCurrentUserTransparencyRegistryValue": "original existence, type, and value matched after restore",
+    "maintenanceJournal": "applied entry restored and marked Restored",
+    "activePowerPlan": "unchanged",
+    "elevation": "not required",
+    "cleanup": "fixture restored exact original values in finally"
+  },
+  "scope": "The test temporarily changed the current user's animation and transparency preferences and restored the captured state before passing. It did not run DISM/SFC, install a driver, reboot, or change the wallpaper."
+}
