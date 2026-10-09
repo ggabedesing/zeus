@@ -22,6 +22,17 @@
       "resolution": "Compare rendered physical disk rows in provider order and assert each disk number instead of selecting a row by model name."
     }
   },
+  "windowsCi": {
+    "runNumber": 285,
+    "runUrl": "https://github.com/ggabedesing/zeus/actions/runs/37948787900",
+    "conclusion": "success",
+    "accepted": true,
+    "testCounts": { "total": 543, "passed": 543, "failed": 0, "skipped": 0 },
+    "build": "success",
+    "readOnlyWindowsDiagnostic": "success",
+    "portablePackageAndExeSmoke": "success",
+    "msiInstallUpgradeUninstall": "success"
+  },
   "localMachineSample": {
     "confirmedVolumeMappings": 1,
     "volumeMappings": ["C: to physical disk #0"],
