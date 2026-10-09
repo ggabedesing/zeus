@@ -1,0 +1,25 @@
+{
+  "evidenceType": "portable-application-launch-smoke",
+  "date": "2026-10-09",
+  "sourceCommit": "f15c862d895d76d0f0428b409171935e0e231b61",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "productVersion": "1.0.0",
+  "developmentBuild": true,
+  "portableExecutableSmoke": {
+    "result": "passed",
+    "openedMainWindow": true,
+    "responded": true,
+    "closedCleanly": true
+  },
+  "package": {
+    "directory": "artifacts/exe-f15c862/zeus-win-x64-f15c862d895d-20261009T092716742Z-b19a798e",
+    "zipPath": "artifacts/exe-f15c862/zeus-win-x64.zip",
+    "zipSha256": "3bd04991a532a76335f45c730ec9e7ca5f6f34692bf4e3e5b3220819d14191a2",
+    "desktopExeSha256": "cb380204431f17d6326acce0a1f780a15c48185ae42e08cb6ce3aa784ad8dadc"
+  },
+  "limitations": [
+    "This smoke verifies startup, responsiveness, and normal close of the packaged executable; it does not verify every application workflow.",
+    "The development package is not signed with production Authenticode."
+  ]
+}
