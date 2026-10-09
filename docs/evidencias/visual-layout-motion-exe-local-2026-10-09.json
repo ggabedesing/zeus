@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "collectedAtLocal": "2026-10-09T13:05:02-03:00",
+  "sourceCommit": "a4c73c03beba5cbeaa721bbf38fe270b6f37163b",
+  "sourceDirty": false,
+  "change": {
+    "setting": "ZEUS visual layout and reduced motion",
+    "presetField": "reduceZeusMotion",
+    "builtInReducedMotionPresets": ["minimalista", "terminal"],
+    "optionalFieldPreservesCurrentPreference": true,
+    "previewIsTemporaryUntilConfirmation": true,
+    "cancelRestoresSavedPreference": true,
+    "windowsAnimationPreferencesChanged": false,
+    "windowsHighContrastAndReducedMotionRemainRespected": true
+  },
+  "verification": {
+    "releaseBuild": { "succeeded": true, "warnings": 0, "errors": 0 },
+    "focusedWpfAcceptance": { "passed": 33, "failed": 0, "skipped": 0 },
+    "fullSolutionTests": { "total": 544, "passed": 533, "failed": 0, "skipped": 11 },
+    "wpfAcceptance": { "total": 91, "passed": 89, "failed": 0, "skipped": 2 },
+    "skippedReasons": ["administrator privileges required", "opt-in real Windows preference or wallpaper changes"],
+    "portablePackage": {
+      "runtime": "win-x64",
+      "sourceDirty": false,
+      "windowOpened": true,
+      "windowResponded": true,
+      "closedNormally": true,
+      "zip": "artifacts/visual-motion-exe/zeus-win-x64.zip",
+      "zipSha256": "A14783CD0F7EDB2CD04ED1454DFDBFE8C596BC26863CD1A3347C61563F71BB50",
+      "executable": "artifacts/visual-motion-exe/zeus-win-x64-a4c73c03beba-20261009T160502335Z-c4ca4087/Zeus.Desktop.exe",
+      "executableSha256": "AF08B74455B9F4F9A85F6FA2E709DAE76A305E89D3F52C887EC81C531A5948CA"
+    }
+  },
+  "productionAuthenticodeSignature": false
+}
