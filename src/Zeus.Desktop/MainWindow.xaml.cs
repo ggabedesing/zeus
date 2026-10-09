@@ -136,6 +136,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     internal static int ResolveHardwareCardColumns(double availableWidth) =>
         !double.IsFinite(availableWidth) || availableWidth <= 0 ? 3 : availableWidth < 520 ? 1 : availableWidth < 840 ? 2 : 3;
 
+    internal static HardwareCard CreateGraphicsOverviewCard(IReadOnlyList<GpuInfo> graphics)
+    {
+        if (graphics.Count == 0)
+            return new("Placas de vídeo", "Indisponível", "O Windows não retornou adaptadores nesta coleta.");
+
+        if (graphics.Count == 1)
+            return new("Placas de vídeo", Available(graphics[0].Name), $"1 adaptador · Driver {Available(graphics[0].DriverVersion)}");
+
+        var shown = graphics.Take(3)
+            .Select(gpu => $"{Available(gpu.Name)} · Driver {Available(gpu.DriverVersion)}")
+            .ToList();
+        var remaining = graphics.Count - shown.Count;
+        if (remaining > 0) shown.Add($"+ {remaining} adaptador(es) na aba Hardware.");
+        return new("Placas de vídeo", $"{graphics.Count} adaptadores identificados", string.Join(Environment.NewLine, shown));
+    }
+
     public HardwareSnapshot? Snapshot => _snapshot;
     public string BuildVersion { get; } = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "Indisponível";
     public OptimizationPlan? FormalOptimizationPlan => _optimizationPlan;
@@ -544,8 +560,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         HardwareCards.Add(new("Processador", cpu?.Name ?? "Indisponível", cpu is null ? "O Windows não retornou esta leitura." : $"{cpu.PhysicalCores} núcleos · {cpu.LogicalProcessors} processadores lógicos"));
         var memory = snapshot.Memory;
         HardwareCards.Add(new("Memória RAM", memory is null ? "Indisponível" : ByteFormatting.Format(memory.TotalBytes), memory is null ? "Leitura indisponível." : $"{ByteFormatting.Format(memory.AvailableBytes)} disponíveis nesta leitura"));
-        var gpu = snapshot.Graphics.FirstOrDefault();
-        HardwareCards.Add(new("Placas de vídeo", gpu?.Name ?? "Indisponível", gpu is null ? "Nenhum dispositivo retornado." : $"{snapshot.Graphics.Count} dispositivo(s) · Driver {Available(gpu.DriverVersion)}"));
+        HardwareCards.Add(CreateGraphicsOverviewCard(snapshot.Graphics));
         HardwareCards.Add(new("Armazenamento", $"{snapshot.Disks.Count} volume(s)", "Espaço livre e dispositivos físicos em Hardware."));
         HardwareCards.Add(new("Microsoft Defender", BooleanStatus(snapshot.Security?.DefenderEnabled), snapshot.Security?.Summary ?? "Consulte Segurança do Windows."));
         HardwareCards.Add(new("Placa-mãe", snapshot.Board?.Product ?? "Indisponível", snapshot.Board?.Manufacturer ?? "A placa não foi identificada nesta coleta."));

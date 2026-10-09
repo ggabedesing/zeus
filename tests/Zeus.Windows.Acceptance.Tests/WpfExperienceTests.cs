@@ -50,6 +50,39 @@ public sealed class WpfExperienceTests
     }
 
     [Fact]
+    public void GraphicsOverviewDoesNotTreatTheFirstReturnedAdapterAsPrimary()
+    {
+        var card = MainWindow.CreateGraphicsOverviewCard(
+        [
+            new GpuInfo("Virtual display adapter", "1.2.3"),
+            new GpuInfo("NVIDIA GeForce GTX 960", "572.16")
+        ]);
+
+        Assert.Equal("2 adaptadores identificados", card.Value);
+        Assert.Contains("Virtual display adapter · Driver 1.2.3", card.Detail, StringComparison.Ordinal);
+        Assert.Contains("NVIDIA GeForce GTX 960 · Driver 572.16", card.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GraphicsOverviewKeepsMissingAndAdditionalAdaptersExplicit()
+    {
+        var unavailable = MainWindow.CreateGraphicsOverviewCard([]);
+        Assert.Equal("Indisponível", unavailable.Value);
+        Assert.Contains("não retornou adaptadores", unavailable.Detail, StringComparison.OrdinalIgnoreCase);
+
+        var many = MainWindow.CreateGraphicsOverviewCard(
+        [
+            new GpuInfo("Adapter A", "1"),
+            new GpuInfo("Adapter B", "2"),
+            new GpuInfo("Adapter C", "3"),
+            new GpuInfo("Adapter D", "4")
+        ]);
+        Assert.Equal("4 adaptadores identificados", many.Value);
+        Assert.Contains("+ 1 adaptador(es) na aba Hardware.", many.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Adapter D", many.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WindowMinimumSizeFitsSmallWorkAreasWithoutContradictingMaximumSize()
     {
         var minimum = MainWindow.ClampMinimumWindowSize(new Size(900, 600), new Size(800, 450));
@@ -308,6 +341,8 @@ public sealed class WpfExperienceTests
         }
         Assert.NotEmpty(window.HardwareCards);
         Assert.NotNull(window.Snapshot);
+        Assert.Equal(MainWindow.CreateGraphicsOverviewCard(window.Snapshot.Graphics),
+            Assert.Single(window.HardwareCards, card => card.Title == "Placas de vídeo"));
         Assert.NotEmpty(window.DeviceRepairSummary);
         Assert.NotEmpty(window.EventDiagnosticSummary);
         if (window.Snapshot.WindowsInventory?.NetworkConfiguration.Count > 0)
