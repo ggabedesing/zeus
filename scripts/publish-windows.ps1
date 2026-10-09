@@ -43,7 +43,7 @@ function Test-PortableApplicationLaunch([string]$Executable, [string]$WorkingDir
     Write-Output 'Portable application smoke passed: main window opened, responded, and closed cleanly.'
 }
 
-function Add-ThirdPartyNotices([string]$Destination, [string]$Repository) {
+function Add-ThirdPartyNotices([string]$Destination, [string]$Repository, [string]$Runtime, [string]$ProductVersion, [string]$SourceCommit, [string]$BuildId) {
     $dotnetCommand = Get-Command dotnet -CommandType Application -ErrorAction Stop
     $dotnetNotices = Join-Path (Split-Path -Parent $dotnetCommand.Source) 'ThirdPartyNotices.txt'
     if (!(Test-Path -LiteralPath $dotnetNotices -PathType Leaf)) {
@@ -62,6 +62,9 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository) {
 
     $dependencies = @{}
     $runtimePacks = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $projectComponents = @{}
+    $dependencyGraphs = [System.Collections.Generic.List[object]]::new()
+    $supportedLibraryKeys = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($depsFile in @('Zeus.Desktop.deps.json', 'Zeus.Maintenance.deps.json')) {
         $depsPath = Join-Path $Destination $depsFile
         if (!(Test-Path -LiteralPath $depsPath -PathType Leaf)) { throw "Required dependency manifest missing: $depsFile" }
@@ -69,6 +72,18 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository) {
         foreach ($library in $deps.libraries.PSObject.Properties) {
             if ($library.Value.type -eq 'runtimepack') {
                 [void]$runtimePacks.Add($library.Name)
+                [void]$supportedLibraryKeys.Add($library.Name)
+                continue
+            }
+            if ($library.Value.type -eq 'project') {
+                $separator = $library.Name.LastIndexOf('/')
+                if ($separator -le 0) { throw "Invalid project identity in ${depsFile}: $($library.Name)" }
+                $projectComponents[$library.Name] = [pscustomobject]@{
+                    LibraryKey = $library.Name
+                    Id = $library.Name.Substring(0, $separator)
+                    Version = $library.Name.Substring($separator + 1)
+                }
+                [void]$supportedLibraryKeys.Add($library.Name)
                 continue
             }
             if ($library.Value.type -ne 'package') { continue }
@@ -78,13 +93,16 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository) {
             $version = $library.Name.Substring($separator + 1)
             $key = "$id/$version"
             $dependencies[$key] = [pscustomobject]@{ Id = $id; Version = $version }
+            [void]$supportedLibraryKeys.Add($library.Name)
         }
+        $dependencyGraphs.Add($deps.targets.PSObject.Properties[$deps.runtimeTarget.name].Value)
     }
 
     $licenseDirectory = Join-Path $Destination 'licenses'
     New-Item -ItemType Directory -Path $licenseDirectory -Force | Out-Null
     $rows = [System.Collections.Generic.List[string]]::new()
     $licenseExpressions = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $licenseByPackage = @{}
     foreach ($package in @($dependencies.Values | Sort-Object Id, Version)) {
         $packageDirectory = Join-Path $globalPackages (Join-Path $package.Id.ToLowerInvariant() $package.Version)
         if (!(Test-Path -LiteralPath $packageDirectory -PathType Container)) {
@@ -103,6 +121,7 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository) {
             }
             [void]$licenseExpressions.Add($expression)
             $licenseText = "licenses/$expression.txt"
+            $licenseByPackage["$($package.Id)/$($package.Version)"] = $expression
         } elseif ($licenseType -eq 'file') {
             $licenseRelativePath = $license.InnerText.Trim()
             $licenseSource = Join-Path $packageDirectory $licenseRelativePath
@@ -111,6 +130,7 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository) {
             }
             $licenseText = "licenses/NuGet-$($package.Id)-$($package.Version).txt"
             Copy-Item -LiteralPath $licenseSource -Destination (Join-Path $Destination $licenseText)
+            $licenseByPackage["$($package.Id)/$($package.Version)"] = 'NOASSERTION'
         } else {
             throw "Unsupported NuGet license metadata for $($package.Id) $($package.Version)."
         }
@@ -146,6 +166,118 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository) {
         '| --- | --- | --- | --- |'
     ) + @($rows)
     $noticeText | Set-Content -LiteralPath (Join-Path $Destination 'THIRD-PARTY-NOTICES.md') -Encoding utf8
+
+    # Emit a machine-readable SPDX inventory from the exact package and project
+    # graphs in the two published .deps.json files. Runtime packs are reported
+    # separately from ordinary NuGet libraries because .NET labels them so.
+    $spdxComponents = [System.Collections.Generic.List[object]]::new()
+    $componentByLibrary = @{}
+    foreach ($project in @($projectComponents.Values | Sort-Object Id, Version)) {
+        $componentByLibrary[$project.LibraryKey] = [ordered]@{
+            name = $project.Id
+            SPDXID = 'SPDXRef-' + [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($project.LibraryKey))).ToLowerInvariant()
+            versionInfo = $project.Version
+            downloadLocation = 'NOASSERTION'
+            filesAnalyzed = $false
+            licenseConcluded = 'NOASSERTION'
+            licenseDeclared = 'NOASSERTION'
+            copyrightText = 'NOASSERTION'
+            externalRefs = @(@{ referenceCategory = 'PACKAGE-MANAGER'; referenceType = 'purl'; referenceLocator = "pkg:generic/$($project.Id.ToLowerInvariant())@$($project.Version)" })
+        }
+    }
+    foreach ($package in @($dependencies.Values | Sort-Object Id, Version)) {
+        $libraryKey = "$($package.Id)/$($package.Version)"
+        $packageUrl = "https://www.nuget.org/packages/$($package.Id)/$($package.Version)"
+        $componentByLibrary[$libraryKey] = [ordered]@{
+            name = $package.Id
+            SPDXID = 'SPDXRef-' + [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($libraryKey))).ToLowerInvariant()
+            versionInfo = $package.Version
+            downloadLocation = $packageUrl
+            filesAnalyzed = $false
+            licenseConcluded = 'NOASSERTION'
+            licenseDeclared = $licenseByPackage[$libraryKey]
+            copyrightText = 'NOASSERTION'
+            externalRefs = @(@{ referenceCategory = 'PACKAGE-MANAGER'; referenceType = 'purl'; referenceLocator = "pkg:nuget/$($package.Id)@$($package.Version)" })
+        }
+    }
+    foreach ($runtimePack in @($runtimePacks | Sort-Object)) {
+        $separator = $runtimePack.LastIndexOf('/')
+        if ($separator -le 0 -or !$runtimePack.StartsWith('runtimepack.', [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Invalid runtime pack identity in dependency manifest: $runtimePack"
+        }
+        $packageId = $runtimePack.Substring('runtimepack.'.Length, $separator - 'runtimepack.'.Length)
+        $version = $runtimePack.Substring($separator + 1)
+        $packageDirectory = Join-Path $globalPackages (Join-Path $packageId.ToLowerInvariant() $version)
+        $nuspec = Get-ChildItem -LiteralPath $packageDirectory -Filter '*.nuspec' -File | Select-Object -First 1
+        if ($null -eq $nuspec) { throw "Runtime pack has no NuGet license metadata: $runtimePack" }
+        [xml]$runtimeMetadata = Get-Content -LiteralPath $nuspec.FullName -Raw -Encoding UTF8
+        $runtimeLicense = $runtimeMetadata.package.metadata.license
+        if ($null -eq $runtimeLicense) { throw "Runtime pack has no declared license metadata: $runtimePack" }
+        if ($runtimeLicense.GetAttribute('type') -ne 'expression' -or $runtimeLicense.InnerText.Trim() -notin @('MIT', 'Apache-2.0')) {
+            throw "Unreviewed runtime pack SPDX expression for $runtimePack."
+        }
+        $libraryKey = $runtimePack
+        $componentByLibrary[$libraryKey] = [ordered]@{
+            name = $packageId
+            SPDXID = 'SPDXRef-' + [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($libraryKey))).ToLowerInvariant()
+            versionInfo = $version
+            downloadLocation = "https://www.nuget.org/packages/$packageId/$version"
+            filesAnalyzed = $false
+            licenseConcluded = 'NOASSERTION'
+            licenseDeclared = $runtimeLicense.InnerText.Trim()
+            copyrightText = 'NOASSERTION'
+            externalRefs = @(@{ referenceCategory = 'PACKAGE-MANAGER'; referenceType = 'purl'; referenceLocator = "pkg:nuget/$packageId@$version" })
+        }
+    }
+    foreach ($component in $componentByLibrary.Values) { $spdxComponents.Add($component) }
+    foreach ($libraryKey in $supportedLibraryKeys) {
+        if (!$componentByLibrary.ContainsKey($libraryKey)) { throw "SPDX inventory omitted published dependency $libraryKey." }
+    }
+
+    $spdxRelationships = [System.Collections.Generic.List[object]]::new()
+    $relationshipKeys = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($root in @('Zeus.Desktop', 'Zeus.Maintenance')) {
+        $rootComponent = @($componentByLibrary.Values | Where-Object name -eq $root | Select-Object -First 1)
+        if ($rootComponent.Count -ne 1) { throw "SPDX inventory is missing first-party application $root." }
+        $spdxRelationships.Add(@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $rootComponent[0].SPDXID })
+    }
+    foreach ($graph in $dependencyGraphs) {
+        foreach ($library in $graph.PSObject.Properties) {
+            if (!$componentByLibrary.ContainsKey($library.Name) -or $null -eq $library.Value.dependencies) { continue }
+            foreach ($dependency in $library.Value.dependencies.PSObject.Properties) {
+                $dependencyKey = "$($dependency.Name)/$($dependency.Value)"
+                if (!$componentByLibrary.ContainsKey($dependencyKey)) { throw "SPDX dependency relationship target is missing: $dependencyKey" }
+                $sourceSpdxId = [string]$componentByLibrary[$library.Name].SPDXID
+                $targetSpdxId = [string]$componentByLibrary[$dependencyKey].SPDXID
+                $relationshipKey = "$sourceSpdxId|$targetSpdxId"
+                if ($relationshipKeys.Add($relationshipKey)) {
+                    $spdxRelationships.Add(@{ spdxElementId = $sourceSpdxId; relationshipType = 'DEPENDS_ON'; relatedSpdxElement = $targetSpdxId })
+                }
+            }
+        }
+    }
+    if ($spdxComponents.Count -eq 0 -or $spdxRelationships.Count -le 2) { throw 'SPDX inventory is incomplete: package components or dependency relationships are missing.' }
+    $spdxDocument = [ordered]@{
+        spdxVersion = 'SPDX-2.3'
+        dataLicense = 'CC0-1.0'
+        SPDXID = 'SPDXRef-DOCUMENT'
+        name = "ZEUS $ProductVersion $Runtime"
+        documentNamespace = "https://spdx.org/spdxdocs/zeus-$Runtime-$ProductVersion-$SourceCommit-$BuildId"
+        creationInfo = @{
+            created = [DateTimeOffset]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            creators = @('Tool: ZEUS packaging script')
+        }
+        packages = @($spdxComponents)
+        relationships = @($spdxRelationships)
+    }
+    $sbomPath = Join-Path $Destination 'SBOM.spdx.json'
+    $spdxDocument | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $sbomPath -Encoding utf8
+    $validatedSbom = Get-Content -LiteralPath $sbomPath -Raw -Encoding utf8 | ConvertFrom-Json
+    if ($validatedSbom.spdxVersion -ne 'SPDX-2.3' -or $validatedSbom.packages.Count -ne $spdxComponents.Count -or
+        $validatedSbom.relationships.Count -ne $spdxRelationships.Count -or
+        @($validatedSbom.packages | Select-Object -ExpandProperty SPDXID -Unique).Count -ne $spdxComponents.Count) {
+        throw 'Generated SPDX SBOM failed structural validation.'
+    }
 }
 
 $repository = Split-Path -Parent $PSScriptRoot
@@ -166,7 +298,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Desktop publication failed.' }
     dotnet publish src/Zeus.Maintenance/Zeus.Maintenance.csproj -c Release -r $Runtime --self-contained true "-p:Version=$ProductVersion" -o $destination
     if ($LASTEXITCODE -ne 0) { throw 'Maintenance helper publication failed.' }
-    Add-ThirdPartyNotices -Destination $destination -Repository $repository
+    Add-ThirdPartyNotices -Destination $destination -Repository $repository -Runtime $Runtime -ProductVersion $ProductVersion -SourceCommit $sourceCommit -BuildId $buildId
     foreach ($assemblyName in @('Zeus.Desktop.dll', 'Zeus.Maintenance.dll')) {
         $assemblyPath = Join-Path $destination $assemblyName
         if (!(Test-Path -LiteralPath $assemblyPath -PathType Leaf)) { throw "Required versioned assembly missing: $assemblyName" }

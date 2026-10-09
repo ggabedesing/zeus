@@ -4,7 +4,7 @@ Aplicativo Windows para diagnóstico, manutenção e otimização com dados reai
 
 **Estado: versão de desenvolvimento com módulos integrados; aceitação nativa acompanhada pelo GitHub Actions.** Os resultados de cada execução são registrados. Ganhos de desempenho precisam ser medidos no computador e na tarefa do usuário.
 
-O [histórico de versões](CHANGELOG.md) registra as mudanças entregues. A versão exibida no aplicativo vem dos metadados incorporados ao executável; o pacote também informa a versão, o commit de origem e os hashes em `build-info.json`.
+O [histórico de versões](CHANGELOG.md) registra as mudanças entregues. A versão exibida no aplicativo vem dos metadados incorporados ao executável; o pacote também contém um inventário SPDX 2.3 das bibliotecas, dos runtime packs e das relações entre projetos/dependências, incluído no manifesto SHA-256 junto dos demais arquivos; `build-info.json` registra versão e commit de origem.
 
 O [processo de release](docs/release-process.md) descreve como tags validadas podem gerar um rascunho de release com executáveis e MSI Authenticode assinados. Builds atuais continuam sendo de desenvolvimento; ainda não há certificado de produção configurado.
 
