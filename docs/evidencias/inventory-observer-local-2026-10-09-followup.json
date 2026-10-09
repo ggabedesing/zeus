@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "phase-2-3-local-read-only-smoke",
+  "recordedAtUtc": "2026-10-09T16:14:59Z",
+  "sourceCommit": "4f1154ca9691ba8b87e211cf1f0a212b425b747d",
+  "sourceDirty": false,
+  "elevation": "not requested",
+  "outcome": "success",
+  "checks": {
+    "cpuMemoryVolumesAndNativePerformance": true,
+    "gpuAdapters": 2,
+    "dedicatedGpuUsageAvailable": 2,
+    "dedicatedGpuCapacityAvailable": 1,
+    "dedicatedGpuOccupancyAvailable": 1,
+    "gpuProcessMemoryInstances": 40,
+    "gpuProcessNamesMapped": 40,
+    "scheduledTasksCollected": 189,
+    "networkRoutesAssociated": 15,
+    "physicalDisks": 1,
+    "volumeDiskAssociations": "1/1 confirmed",
+    "memoryModules": 2,
+    "firmwareDeclaredMemorySlots": 4,
+    "memoryChannelsInferred": false,
+    "optionalInventoryWarnings": 7
+  },
+  "unavailableOrLimited": {
+    "processInventory": "200 collected; sample limit reached and explicitly marked truncated",
+    "storageTemperatureWearPowerOnHoursAndReadWriteErrors": "unavailable for 1/1 disk",
+    "perProcessGpuBudget": "unavailable",
+    "obsEncoderActivity": "unavailable in this sample",
+    "memoryPressure": "insufficient evidence; one performance sample",
+    "memoryChannels": "not inferred from module count",
+    "windowsRestart": "registry indicates pending file renames; not a complete restart guarantee"
+  },
+  "maintenancePerformed": false,
+  "limitations": [
+    "This smoke reads the current PC only and is not a hardware compatibility matrix or performance benchmark.",
+    "The single memory sample cannot establish pressure or a bottleneck.",
+    "Missing storage counters are unavailable, not zero and not evidence of disk health.",
+    "No process names, model names, addresses, computer name, or device identifiers are recorded."
+  ]
+}
