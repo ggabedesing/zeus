@@ -7,6 +7,42 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($ProductVersion -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw 'ProductVersion must contain three or four numeric fields.' }
+
+function Test-PortableApplicationLaunch([string]$Executable, [string]$WorkingDirectory) {
+    $process = Start-Process -FilePath $Executable -WorkingDirectory $WorkingDirectory -PassThru
+    $windowReady = $false
+    try {
+        $deadline = [DateTimeOffset]::UtcNow.AddSeconds(45)
+        while ([DateTimeOffset]::UtcNow -lt $deadline) {
+            $process.Refresh()
+            if ($process.HasExited) { throw "Portable ZEUS exited during startup with code $($process.ExitCode)." }
+            if ($process.MainWindowHandle -ne [IntPtr]::Zero -and
+                $process.MainWindowTitle -eq 'ZEUS · Otimização e diagnóstico' -and $process.Responding) {
+                $windowReady = $true
+                break
+            }
+            Start-Sleep -Milliseconds 250
+        }
+        if (!$windowReady) { throw 'Portable ZEUS did not show a responsive main window within 45 seconds.' }
+    } finally {
+        $process.Refresh()
+        if (!$process.HasExited) {
+            if (!$process.CloseMainWindow()) {
+                $process.Kill()
+                [void]$process.WaitForExit(5000)
+                throw 'Portable ZEUS had no closable main window; its smoke process was stopped.'
+            }
+            if (!$process.WaitForExit(15000)) {
+                $process.Kill()
+                if (!$process.WaitForExit(5000)) { throw 'Could not stop the portable ZEUS smoke process.' }
+                throw 'Portable ZEUS did not close cleanly after its launch smoke.'
+            }
+        }
+        $process.Dispose()
+    }
+    Write-Output 'Portable application smoke passed: main window opened, responded, and closed cleanly.'
+}
+
 $repository = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repository 'artifacts'
@@ -42,6 +78,7 @@ try {
             throw "Published $executableName does not report ProductVersion $ProductVersion."
         }
     }
+    Test-PortableApplicationLaunch (Join-Path $destination 'Zeus.Desktop.exe') $destination
     Copy-Item README.md, SECURITY.md, CHANGELOG.md -Destination $destination
     Copy-Item docs/validacao-windows.md -Destination $destination
     $files = @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Core.dll', 'Zeus.Windows.dll', 'Zeus.Cleanup.dll')
