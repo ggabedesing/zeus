@@ -48,6 +48,7 @@ if ($normalizedThumbprint -notmatch '^[0-9A-F]{40}$') { throw 'Expected certific
 $certificateCollection = [System.Security.Cryptography.X509Certificates.X509Certificate2Collection]::new()
 $certificateCollection.Import($CertificatePath, $CertificatePassword,
     [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+$pfxThumbprints = @($certificateCollection | ForEach-Object Thumbprint)
 $certificate = @($certificateCollection | Where-Object { $_.Thumbprint -eq $normalizedThumbprint -and $_.HasPrivateKey })
 if ($certificate.Count -ne 1) { throw 'The PFX must contain exactly one private-key certificate matching the pinned thumbprint.' }
 $certificate = $certificate[0]
@@ -60,7 +61,6 @@ $ekuExtension = $certificate.Extensions | Where-Object { $_ -is [System.Security
 if ($null -eq $ekuExtension -or !($ekuExtension.EnhancedKeyUsages | Where-Object { $_.Value -eq $codeSigningOid })) {
     throw 'The pinned certificate does not contain the Code Signing enhanced key usage.'
 }
-
 $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
 if ($null -eq $signtool) {
     $windowsKits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
@@ -69,6 +69,38 @@ if ($null -eq $signtool) {
 }
 if ($null -eq $signtool) { throw 'Windows SDK SignTool was not found.' }
 $signtoolPath = if ($signtool.Path) { $signtool.Path } else { $signtool.FullName }
+
+$certificateStorePath = 'Cert:\CurrentUser\My'
+$certificatesBeforeSigning = @(Get-ChildItem -LiteralPath $certificateStorePath -ErrorAction Stop)
+$thumbprintsBeforeSigning = @($certificatesBeforeSigning | ForEach-Object Thumbprint)
+$certificateImportStarted = $false
+$certificateStoreEntriesToRemove = @()
+$secureCertificatePassword = ConvertTo-SecureString -String $CertificatePassword -AsPlainText -Force
+$CertificatePassword = $null
+
+try {
+    Remove-Item Env:ZEUS_SIGNING_PFX_PASSWORD -ErrorAction SilentlyContinue
+    $existingPinnedCertificates = @($certificatesBeforeSigning | Where-Object Thumbprint -eq $normalizedThumbprint)
+    if ($existingPinnedCertificates.Count -gt 1) {
+        throw 'More than one certificate with the pinned thumbprint exists in the current-user store.'
+    }
+    if ($existingPinnedCertificates.Count -eq 1 -and !$existingPinnedCertificates[0].HasPrivateKey) {
+        throw 'The pinned certificate already exists in the current-user store without a private key; signing stopped without replacing it.'
+    }
+
+    if ($existingPinnedCertificates.Count -eq 0) {
+        $certificateImportStarted = $true
+        Import-PfxCertificate -FilePath $CertificatePath -CertStoreLocation $certificateStorePath `
+            -Password $secureCertificatePassword -ErrorAction Stop | Out-Null
+    }
+
+    $storePinnedCertificates = @(
+        Get-ChildItem -LiteralPath $certificateStorePath -ErrorAction Stop |
+            Where-Object Thumbprint -eq $normalizedThumbprint
+    )
+    if ($storePinnedCertificates.Count -ne 1 -or !$storePinnedCertificates[0].HasPrivateKey) {
+        throw 'The pinned private-key certificate was not available in the current-user My store.'
+    }
 
 # Sign an isolated copy so a failed release attempt cannot partially modify its unsigned input.
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
@@ -86,7 +118,7 @@ foreach ($required in @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Deskto
 }
 
 function Invoke-ZeusSigning([string]$Path) {
-    & $signtoolPath sign /fd SHA256 /tr $timestampUrl /td SHA256 /f $CertificatePath /p $CertificatePassword $Path
+    & $signtoolPath sign /fd SHA256 /tr $timestampUrl /td SHA256 /s My /sha1 $normalizedThumbprint $Path
     if ($LASTEXITCODE -ne 0) { throw "Authenticode signing or timestamping failed for $(Split-Path -Leaf $Path)." }
     & $signtoolPath verify /pa /all /v $Path
     if ($LASTEXITCODE -ne 0) { throw "Authenticode verification failed for $(Split-Path -Leaf $Path)." }
@@ -183,3 +215,22 @@ Copy-Item -LiteralPath $infoPath -Destination (Join-Path $OutputDirectory 'build
 Write-Output "Signed portable package: $archivePath"
 Write-Output "Signed MSI installer: $msiPath"
 Write-Output "Pinned signer: $($certificate.Subject) [$normalizedThumbprint]"
+} finally {
+    try {
+        if ($certificateImportStarted) {
+            $certificateStoreEntriesToRemove = @(
+                Get-ChildItem -LiteralPath $certificateStorePath -ErrorAction Stop |
+                    Where-Object {
+                        $_.Thumbprint -notin $thumbprintsBeforeSigning -and
+                        $_.Thumbprint -in $pfxThumbprints
+                    }
+            )
+            foreach ($entry in $certificateStoreEntriesToRemove) {
+                Remove-Item -LiteralPath $entry.PSPath -Force -ErrorAction Stop
+            }
+        }
+    } finally {
+        $secureCertificatePassword.Dispose()
+        foreach ($entry in $certificateCollection) { $entry.Dispose() }
+    }
+}

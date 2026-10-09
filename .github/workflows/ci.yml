@@ -88,6 +88,10 @@ jobs:
       - name: Build every project
         id: build
         run: dotnet build Zeus.slnx -c Release
+      - name: Validate release-signing secret boundary
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: pwsh
+        run: ./scripts/test-release-signing-safety.ps1
       - name: Exercise all tests on the actual Windows runner
         id: windowsTests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -341,6 +345,9 @@ jobs:
             $pfxBytes = [Convert]::FromBase64String($env:ZEUS_SIGNING_PFX_BASE64)
             [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
             [Array]::Clear($pfxBytes, 0, $pfxBytes.Length)
+            Remove-Item Env:ZEUS_SIGNING_PFX_BASE64 -ErrorAction SilentlyContinue
+            $certificatePassword = $env:ZEUS_SIGNING_PFX_PASSWORD
+            Remove-Item Env:ZEUS_SIGNING_PFX_PASSWORD -ErrorAction SilentlyContinue
             $unsignedRoot = Join-Path $env:RUNNER_TEMP 'zeus-release-unsigned'
             ./scripts/publish-windows.ps1 -Runtime win-x64 -ProductVersion $env:ZEUS_PRODUCT_VERSION -OutputRoot $unsignedRoot
             if ($LASTEXITCODE -ne 0) { throw 'Release payload build or portable application smoke failed.' }
@@ -348,7 +355,7 @@ jobs:
             if ($null -eq $payload) { throw 'The clean x64 release payload was not generated.' }
             $releaseDirectory = Join-Path $env:RUNNER_TEMP 'zeus-release-signed'
             ./scripts/sign-windows-release.ps1 -PayloadDirectory $payload.FullName -ProductVersion $env:ZEUS_PRODUCT_VERSION `
-              -CertificatePath $pfxPath -CertificatePassword $env:ZEUS_SIGNING_PFX_PASSWORD `
+              -CertificatePath $pfxPath -CertificatePassword $certificatePassword `
               -ExpectedThumbprint $env:ZEUS_SIGNING_CERTIFICATE_THUMBPRINT -OutputDirectory $releaseDirectory
             if ($LASTEXITCODE -ne 0) { throw 'Authenticode signing, verification, timestamp, or signed MSI build failed.' }
             $previousMsiDirectory = Join-Path $env:RUNNER_TEMP 'zeus-release-previous-msi'
@@ -368,6 +375,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Could not create the draft release; signed artifacts remain in the runner workspace.' }
           }
           finally {
+            $certificatePassword = $null
+            Remove-Item Env:ZEUS_SIGNING_PFX_PASSWORD -ErrorAction SilentlyContinue
+            Remove-Item Env:ZEUS_SIGNING_PFX_BASE64 -ErrorAction SilentlyContinue
             if (Test-Path -LiteralPath $pfxPath) { Remove-Item -LiteralPath $pfxPath -Force }
             if ($null -ne $pfxBytes) { [Array]::Clear($pfxBytes, 0, $pfxBytes.Length) }
           }

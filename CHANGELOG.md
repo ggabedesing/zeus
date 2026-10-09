@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- A assinatura de release usa o certificado fixado no repositório `CurrentUser\My`, sem passar a senha PFX na linha de comando do SignTool; variáveis secretas e entradas de certificado temporárias são removidas, inclusive em caso de falha.
 - A personalização de papel de parede agora aplica uma imagem estática aos monitores conectados com cópia e restauração independentes por monitor; slideshows são preservados e conflitos externos/topologia alterada bloqueiam a reversão automática.
 - O pipeline de release agora bloqueia versões sem certificado fixado e testes completos; tags validadas podem gerar apenas um rascunho, com binários e MSI assinados, hashes atualizados e revisão manual antes da publicação.
 - A aba Atualizações permite consultar manualmente a versão estável publicada do ZEUS no GitHub; comparar versão não baixa nem instala arquivos, e a abertura da publicação pede confirmação.
