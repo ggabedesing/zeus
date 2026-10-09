@@ -28,6 +28,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private Guid _performanceSessionId = Guid.NewGuid();
     private readonly WindowsUpdateService _windowsUpdate = new();
     private readonly WingetUpdateService _wingetUpdates = new();
+    private readonly ZeusReleaseChecker _zeusReleaseChecker = new();
     private readonly PendingMaintenanceSessions _pendingSessions = new();
     private readonly UserOptimizationService _userOptimization;
     private readonly DesktopFileOrganizer _desktopOrganizer;
@@ -82,6 +83,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _profileSummary = "O perfil orienta o plano. Ajustes do Windows são separados e reversíveis.";
     private string _driverSummary = "Consulte os drivers oferecidos oficialmente pelo Windows Update para este computador.";
     private string _wingetSummary = "Consulte atualizações de programas identificadas pela fonte winget. A consulta não instala nada.";
+    private string _zeusReleaseSummary = "Consulte manualmente se há uma versão mais recente do ZEUS. Nada será baixado ou instalado.";
     private string _performanceSummary = "Meça por cinco segundos durante a tarefa lenta para observar a carga real.";
     private string _networkProbeTarget = string.Empty;
     private string _networkProbeSummary = "A medição só começa quando você informa um IP ou host e solicita o teste.";
@@ -243,6 +245,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string DriverSummary { get => _driverSummary; private set => Set(ref _driverSummary, value); }
     public string DriverInventorySummary { get; private set; } = "Inventário de drivers disponível após a coleta do Windows.";
     public string WingetSummary { get => _wingetSummary; private set => Set(ref _wingetSummary, value); }
+    public string ZeusReleaseSummary { get => _zeusReleaseSummary; private set => Set(ref _zeusReleaseSummary, value); }
     private string _windowsUpdateSummary = "A busca online só começa quando você solicitar. Não baixa nem instala atualizações.";
     public string WindowsUpdateSummary { get => _windowsUpdateSummary; private set => Set(ref _windowsUpdateSummary, value); }
     public string PerformanceSummary { get => _performanceSummary; private set => Set(ref _performanceSummary, value); }

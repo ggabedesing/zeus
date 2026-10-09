@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- A aba Atualizações permite consultar manualmente a versão estável publicada do ZEUS no GitHub; comparar versão não baixa nem instala arquivos, e a abertura da publicação pede confirmação.
 - A aparência do ZEUS agora permite escolher entre seis cores de destaque além do padrão de cada tema; a preferência é salva no SQLite e o alto contraste do Windows continua prevalecendo.
 - Novo tema claro para leitura, com cores próprias para avisos, registros e botões.
 - Novos temas Gamer Neon e Cyberpunk com paletas originais para a interface do ZEUS; não criam overlay sobre jogos nem alteram programas externos.

@@ -226,6 +226,10 @@ Para falhas do Windows após reparo/driver, use as opções de Recuperação do 
 
 ## Conferência no computador principal
 
+### Consulta de versão do próprio ZEUS
+
+A aba Atualizações consulta manualmente a API pública de versões estáveis do repositório oficial no GitHub. A consulta tem limite de 12 segundos, não envia dados do computador e não baixa instaladores. Uma publicação inexistente, erro HTTP, pré-lançamento ou número de versão inválido não é apresentado como “atualizado”. A URL exibida para abertura é limitada ao repositório oficial; abrir a publicação também exige confirmação. Três testes cobrem nova versão, ausência de versão estável e rejeição de destino externo. A compilação Release passou sem avisos; a suíte de aceitação Windows passou com 49 aprovados e 1 teste administrativo ignorado.
+
 O pacote `zeus-testes-windows.zip` permite executar a suíte automatizada no próprio computador: extraia a pasta inteira e abra `INICIAR-TESTES.cmd`. Autorize o pedido de administrador e aguarde o relatório em `artifacts/TestResults/<sessão>/relatorio.json`. Se necessário, o iniciador baixa o SDK oficial e verifica SHA-512. Ele testa arquivos e entradas próprios e restaura as preferências visuais ao final. Os resultados ficam locais.
 
 Para conferir também o uso normal da interface:

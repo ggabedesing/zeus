@@ -14,6 +14,34 @@ namespace Zeus.Desktop;
 
 public partial class MainWindow
 {
+    private async void CheckZeusUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isBusy) return;
+        ZeusReleaseSummary = "Consultando a publicação oficial do ZEUS no GitHub…";
+        await RunOperationAsync("Consultando atualização do ZEUS", "Somente leitura. Nenhum arquivo será baixado ou instalado.", async token =>
+        {
+            try
+            {
+                var result = await _zeusReleaseChecker.CheckAsync(BuildVersion, token);
+                ZeusReleaseSummary = result.Summary;
+                StatusTitle = "Consulta de versão do ZEUS concluída";
+                StatusDetail = result.Summary;
+                if (result.ReleasePage is not null && Confirm($"{result.Summary}\n\nAbrir a página oficial de versões do ZEUS no navegador? Nenhum instalador será baixado automaticamente.", "Versões do ZEUS"))
+                    _openUri(result.ReleasePage.AbsoluteUri);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                ZeusReleaseSummary = "Consulta de versão cancelada.";
+            }
+            catch (Exception error)
+            {
+                ZeusReleaseSummary = $"Não foi possível confirmar a versão mais recente: {error.Message}";
+                StatusTitle = "Consulta de versão inconclusiva";
+                StatusDetail = ZeusReleaseSummary;
+            }
+        });
+    }
+
     private void AnalyzeServiceDependencies_Click(object sender, RoutedEventArgs e)
     {
         var inventory = _snapshot?.WindowsInventory;
