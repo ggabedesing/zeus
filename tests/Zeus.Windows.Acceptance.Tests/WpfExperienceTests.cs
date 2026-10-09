@@ -19,6 +19,25 @@ namespace Zeus.Windows.Acceptance.Tests;
 public sealed class WpfExperienceTests
 {
     [Fact]
+    public void EquivalentCpuCoreFormattingDoesNotUsePercentUnits()
+    {
+        var originalCulture = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+            Assert.Equal("0,5 núcleos equivalentes", MainWindow.FormatCpuCores(0.5));
+            Assert.Equal("1 núcleo equivalente", MainWindow.FormatCpuCores(1));
+            Assert.Equal("1,25 núcleos equivalentes", MainWindow.FormatCpuCores(1.25));
+            Assert.Equal("indisponível", MainWindow.FormatCpuCores(null));
+            Assert.Equal("indisponível", MainWindow.FormatCpuCores(double.NaN));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = originalCulture;
+        }
+    }
+
+    [Fact]
     public void WindowMinimumSizeFitsSmallWorkAreasWithoutContradictingMaximumSize()
     {
         var minimum = MainWindow.ClampMinimumWindowSize(new Size(900, 600), new Size(800, 450));

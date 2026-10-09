@@ -167,7 +167,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 ? "Até cinco processos acompanhados por PID/início: " + string.Join("; ", processUsage
                     .OrderByDescending(item => Math.Max(item.LaterCpuPercent ?? -1, item.ReferenceCpuPercent ?? -1))
                     .Take(5).Select(item =>
-                        $"{item.Name} · PID {item.ProcessId}: CPU {FormatMetric(item.ReferenceCpuPercent)} ({item.ReferenceCpuSamples}/{comparison.ReferenceSampleCount}) → {FormatMetric(item.LaterCpuPercent)} ({item.LaterCpuSamples}/{comparison.LaterSampleCount}); núcleos equivalentes {FormatMetric(item.ReferenceCpuCoresUsed)} ({item.ReferenceCpuCoresSamples}/{comparison.ReferenceSampleCount}) → {FormatMetric(item.LaterCpuCoresUsed)} ({item.LaterCpuCoresSamples}/{comparison.LaterSampleCount}); memória {FormatByteQuantity(item.ReferenceWorkingSetBytes)} ({item.ReferenceWorkingSetSamples}/{comparison.ReferenceSampleCount}) → {FormatByteQuantity(item.LaterWorkingSetBytes)} ({item.LaterWorkingSetSamples}/{comparison.LaterSampleCount})"))
+                        $"{item.Name} · PID {item.ProcessId}: CPU {FormatMetric(item.ReferenceCpuPercent)} ({item.ReferenceCpuSamples}/{comparison.ReferenceSampleCount}) → {FormatMetric(item.LaterCpuPercent)} ({item.LaterCpuSamples}/{comparison.LaterSampleCount}); núcleos equivalentes {FormatCpuCores(item.ReferenceCpuCoresUsed)} ({item.ReferenceCpuCoresSamples}/{comparison.ReferenceSampleCount}) → {FormatCpuCores(item.LaterCpuCoresUsed)} ({item.LaterCpuCoresSamples}/{comparison.LaterSampleCount}); memória {FormatByteQuantity(item.ReferenceWorkingSetBytes)} ({item.ReferenceWorkingSetSamples}/{comparison.ReferenceSampleCount}) → {FormatByteQuantity(item.LaterWorkingSetBytes)} ({item.LaterWorkingSetSamples}/{comparison.LaterSampleCount})"))
                 : "Comparação por processo: indisponível (identidade do processo não confirmada nos períodos)";
             var gpuProcesses = comparison.GpuProcessMemoryUsage is { Count: > 0 } gpuProcessUsage
                 ? "Memória GPU dedicada por processo (PID/início/adaptador confirmados): " + string.Join("; ", gpuProcessUsage
@@ -1086,6 +1086,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _ => $"Estado desconhecido · {state.CheckedSourceCount}/{state.TotalSourceCount} fontes consultadas."
     };
     private static string FormatMetric(double? value) => value is { } number ? $"{number:0.#}%" : "indisponível";
+    internal static string FormatCpuCores(double? value)
+    {
+        if (value is not { } number || !double.IsFinite(number) || number < 0) return "indisponível";
+        var unit = number == 1 ? "núcleo equivalente" : "núcleos equivalentes";
+        return $"{number.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture)} {unit}";
+    }
     private static string FormatByteQuantity(double? bytes) => bytes is { } value && double.IsFinite(value) && value >= 0
         ? $"{value / (1024d * 1024 * 1024):0.##} GiB" : "indisponível";
     private static string FormatMetricCoverage(PerformanceMetricComparison? metric, int referenceTotal, int laterTotal) => metric is null

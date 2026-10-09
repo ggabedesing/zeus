@@ -2,6 +2,7 @@
 
 ## Não lançado
 
+- A comparação do Observador agora apresenta núcleos equivalentes com unidade própria, sem formatá-los como porcentagem.
 - A comparação de desempenho por processo agora inclui núcleos equivalentes usados e a cobertura dessas leituras em cada sessão, além da porcentagem da máquina.
 - O Observador agora mostra também núcleos equivalentes usados por processo; a amostragem adaptativa considera esse sinal para detectar carga alta em um núcleo mesmo em CPUs com muitos processadores lógicos.
 - O inventário mostra edição, versão, build e arquitetura do Windows a partir de `Win32_OperatingSystem`; a ausência de dados não é substituída por uma versão presumida.
