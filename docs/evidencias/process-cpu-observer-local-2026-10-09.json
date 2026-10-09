@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-09",
+  "sourceCommit": "dd022a414aa700505888b5f203c9cd275da0dffb",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "package": "artifacts/process-cpu/zeus-win-x64.zip",
+  "packageSha256": "2750b94d6f1329793193994d83ac34b12b1688a19f065b20064350da16a99178",
+  "desktopExeSha256": "32acfcef7b01833d4738db1750abb736d1477e942beb5a2a3ea755611165e2e9",
+  "portableExeSmoke": {
+    "result": "passed",
+    "openedMainWindow": true,
+    "responded": true,
+    "closedCleanly": true
+  },
+  "tests": {
+    "solution": "Zeus.slnx",
+    "configuration": "Release",
+    "passed": 467,
+    "failed": 0,
+    "skipped": 9,
+    "hardwarePassed": 143,
+    "windowsAcceptancePassed": 55
+  },
+  "notes": [
+    "Observer displays per-process CPU as machine percentage and equivalent cores used.",
+    "Adaptive sampling detects high per-process core usage even when whole-machine CPU percentage is low.",
+    "Package is a development build and is not Authenticode signed for production."
+  ]
+}
