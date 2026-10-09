@@ -7,7 +7,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Microsoft.Win32;
 using Zeus.Cleanup;
 using Zeus.Core;
@@ -700,6 +702,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     internal void RefreshSelectedThemeAfterContrastChange() => ApplyTheme();
+
+    private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(e.Source, WorkspaceTabs)) return;
+        if (WorkspaceTabs.SelectedContent is not FrameworkElement content) return;
+        if (ReduceAnimations || SystemParameters.HighContrast || !SystemParameters.ClientAreaAnimation)
+        {
+            content.BeginAnimation(UIElement.OpacityProperty, null);
+            return;
+        }
+
+        content.BeginAnimation(UIElement.OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140)) { FillBehavior = FillBehavior.Stop },
+            HandoffBehavior.SnapshotAndReplace);
+    }
 
     private static string GetAccentHex(AppAccentColor accent, DesktopTheme theme) => (accent, theme == DesktopTheme.Light) switch
     {

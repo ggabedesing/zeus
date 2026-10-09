@@ -23,7 +23,7 @@
     <WrapPanel Grid.Column="1" VerticalAlignment="Center" MaxWidth="330"><Button Content="Atualizar diagnóstico" Click="Refresh_Click" IsEnabled="{Binding CanRefresh}" AutomationProperties.AutomationId="refresh-diagnostics" Margin="0,0,8,5"/><Button Content="Exportar JSON" Click="Export_Click" IsEnabled="{Binding CanExport}" AutomationProperties.AutomationId="export-report" Margin="0,0,8,5"/><Button Content="Pacote de diagnóstico" Click="ExportDiagnosticPackage_Click" IsEnabled="{Binding CanExport}" AutomationProperties.AutomationId="export-diagnostic-package" AutomationProperties.Name="Salvar pacote de diagnóstico ZIP" Margin="0,0,8,5"/><Button Content="Cancelar leitura" Click="Cancel_Click" IsEnabled="{Binding CanCancel}" Margin="0,0,0,5"/></WrapPanel>
    </Grid>
   </Border>
-  <TabControl x:Name="WorkspaceTabs" Grid.Row="2" TabStripPlacement="Left" AutomationProperties.AutomationId="workspace-tabs">
+  <TabControl x:Name="WorkspaceTabs" Grid.Row="2" TabStripPlacement="Left" SelectionChanged="WorkspaceTabs_SelectionChanged" AutomationProperties.AutomationId="workspace-tabs">
    <TabItem Header="Visão geral" AutomationProperties.AutomationId="OverviewTab">
     <ScrollViewer><StackPanel Margin="20,0,10,12">
      <TextBlock Text="Conheça seu computador" Style="{StaticResource SectionTitle}"/><TextBlock Text="{Binding SystemDescription}" Style="{StaticResource MutedText}"/><TextBlock Text="{Binding CollectionDate, StringFormat='Última coleta: {0}'}" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,5,0,18"/>
