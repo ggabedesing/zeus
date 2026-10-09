@@ -8,6 +8,47 @@ namespace Zeus.Windows.Acceptance.Tests;
 public sealed class ProtectedSessionStoreTests
 {
     [AdministratorFact]
+    public async Task RecoveryPreservesDurablePendingProgressWithoutClaimingCompletion()
+    {
+        var id = Guid.NewGuid();
+        var started = DateTimeOffset.UtcNow;
+        var request = new MaintenanceRequest(MaintenanceActionId.VerifySystemFiles);
+        string? directory = null;
+        var receiptDirectory = Path.Combine(Path.GetTempPath(), "Zeus.PendingProgress." + Guid.NewGuid().ToString("N"));
+        var receipts = new PendingMaintenanceSessions(Path.Combine(receiptDirectory, "PendingMaintenance"));
+        try
+        {
+            directory = SessionStore.CreateSession(id);
+            var pendingStep = new MaintenanceStepResult(request.Action, StepOutcome.Skipped,
+                "Ação em andamento; ainda não existe confirmação de conclusão.",
+                Verification: MaintenanceVerificationStatus.Pending);
+            await SessionStore.WriteProgressReportAsync(id, new MaintenanceReport(id, started,
+                DateTimeOffset.UtcNow, false, [pendingStep], IsComplete: false));
+            await receipts.RememberAsync(id, [request], started);
+
+            // Recovery sees the last durable progress state as if the helper had
+            // exited before writing its final report. It must leave the action unresolved.
+            var recovered = Assert.Single(await receipts.RecoverAsync());
+            Assert.Equal(id, recovered.SessionId);
+            Assert.False(recovered.IsComplete);
+            var step = Assert.Single(recovered.Steps);
+            Assert.Equal(request.Action, step.Action);
+            Assert.Equal(MaintenanceVerificationStatus.Pending, step.Verification);
+            Assert.Contains("ainda não existe confirmação", step.Message, StringComparison.OrdinalIgnoreCase);
+            var unresolved = Assert.Single(MaintenancePolicy.FindUnresolvedAttempts([request], [recovered]));
+            Assert.Equal(id, unresolved.SessionId);
+            Assert.Equal(MaintenanceVerificationStatus.Pending, unresolved.Verification);
+        }
+        finally
+        {
+            await receipts.ForgetAsync(id);
+            if (Directory.Exists(receiptDirectory)) Directory.Delete(receiptDirectory, recursive: true);
+            // Only the GUID directory created above is removed; no shared lock or other session is touched.
+            if (directory is not null && Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [AdministratorFact]
     public async Task RealProtectedSessionSupportsAtomicProgressWithoutUserWriteAccess()
     {
         var id = Guid.NewGuid();
