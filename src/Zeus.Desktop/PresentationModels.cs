@@ -124,7 +124,7 @@ public sealed class DriverChoice(DriverUpdateCandidate candidate) : SelectableRo
         if (declaredName.Contains("AMD", StringComparison.OrdinalIgnoreCase) || ContainsToken(declaredName, "ATI") ||
             declaredName.Contains("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase)) return "AMD (heurística pelo nome declarado)";
         if (declaredName.Contains("Intel", StringComparison.OrdinalIgnoreCase)) return "Intel (heurística pelo nome declarado)";
-        if (new[] { "Dell", "HP Inc", "Hewlett-Packard", "Hewlett Packard", "Lenovo", "ASUS", "Acer", "MSI", "Samsung", "Gigabyte", "Toshiba" }
+        if (new[] { "Dell", "HP Inc", "Hewlett-Packard", "Hewlett Packard", "Lenovo", "ASUS", "Acer", "MSI", "Samsung", "Gigabyte", "Giga-Byte", "ASRock", "Toshiba" }
             .Any(name => declaredName.Contains(name, StringComparison.OrdinalIgnoreCase)))
             return "OEM (heurística pelo nome declarado)";
         if (ContainsToken(declaredName, "HP")) return "OEM (heurística pelo nome declarado)";

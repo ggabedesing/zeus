@@ -29,6 +29,13 @@ public static class DriverSupportCatalog
             value.Equals("MSI", StringComparison.OrdinalIgnoreCase) ||
             value.StartsWith("MSI ", StringComparison.OrdinalIgnoreCase))
             return new("MSI", new Uri("https://us.msi.com/support/download/"));
+        if (value.Contains("GIGABYTE", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("Giga-Byte", StringComparison.OrdinalIgnoreCase))
+            return new("GIGABYTE", new Uri("https://www.gigabyte.com/br/Support/Consumer/Download"));
+        if (value.Contains("ASRock", StringComparison.OrdinalIgnoreCase))
+            return new("ASRock", new Uri("https://www.asrock.com/support/index.asp?cat=Drivers"));
+        if (value.Contains("Samsung", StringComparison.OrdinalIgnoreCase))
+            return new("Samsung", new Uri("https://www.samsung.com/us/support/downloads/"));
         if (value.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase))
             return new("NVIDIA", new Uri("https://www.nvidia.com/Download/index.aspx"));
         if (value.Contains("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase) ||

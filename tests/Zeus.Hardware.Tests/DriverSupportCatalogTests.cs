@@ -14,6 +14,9 @@ public sealed class DriverSupportCatalogTests
     [InlineData("ASUSTeK COMPUTER INC.", "www.asus.com")]
     [InlineData("Acer Incorporated", "www.acer.com")]
     [InlineData("Micro-Star International", "us.msi.com")]
+    [InlineData("GIGABYTE Technology Co., Ltd.", "www.gigabyte.com")]
+    [InlineData("ASRock Incorporation", "www.asrock.com")]
+    [InlineData("Samsung Electronics", "www.samsung.com")]
     public void RecognizedVendorsHaveFixedOfficialHttpsLookup(string provider, string host)
     {
         var source = Assert.IsType<DriverSupportSource>(DriverSupportCatalog.Find(provider));

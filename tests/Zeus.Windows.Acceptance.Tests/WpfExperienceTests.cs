@@ -8,6 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Text.Json;
+using Zeus.Core;
 using Zeus.Desktop;
 using Zeus.Windows;
 
@@ -448,6 +449,20 @@ public sealed class WpfExperienceTests
         var verifyDriverButton = Assert.IsType<Button>(window.FindName("VerifyPendingDriverUpdatesButton"));
         Assert.Equal("verify-pending-driver-updates", AutomationProperties.GetAutomationId(verifyDriverButton));
         Assert.False(verifyDriverButton.IsEnabled, "A reconsulta de driver só fica disponível para histórico pendente com origem registrada.");
+        var boardSupportButton = Assert.IsType<Button>(window.FindName("BoardSupportButton"));
+        Assert.Equal("open-board-support", AutomationProperties.GetAutomationId(boardSupportButton));
+        Assert.Equal(window.CanOpenBoardSupport, boardSupportButton.IsEnabled);
+        if (window.CanOpenBoardSupport)
+        {
+            var boardSource = Assert.IsType<DriverSupportSource>(DriverSupportCatalog.Find(window.BoardSupportSourceName));
+            Assert.Contains(boardSource.Name, Assert.IsType<string>(boardSupportButton.Content), StringComparison.Ordinal);
+            boardSupportButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, boardSupportButton));
+            Assert.Contains(boardSource.Uri.AbsoluteUri, openedUris);
+        }
+        else
+        {
+            Assert.Contains("não", window.BoardSupportSummary, StringComparison.OrdinalIgnoreCase);
+        }
         var backupDatabaseButton = Assert.IsType<Button>(window.FindName("BackupDatabaseButton"));
         Assert.Equal("backup-local-data", AutomationProperties.GetAutomationId(backupDatabaseButton));
         Assert.True(backupDatabaseButton.IsEnabled, "O usuário deve conseguir criar um backup local a partir do histórico.");

@@ -1179,6 +1179,14 @@ public partial class MainWindow
         }
         OpenTrustedUri(source.Uri.AbsoluteUri);
     }
+    private void OpenBoardSupport_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string sourceName } ||
+            !string.Equals(sourceName, BoardSupportSourceName, StringComparison.Ordinal)) return;
+        var source = DriverSupportCatalog.Find(sourceName);
+        if (source is null) return;
+        OpenTrustedUri(source.Uri.AbsoluteUri);
+    }
     private void OpenTrustedUri(string uri)
     {
         if (_isBusy) return;

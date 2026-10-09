@@ -284,6 +284,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string ProfileSummary { get => _profileSummary; private set => Set(ref _profileSummary, value); }
     public string DriverSummary { get => _driverSummary; private set => Set(ref _driverSummary, value); }
     public string DriverInventorySummary { get; private set; } = "Inventário de drivers disponível após a coleta do Windows.";
+    public string BoardSupportSummary { get; private set; } = "O fabricante da placa-mãe será identificado após a coleta do Windows.";
+    public string? BoardSupportSourceName { get; private set; }
+    public bool CanOpenBoardSupport => BoardSupportSourceName is not null;
+    public string BoardSupportButtonText => BoardSupportSourceName is { } name ? $"Abrir suporte oficial · {name}" : "Portal oficial não identificado";
     public string WingetSummary { get => _wingetSummary; private set => Set(ref _wingetSummary, value); }
     public string ZeusReleaseSummary { get => _zeusReleaseSummary; private set => Set(ref _zeusReleaseSummary, value); }
     private string _windowsUpdateSummary = "A busca online só começa quando você solicitar. Não baixa nem instala atualizações.";
@@ -462,6 +466,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void DisplaySnapshot(HardwareSnapshot snapshot)
     {
+        var boardManufacturer = snapshot.Board?.Manufacturer;
+        var boardSupportSource = DriverSupportCatalog.Find(boardManufacturer);
+        BoardSupportSourceName = boardSupportSource?.Name;
+        BoardSupportSummary = string.IsNullOrWhiteSpace(boardManufacturer)
+            ? "Indisponível: o fabricante da placa-mãe não foi identificado nesta coleta."
+            : boardSupportSource is null
+                ? $"Fabricante reportado: {boardManufacturer}. Não há um portal oficial mapeado; confira o fabricante manualmente."
+                : $"Fabricante reportado: {boardManufacturer}. O portal exige que você confirme o modelo exato; o link não identifica nem confirma um driver compatível.";
+        Notify(nameof(BoardSupportSummary));
+        Notify(nameof(BoardSupportSourceName));
+        Notify(nameof(CanOpenBoardSupport));
+        Notify(nameof(BoardSupportButtonText));
         InstalledDriverRows.Clear();
         var driverInventory = snapshot.WindowsInventory;
         if (driverInventory is null)

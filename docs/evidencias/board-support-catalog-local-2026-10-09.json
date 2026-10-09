@@ -1,0 +1,37 @@
+{
+  "evidenceType": "official-board-and-oem-support-links",
+  "date": "2026-10-09",
+  "sourceBaseCommit": "c2f6262c19d211c182c2b790d52e6c6ac808e4b7",
+  "sourceIncludesWorkingTreeChanges": true,
+  "tests": [
+    {
+      "project": "tests/Zeus.Hardware.Tests/Zeus.Hardware.Tests.csproj",
+      "filter": "DriverSupportCatalogTests",
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "project": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
+      "filter": "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "verifiedBehavior": [
+    "Official HTTPS support destinations are fixed in the catalog for matched vendors.",
+    "The motherboard support panel reflects recognized, unavailable, and unmapped vendor states.",
+    "The WPF test routes the selected link through an injected callback and checks the target without opening a browser.",
+    "The real WPF experience test completed with no binding errors."
+  ],
+  "officialSourcesReviewed": [
+    "https://www.gigabyte.com/br/Support/Consumer/Download",
+    "https://www.asrock.com/support/index.asp?cat=Drivers",
+    "https://www.samsung.com/us/support/downloads/"
+  ],
+  "limitations": [
+    "A support page is only a manual lookup route; it does not establish that a driver is newer or compatible.",
+    "No driver was downloaded, installed, or rolled back."
+  ]
+}
