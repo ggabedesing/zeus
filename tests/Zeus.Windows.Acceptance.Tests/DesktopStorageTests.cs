@@ -49,6 +49,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.Equal(MaintenanceVerificationStatus.NotRecorded, migratedHistory.Steps[0].Verification);
         Assert.True(migratedPreferences.IsMinimal);
         Assert.False(migratedPreferences.IsTechnicalMode, "Older preferences must retain the default non-technical mode when the new field is absent.");
+        Assert.Equal(AppAccentColor.ThemeDefault, migratedPreferences.AccentColor);
         Assert.Equal(UsageProfile.Gaming, migratedPreferences.Profile);
         Assert.True(migratedPreferences.FirstRunSetupComplete);
         Assert.True(File.Exists(historyPath));

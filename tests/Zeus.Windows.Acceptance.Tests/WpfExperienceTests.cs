@@ -105,7 +105,7 @@ public sealed class WpfExperienceTests
         var themeSelectorPeer = Assert.IsAssignableFrom<ComboBoxAutomationPeer>(UIElementAutomationPeer.CreatePeerForElement(themeSelector));
         Assert.Equal("Tema do aplicativo", themeSelectorPeer.GetName());
         var expandCollapse = Assert.IsAssignableFrom<IExpandCollapseProvider>(themeSelectorPeer.GetPattern(PatternInterface.ExpandCollapse));
-        Assert.Equal(4, themeSelector.Items.Count);
+        Assert.Equal(6, themeSelector.Items.Count);
         var accentSelector = Assert.IsType<ComboBox>(window.FindName("AccentColorSelector"));
         Assert.Equal("accent-color-selector", AutomationProperties.GetAutomationId(accentSelector));
         Assert.Equal("Cor de destaque do aplicativo", AutomationProperties.GetName(accentSelector));
@@ -123,6 +123,7 @@ public sealed class WpfExperienceTests
             window.SelectedTheme = theme;
             Assert.Same(Application.Current.Resources["PanelBrush"], themeSelector.Background);
             Assert.Same(Application.Current.Resources["TextBrush"], themeSelector.Foreground);
+            await RenderAsync(window, $"zeus-theme-{theme}.png");
         }
         foreach (var accent in Enum.GetValues<AppAccentColor>())
         {
@@ -414,6 +415,11 @@ public sealed class WpfExperienceTests
         window.SelectedAccentColor = AppAccentColor.Green;
         Assert.Equal(Color.FromRgb(0x22, 0x6B, 0x45), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
         await RenderAsync(window, "zeus-light-overview.png");
+        window.SelectedAccentColor = AppAccentColor.ThemeDefault;
+        window.SelectedTheme = DesktopTheme.GamingNeon;
+        Assert.Equal(Color.FromRgb(0xD6, 0xFF, 0x5F), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
+        window.SelectedTheme = DesktopTheme.Cyberpunk;
+        Assert.Equal(Color.FromRgb(0xFF, 0x63, 0xD8), Assert.IsType<SolidColorBrush>(app.Resources["AccentBrush"]).Color);
 
         foreach (var tab in actualTabs)
         {

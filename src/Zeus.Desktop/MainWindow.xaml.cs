@@ -197,7 +197,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<WingetUpdateRow> WingetUpdates { get; } = [];
     public ObservableCollection<WindowsUpdateRow> PendingWindowsUpdates { get; } = [];
     public IReadOnlyList<ProfileOption> ProfileOptions { get; } = [new(UsageProfile.Balanced, "Geral"), new(UsageProfile.Gaming, "Jogos"), new(UsageProfile.GamingStreaming, "Jogos e transmissão"), new(UsageProfile.Work, "Trabalho e estudo"), new(UsageProfile.Creative, "Edição e criação"), new(UsageProfile.Development, "Programação"), new(UsageProfile.Battery, "Autonomia no notebook")];
-    public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS"), new(DesktopTheme.Light, "Claro · leitura")];
+    public IReadOnlyList<ThemeOption> ThemeOptions { get; } = [new(DesktopTheme.Complete, "Completo · ZEUS"), new(DesktopTheme.Minimal, "Mínimo · Foco"), new(DesktopTheme.MacInspired, "Aurora · inspirado no macOS"), new(DesktopTheme.Light, "Claro · leitura"), new(DesktopTheme.GamingNeon, "Gamer Neon · foco em jogos"), new(DesktopTheme.Cyberpunk, "Cyberpunk · criação")];
     public IReadOnlyList<AccentColorOption> AccentColorOptions { get; } = [new(AppAccentColor.ThemeDefault, "Padrão do tema"), new(AppAccentColor.Blue, "Azul oceano"), new(AppAccentColor.Violet, "Violeta"), new(AppAccentColor.Green, "Verde"), new(AppAccentColor.Rose, "Rosa"), new(AppAccentColor.Amber, "Âmbar")];
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -670,8 +670,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 ? new[] { "#101216", "#191D22", "#3B424A", "#F5F7FA", "#BEC6D1", "#BFE7D7", "#282F37", "#293C35", "#0D1013" }
                 : SelectedTheme == DesktopTheme.Light
                     ? new[] { "#F3F6FA", "#FFFFFF", "#D8E0EA", "#17212E", "#4B5A6B", "#176B87", "#EFF4F8", "#E7F1F5", "#F6F8FB" }
-                    : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
-        colors[5] = GetAccentHex(SelectedAccentColor, SelectedTheme == DesktopTheme.Light);
+                    : SelectedTheme == DesktopTheme.GamingNeon
+                        ? new[] { "#090D16", "#111A2B", "#293650", "#EEF4FF", "#ABB8CD", "#D6FF5F", "#1B2A3E", "#1B2A26", "#070B12" }
+                        : SelectedTheme == DesktopTheme.Cyberpunk
+                            ? new[] { "#100B1A", "#1A1230", "#3D2C58", "#F7F1FF", "#C4B5D5", "#FF63D8", "#2E1A43", "#291A39", "#0A0711" }
+                            : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
+        colors[5] = GetAccentHex(SelectedAccentColor, SelectedTheme);
         var keys = new[] { "BackgroundBrush", "PanelBrush", "BorderBrush", "TextBrush", "MutedBrush", "AccentBrush", "ButtonBrush", "SelectedTabBrush", "LogBackgroundBrush" };
         for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[i]));
         Application.Current.Resources["PrimaryButtonBrush"] = Application.Current.Resources["AccentBrush"];
@@ -697,7 +701,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     internal void RefreshSelectedThemeAfterContrastChange() => ApplyTheme();
 
-    private static string GetAccentHex(AppAccentColor accent, bool isLightTheme) => (accent, isLightTheme) switch
+    private static string GetAccentHex(AppAccentColor accent, DesktopTheme theme) => (accent, theme == DesktopTheme.Light) switch
     {
         (AppAccentColor.Blue, true) => "#1D4ED8",
         (AppAccentColor.Blue, false) => "#60A5FA",
@@ -709,8 +713,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         (AppAccentColor.Rose, false) => "#FDA4AF",
         (AppAccentColor.Amber, true) => "#8A4B00",
         (AppAccentColor.Amber, false) => "#FCD34D",
-        _ => isLightTheme ? "#176B87"
-            : "#65E3E0"
+        _ when accent == AppAccentColor.ThemeDefault => theme switch
+        {
+            DesktopTheme.MacInspired => "#C5B4FF",
+            DesktopTheme.Minimal => "#BFE7D7",
+            DesktopTheme.Light => "#176B87",
+            DesktopTheme.GamingNeon => "#D6FF5F",
+            DesktopTheme.Cyberpunk => "#FF63D8",
+            _ => "#65E3E0"
+        },
+        _ => theme == DesktopTheme.Light ? "#176B87" : "#65E3E0"
     };
 
     private async Task RunOperationAsync(string title, string detail, Func<CancellationToken, Task> operation, bool cancellable = false, bool mutation = false)
