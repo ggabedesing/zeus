@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "collectedAtLocal": "2026-10-09T12:53:26-03:00",
+  "sourceCommit": "cb7a6066e33fac1cd421a5c8fd6511f2fc7ebfef",
+  "sourceDirty": false,
+  "change": {
+    "setting": "ZEUS interface density",
+    "options": ["Comfortable", "Compact"],
+    "compactChanges": ["card padding", "button padding", "navigation spacing and padding", "input padding", "card corners"],
+    "fontSizeReduced": false,
+    "windowsPreferencesChanged": false,
+    "sqlitePersisted": true,
+    "legacyPreferenceDefault": "Comfortable"
+  },
+  "verification": {
+    "releaseBuild": { "succeeded": true, "warnings": 0, "errors": 0 },
+    "focusedAcceptance": { "passed": 3, "failed": 0, "skipped": 0 },
+    "fullSolutionTests": { "total": 544, "passed": 533, "failed": 0, "skipped": 11 },
+    "fullWpfAcceptance": { "total": 91, "passed": 89, "failed": 0, "skipped": 2 },
+    "skippedReasons": ["administrator privileges required", "opt-in real Windows preference or wallpaper changes"],
+    "portablePackage": {
+      "runtime": "win-x64",
+      "sourceDirty": false,
+      "windowOpened": true,
+      "windowResponded": true,
+      "closedNormally": true,
+      "zip": "artifacts/density-acceptance-head-cb7a606/zeus-win-x64.zip",
+      "zipSha256": "01786B3BA689F3AB18D8538EE6B10F407D97862703C667FA9C95DFD7B7D9D9ED",
+      "executable": "artifacts/density-acceptance-head-cb7a606/zeus-win-x64-cb7a6066e33f-20261009T155316054Z-260cd1fc/Zeus.Desktop.exe",
+      "executableSha256": "F524E547F1497760A390F0CE6BA42E60EBD8DA0B8D29774544B44EB24080E96C"
+    }
+  },
+  "productionAuthenticodeSignature": false
+}
