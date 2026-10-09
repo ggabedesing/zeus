@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Zeus.Desktop;
 
-internal sealed record ZeusReleaseCheckResult(string Summary, Uri? ReleasePage);
+internal sealed record ZeusReleaseCheckResult(string Summary, Uri? ReleasePage, bool IsSuccessful = true);
 
 internal sealed class ZeusReleaseChecker
 {
@@ -28,7 +28,7 @@ internal sealed class ZeusReleaseChecker
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return new("Ainda não há uma versão estável publicada no GitHub para consulta.", OfficialReleasePage);
         if (!response.IsSuccessStatusCode)
-            return new($"Não foi possível consultar as versões do ZEUS (HTTP {(int)response.StatusCode}).", null);
+            return new($"Não foi possível consultar as versões do ZEUS (HTTP {(int)response.StatusCode}).", null, IsSuccessful: false);
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);

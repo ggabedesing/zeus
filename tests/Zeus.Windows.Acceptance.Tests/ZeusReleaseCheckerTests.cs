@@ -40,6 +40,19 @@ public sealed class ZeusReleaseCheckerTests
 
         Assert.Contains("Ainda não há uma versão estável publicada", result.Summary);
         Assert.Equal("https://github.com/ggabedesing/zeus/releases", result.ReleasePage?.AbsoluteUri);
+        Assert.True(result.IsSuccessful);
+    }
+
+    [Fact]
+    public async Task MarksHttpFailureAsInconclusiveInsteadOfSuccessfulCheck()
+    {
+        var checker = new ZeusReleaseChecker(new StubHandler(HttpStatusCode.Forbidden, "{}"));
+
+        var result = await checker.CheckAsync("1.2.0", CancellationToken.None);
+
+        Assert.False(result.IsSuccessful);
+        Assert.Contains("HTTP 403", result.Summary);
+        Assert.Null(result.ReleasePage);
     }
 
     [Fact]

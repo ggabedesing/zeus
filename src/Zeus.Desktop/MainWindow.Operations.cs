@@ -30,9 +30,15 @@ public partial class MainWindow
             var result = await _zeusReleaseChecker.CheckAsync(BuildVersion, cancellation.Token);
             if (_isClosing || !CheckZeusUpdatesAutomatically) return;
             _lastZeusUpdateCheckUtc = DateTimeOffset.UtcNow;
-            ZeusReleaseSummary = $"{result.Summary} Verificado automaticamente em {_lastZeusUpdateCheckUtc.Value.ToLocalTime():dd/MM HH:mm}.";
-            QueueActivity(new(_lastZeusUpdateCheckUtc.Value, "zeus-update", "automatic-check", "info",
-                "Consulta automática somente leitura da versão do ZEUS concluída.",
+            ZeusReleaseSummary = result.IsSuccessful
+                ? $"{result.Summary} Verificado automaticamente em {_lastZeusUpdateCheckUtc.Value.ToLocalTime():dd/MM HH:mm}."
+                : $"A verificação automática ficou inconclusiva: {result.Summary} Nova tentativa após 24 horas.";
+            QueueActivity(new(_lastZeusUpdateCheckUtc.Value, "zeus-update",
+                result.IsSuccessful ? "automatic-check" : "automatic-check-incomplete",
+                result.IsSuccessful ? "info" : "warning",
+                result.IsSuccessful
+                    ? "Consulta automática somente leitura da versão do ZEUS concluída."
+                    : "A consulta automática somente leitura da versão do ZEUS ficou inconclusiva.",
                 JsonSerializer.Serialize(new { result.Summary, checkedAt = _lastZeusUpdateCheckUtc })));
             await SavePreferencesAsync();
         }
@@ -70,13 +76,17 @@ public partial class MainWindow
                 var result = await _zeusReleaseChecker.CheckAsync(BuildVersion, token);
                 _lastZeusUpdateCheckUtc = DateTimeOffset.UtcNow;
                 ZeusReleaseSummary = result.Summary;
-                QueueActivity(new(_lastZeusUpdateCheckUtc.Value, "zeus-update", "manual-check", "info",
-                    "Consulta manual somente leitura da versão do ZEUS concluída.",
+                QueueActivity(new(_lastZeusUpdateCheckUtc.Value, "zeus-update",
+                    result.IsSuccessful ? "manual-check" : "manual-check-incomplete",
+                    result.IsSuccessful ? "info" : "warning",
+                    result.IsSuccessful
+                        ? "Consulta manual somente leitura da versão do ZEUS concluída."
+                        : "A consulta manual somente leitura da versão do ZEUS ficou inconclusiva.",
                     JsonSerializer.Serialize(new { result.Summary, checkedAt = _lastZeusUpdateCheckUtc })));
                 await SavePreferencesAsync();
-                StatusTitle = "Consulta de versão do ZEUS concluída";
+                StatusTitle = result.IsSuccessful ? "Consulta de versão do ZEUS concluída" : "Consulta de versão inconclusiva";
                 StatusDetail = result.Summary;
-                if (result.ReleasePage is not null && Confirm($"{result.Summary}\n\nAbrir a página oficial de versões do ZEUS no navegador? Nenhum instalador será baixado automaticamente.", "Versões do ZEUS"))
+                if (result.IsSuccessful && result.ReleasePage is not null && Confirm($"{result.Summary}\n\nAbrir a página oficial de versões do ZEUS no navegador? Nenhum instalador será baixado automaticamente.", "Versões do ZEUS"))
                     _openUri(result.ReleasePage.AbsoluteUri);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
