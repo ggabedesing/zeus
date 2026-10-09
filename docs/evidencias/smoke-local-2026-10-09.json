@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "local-read-only-diagnostic-smoke",
+  "recordedAtUtc": "2026-10-09T04:44:17Z",
+  "sourceCommit": "8d974995cc506ea614e8dee64c06ed34d8500988",
+  "elevation": "not requested",
+  "outcome": "success",
+  "exitCode": 0,
+  "checks": {
+    "operatingSystem": true,
+    "cpuInventory": true,
+    "memoryInventory": true,
+    "volumeInventory": true,
+    "nativeCpuAndMemoryCounters": true,
+    "processObservation": true,
+    "motherboard": true,
+    "bios": true,
+    "physicalDiskCount": 1,
+    "memoryModules": 2,
+    "firmwareDeclaredMemorySlots": 4,
+    "memoryChannelsInferred": false
+  },
+  "restartIndicators": {
+    "state": true,
+    "checkedSources": 3,
+    "totalSources": 3,
+    "positiveSource": "pending file renames",
+    "interpretation": "Registry evidence only; not a guarantee that Windows requires a restart."
+  },
+  "optionalStorageCounters": {
+    "temperatureAvailable": 0,
+    "wearAvailable": 0,
+    "powerOnHoursAvailable": 0,
+    "readWriteErrorCountersAvailable": 0,
+    "physicalDisks": 1
+  },
+  "performanceCounters": {
+    "gpuMemoryAdapters": 2,
+    "dedicatedUsageAvailable": 2,
+    "dedicatedCapacityAvailable": 1,
+    "dedicatedOccupancyAvailable": 1,
+    "gpuProcessMemoryInstances": 40,
+    "gpuProcessNameMapped": 40,
+    "validSamples": 1,
+    "ramPressureAssessment": "InsufficientEvidence",
+    "gameOrObsDetected": false,
+    "obsEncoderActivityAvailable": false
+  },
+  "warnings": 6,
+  "maintenancePerformed": false,
+  "limitations": [
+    "The report intentionally omits computer name, CPU/GPU model names, process names, network addresses, and device identifiers.",
+    "This smoke check confirms that required readings were collected; it is not a full hardware acceptance suite.",
+    "Unavailable storage reliability counters are not interpreted as zero health or as proof that the disk is healthy.",
+    "No known game or OBS process was found among accessible processes; this does not prove they were closed.",
+    "A single performance sample cannot establish RAM pressure, a bottleneck, or a performance improvement.",
+    "No restore point, repair, driver change, or restart was performed."
+  ]
+}
