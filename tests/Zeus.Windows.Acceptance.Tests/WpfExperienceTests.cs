@@ -668,6 +668,13 @@ public sealed class WpfExperienceTests
         Assert.False(window.CanExecute);
         // No button that repairs, installs a driver, deletes files, schedules a
         // scan, changes startup or reboots the machine is invoked by this test.
+        window.DesktopClockEnabled = true;
+        Assert.Single(Application.Current!.Windows.OfType<DesktopClockWindow>());
+        window.Close();
+        var closeDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        while (window.IsVisible && DateTimeOffset.UtcNow < closeDeadline) await Task.Delay(25);
+        Assert.False(window.IsVisible, "The main window must finish closing after its activity writes drain.");
+        Assert.Empty(Application.Current.Windows.OfType<DesktopClockWindow>());
     }
 
     private static async Task RenderAsync(MainWindow window, string fileName)

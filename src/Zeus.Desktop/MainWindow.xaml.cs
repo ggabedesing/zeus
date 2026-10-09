@@ -950,7 +950,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {
         if (_isExecuting) { e.Cancel = true; MessageBox.Show(this, "Uma alteração está em andamento. Aguarde o resultado antes de fechar o ZEUS.", "Aguarde a conclusão", MessageBoxButton.OK, MessageBoxImage.Information); return; }
-        if (_closingAfterActivityDrain) return;
+        if (_closingAfterActivityDrain)
+        {
+            _isClosing = true;
+            _desktopClock?.Close();
+            _lifetime.Cancel();
+            return;
+        }
         QueueActivity(new(DateTimeOffset.UtcNow, "application", "stopping", "info", "ZEUS encerrando."));
         var pending = _activityWrites.ToArray();
         if (pending.Length > 0)
