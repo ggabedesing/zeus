@@ -1,0 +1,61 @@
+{
+  "milestone": "observer-isolated-collectors",
+  "recordedAtUtc": "2026-10-09T22:43:18.7353348+00:00",
+  "sourceCommit": "39543d9c5148512229cb9f589fde31ade3fbf0c3",
+  "sourceDirty": false,
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "signedRelease": false,
+  "build": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "tests": {
+    "failed": 0,
+    "total": 703,
+    "skipped": 12,
+    "passed": 691
+  },
+  "finalBoundaryFixtures": {
+    "scope": "protocol and native process fixtures repeated after Windows-only attribute and token disposal changes",
+    "failed": 0,
+    "skipped": 0,
+    "passed": 21
+  },
+  "verification": {
+    "portableObserver": "included executable emitted completed RAM/paging protocol",
+    "wpf": "measurement through UI displayed seven collector states/times and exported metadata",
+    "processBoundary": "suspended native creation; restricted handle inheritance; job assignment before resume; immediate descendant with pipes terminated after parent exit",
+    "fixtures": [
+      "timeout preserves validated rows",
+      "EOF without completion is not success",
+      "invalid packet preserves only earlier validated rows",
+      "stdout flood interrupts collector",
+      "user cancellation propagates after own PID terminated",
+      "descendant holding pipes is terminated"
+    ],
+    "portableMainWindow": "opened, responded, closed cleanly",
+    "realSample": "seven collector categories with timestamps, CPU interval and bounded counters",
+    "persistence": "SQLite and JSON13 preserved TimedOut state/times/validated disk row; legacy missing metadata remains null",
+    "independentReview": "start/attach race, partial rates, capped warning, parser defaults fixed; final read-only review found no remaining blockers"
+  },
+  "schema": {
+    "sqlite": 7,
+    "collectorProtocol": 1,
+    "report": 13
+  },
+  "package": {
+    "zipSha256": "ab7932372ec46e5b4e4e1b1d72f90558d55a6535f8edc1b25b4fe4935b4c9461",
+    "observerExeSha256": "c0d906a3fe754160d26f6e251bd928a702af37bbf2b59e6aa546fa0a43d38048",
+    "desktopExeSha256": "ec2275eac4b6e600c064f08e8f1822a759c1b1a9eea4b886336fd78e4281c0dd",
+    "folder": "artifacts/observer-isolated-exe/zeus-win-x64-39543d9c5148-20261009T224222346Z-e36fc4be",
+    "zip": "artifacts/observer-isolated-exe/zeus-win-x64.zip"
+  },
+  "limitations": [
+    "No optimization, actual repair, driver installation/rollback or restart performed",
+    "Skipped administrative/opt-in tests not accepted by this milestone",
+    "Collector overhead not benchmarked across machines",
+    "Not universal accuracy, GPU compatibility or performance gain evidence",
+    "Production signed release remains pending"
+  ]
+}
