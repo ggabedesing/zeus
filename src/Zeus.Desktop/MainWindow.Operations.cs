@@ -1136,6 +1136,18 @@ public partial class MainWindow
             StatusDetail = $"Não foi possível abrir a referência de {approved.Name}: {error.Message}";
         }
     }
+    private void ResetDesktopClockPosition_Click(object sender, RoutedEventArgs e)
+    {
+        if (!DesktopClockEnabled) return;
+        if (_desktopClock is null) SyncDesktopClock();
+        if (_desktopClock is null) return;
+        var area = SystemParameters.WorkArea;
+        _desktopClock.Left = area.Left + Math.Max(0, (area.Width - _desktopClock.Width) / 2);
+        _desktopClock.Top = area.Top + Math.Max(0, (area.Height - _desktopClock.Height) / 2);
+        _desktopClockLeft = _desktopClock.Left;
+        _desktopClockTop = _desktopClock.Top;
+        QueuePreferencesSave();
+    }
     private void OpenWindowsPersonalizationSettings(string uri, string settingName)
     {
         if (_isBusy) return;

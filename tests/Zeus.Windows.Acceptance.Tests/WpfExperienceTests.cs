@@ -543,6 +543,23 @@ public sealed class WpfExperienceTests
         var clockFormatToggle = Assert.IsType<CheckBox>(window.FindName("DesktopClockUse24HourFormatToggle"));
         Assert.Equal("clock-use-24-hour", AutomationProperties.GetAutomationId(clockFormatToggle));
         Assert.Equal("Relógio: formato 24 horas", AutomationProperties.GetName(clockFormatToggle));
+        desktopClock.Left = 100000;
+        desktopClock.Top = 100000;
+        var resetClockPositionButton = Assert.IsType<Button>(window.FindName("ResetDesktopClockPositionButton"));
+        Assert.Equal("reset-desktop-clock-position", AutomationProperties.GetAutomationId(resetClockPositionButton));
+        Assert.True(resetClockPositionButton.IsEnabled);
+        resetClockPositionButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, resetClockPositionButton));
+        var clockWorkArea = SystemParameters.WorkArea;
+        Assert.InRange(desktopClock.Left, clockWorkArea.Left, clockWorkArea.Right - desktopClock.Width);
+        Assert.InRange(desktopClock.Top, clockWorkArea.Top, clockWorkArea.Bottom - desktopClock.Height);
+        var positionDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        do
+        {
+            await Task.Delay(25);
+            clockPreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        } while (clockPreferences.Clock?.Left != desktopClock.Left && DateTimeOffset.UtcNow < positionDeadline);
+        Assert.Equal(desktopClock.Left, clockPreferences.Clock!.Left);
+        Assert.Equal(desktopClock.Top, clockPreferences.Clock.Top);
         window.SelectedAccentColor = AppAccentColor.Blue;
         Assert.Equal(Color.FromRgb(0x60, 0xA5, 0xFA), Assert.IsType<SolidColorBrush>(clockLabels[0].Foreground).Color);
         window.SelectedAccentColor = AppAccentColor.ThemeDefault;
