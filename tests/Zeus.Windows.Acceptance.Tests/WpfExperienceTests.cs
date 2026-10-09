@@ -162,11 +162,20 @@ public sealed class WpfExperienceTests
         Assert.Equal("visual-layout-preset-selector", AutomationProperties.GetAutomationId(visualLayoutSelector));
         Assert.Equal("Perfil visual do ZEUS", AutomationProperties.GetName(visualLayoutSelector));
         Assert.Equal(4, visualLayoutSelector.Items.Count);
+        var visualLayoutPreview = Assert.IsType<Border>(window.FindName("VisualLayoutPreviewCard"));
+        Assert.Equal("visual-layout-preview", AutomationProperties.GetAutomationId(visualLayoutPreview));
         var applyVisualLayoutButton = Assert.IsType<Button>(window.FindName("ApplyVisualLayoutButton"));
         Assert.Equal("apply-visual-layout", AutomationProperties.GetAutomationId(applyVisualLayoutButton));
         foreach (var visualPreset in window.VisualLayoutPresets)
         {
+            var themeBeforePreview = window.SelectedTheme;
             window.SelectedVisualLayoutPreset = visualPreset;
+            Assert.Equal(themeBeforePreview, window.SelectedTheme);
+            Assert.Equal(visualPreset.Name, window.SelectedVisualLayoutPreview.Name);
+            Assert.NotNull(window.SelectedVisualLayoutPreview.BackgroundBrush);
+            Assert.NotNull(window.SelectedVisualLayoutPreview.PanelBrush);
+            Assert.NotNull(window.SelectedVisualLayoutPreview.TextBrush);
+            Assert.NotNull(window.SelectedVisualLayoutPreview.AccentBrush);
             applyVisualLayoutButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(visualPreset.Theme, window.SelectedTheme);
             Assert.Equal(visualPreset.Accent, window.SelectedAccentColor);

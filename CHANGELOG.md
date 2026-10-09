@@ -2,7 +2,7 @@
 
 ## Não lançado
 
-- A personalização agora inclui quatro perfis visuais rápidos — Windows Moderno, Minimalista, Produtividade e Aurora — num manifesto de dados versionado e estrito; eles mudam apenas o tema e a cor de destaque do ZEUS, mantendo papel de parede, relógio e configurações do Windows separados.
+- A personalização agora inclui prévia de cores e quatro perfis visuais rápidos — Windows Moderno, Minimalista, Produtividade e Aurora — num manifesto de dados versionado e estrito; eles mudam apenas o tema e a cor de destaque do ZEUS, mantendo papel de parede, relógio e configurações do Windows separados.
 - O diagnóstico de rede agora mostra tentativas sem resposta ICMP e timeouts separadamente; a taxa não é apresentada como perda de pacotes da conexão inteira.
 - As heurísticas do Observador agora reconhecem processos de Genshin Impact, Warframe, Minecraft Bedrock e OBS 32-bit; continuam descrevendo presença de processo e não inferem partida ou transmissão ao vivo.
 - O smoke de instalação do MSI agora exige que a janela instalada responda antes de confirmar o ciclo de atualização.

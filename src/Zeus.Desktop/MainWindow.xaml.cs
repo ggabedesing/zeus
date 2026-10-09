@@ -316,8 +316,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set
         {
             if (value is null || !VisualLayoutPresets.Contains(value) || !Set(ref _selectedVisualLayoutPreset, value)) return;
+            Notify(nameof(SelectedVisualLayoutPreview));
         }
     }
+    public VisualLayoutPreview SelectedVisualLayoutPreview => CreateVisualLayoutPreview(SelectedVisualLayoutPreset);
     public bool IsMinimal { get => SelectedTheme == DesktopTheme.Minimal; set => SelectedTheme = value ? DesktopTheme.Minimal : DesktopTheme.Complete; }
     public bool IsTechnicalMode { get => _isTechnicalMode; set { if (Set(ref _isTechnicalMode, value)) { Notify(nameof(DetailedVisibility)); QueuePreferencesSave(); } } }
     public DesktopTheme SelectedTheme
@@ -773,43 +775,67 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void ApplyTheme()
     {
         if (SystemParameters.HighContrast) return;
-        var colors = SelectedTheme == DesktopTheme.MacInspired
-            ? new[] { "#151625", "#202235", "#3C3E58", "#F5F4FC", "#CBCBDF", "#C5B4FF", "#303248", "#37304F", "#0D0D18" }
-            : SelectedTheme == DesktopTheme.Minimal
-                ? new[] { "#101216", "#191D22", "#3B424A", "#F5F7FA", "#BEC6D1", "#BFE7D7", "#282F37", "#293C35", "#0D1013" }
-                : SelectedTheme == DesktopTheme.Light
-                    ? new[] { "#F3F6FA", "#FFFFFF", "#D8E0EA", "#17212E", "#4B5A6B", "#176B87", "#EFF4F8", "#E7F1F5", "#F6F8FB" }
-                    : SelectedTheme == DesktopTheme.GamingNeon
-                        ? new[] { "#090D16", "#111A2B", "#293650", "#EEF4FF", "#ABB8CD", "#D6FF5F", "#1B2A3E", "#1B2A26", "#070B12" }
-                        : SelectedTheme == DesktopTheme.Cyberpunk
-                            ? new[] { "#100B1A", "#1A1230", "#3D2C58", "#F7F1FF", "#C4B5D5", "#FF63D8", "#2E1A43", "#291A39", "#0A0711" }
-                            : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
-        colors[5] = GetAccentHex(SelectedAccentColor, SelectedTheme);
+        var colors = GetThemePalette(SelectedTheme, SelectedAccentColor);
         var keys = new[] { "BackgroundBrush", "PanelBrush", "BorderBrush", "TextBrush", "MutedBrush", "AccentBrush", "ButtonBrush", "SelectedTabBrush", "LogBackgroundBrush" };
-        for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colors[i]));
+        for (var i = 0; i < keys.Length; i++) Application.Current.Resources[keys[i]] = BrushFromHex(colors[i]);
         Application.Current.Resources["PrimaryButtonBrush"] = Application.Current.Resources["AccentBrush"];
         Application.Current.Resources["SelectedTabTextBrush"] = Application.Current.Resources["AccentBrush"];
         Application.Current.Resources["ButtonTextBrush"] = Application.Current.Resources["TextBrush"];
         if (SelectedTheme == DesktopTheme.Light)
         {
-            Application.Current.Resources["WarningBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#805400"));
-            Application.Current.Resources["WarningPanelBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFF6DF"));
-            Application.Current.Resources["WarningBorderBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D5B66D"));
-            Application.Current.Resources["LogTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#263648"));
-            Application.Current.Resources["PrimaryTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFFFFF"));
+            Application.Current.Resources["WarningBrush"] = BrushFromHex("#805400");
+            Application.Current.Resources["WarningPanelBrush"] = BrushFromHex("#FFF6DF");
+            Application.Current.Resources["WarningBorderBrush"] = BrushFromHex("#D5B66D");
+            Application.Current.Resources["LogTextBrush"] = BrushFromHex("#263648");
+            Application.Current.Resources["PrimaryTextBrush"] = BrushFromHex("#FFFFFF");
         }
         else
         {
-            Application.Current.Resources["WarningBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD18B"));
-            Application.Current.Resources["WarningPanelBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2B251B"));
-            Application.Current.Resources["WarningBorderBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#6A532F"));
-            Application.Current.Resources["LogTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#C8D8E8"));
-            Application.Current.Resources["PrimaryTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#071623"));
+            Application.Current.Resources["WarningBrush"] = BrushFromHex("#FFD18B");
+            Application.Current.Resources["WarningPanelBrush"] = BrushFromHex("#2B251B");
+            Application.Current.Resources["WarningBorderBrush"] = BrushFromHex("#6A532F");
+            Application.Current.Resources["LogTextBrush"] = BrushFromHex("#C8D8E8");
+            Application.Current.Resources["PrimaryTextBrush"] = BrushFromHex("#071623");
         }
         if (_loaded && DesktopClockEnabled) SyncDesktopClock();
     }
 
-    internal void RefreshSelectedThemeAfterContrastChange() => ApplyTheme();
+    private static string[] GetThemePalette(DesktopTheme theme, AppAccentColor accent)
+    {
+        var colors = theme == DesktopTheme.MacInspired
+            ? new[] { "#151625", "#202235", "#3C3E58", "#F5F4FC", "#CBCBDF", "#C5B4FF", "#303248", "#37304F", "#0D0D18" }
+            : theme == DesktopTheme.Minimal
+                ? new[] { "#101216", "#191D22", "#3B424A", "#F5F7FA", "#BEC6D1", "#BFE7D7", "#282F37", "#293C35", "#0D1013" }
+                : theme == DesktopTheme.Light
+                    ? new[] { "#F3F6FA", "#FFFFFF", "#D8E0EA", "#17212E", "#4B5A6B", "#176B87", "#EFF4F8", "#E7F1F5", "#F6F8FB" }
+                    : theme == DesktopTheme.GamingNeon
+                        ? new[] { "#090D16", "#111A2B", "#293650", "#EEF4FF", "#ABB8CD", "#D6FF5F", "#1B2A3E", "#1B2A26", "#070B12" }
+                        : theme == DesktopTheme.Cyberpunk
+                            ? new[] { "#100B1A", "#1A1230", "#3D2C58", "#F7F1FF", "#C4B5D5", "#FF63D8", "#2E1A43", "#291A39", "#0A0711" }
+                            : new[] { "#0A1120", "#131F32", "#2B3F59", "#F0F5FA", "#B1C1D5", "#65E3E0", "#1D3049", "#1A3546", "#080F1B" };
+        colors[5] = GetAccentHex(accent, theme);
+        return colors;
+    }
+
+    private static VisualLayoutPreview CreateVisualLayoutPreview(VisualLayoutPreset preset)
+    {
+        if (SystemParameters.HighContrast)
+            return new(preset.Name, preset.Description, SystemColors.WindowBrush, SystemColors.ControlBrush,
+                SystemColors.WindowFrameBrush, SystemColors.WindowTextBrush, SystemColors.GrayTextBrush, SystemColors.HighlightBrush);
+
+        var colors = GetThemePalette(preset.Theme, preset.Accent);
+        return new(preset.Name, preset.Description, BrushFromHex(colors[0]), BrushFromHex(colors[1]),
+            BrushFromHex(colors[2]), BrushFromHex(colors[3]), BrushFromHex(colors[4]), BrushFromHex(colors[5]));
+    }
+
+    private static SolidColorBrush BrushFromHex(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value));
+
+    internal void RefreshSelectedThemeAfterContrastChange()
+    {
+        ApplyTheme();
+        Notify(nameof(SelectedVisualLayoutPreview));
+    }
     internal void RefreshDesktopClockAppearance(bool highContrast) { if (DesktopClockEnabled) SyncDesktopClock(highContrast); }
 
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
