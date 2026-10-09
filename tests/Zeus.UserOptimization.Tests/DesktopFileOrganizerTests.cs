@@ -19,11 +19,21 @@ public sealed class DesktopFileOrganizerTests
 
         var preview = await fixture.Service.PreviewAsync();
 
-        var item = Assert.Single(preview.Items);
-        Assert.Equal("photo.png", item.Name);
-        Assert.Equal("Imagens", item.Category);
-        Assert.Equal(5, preview.TotalBytes);
-        Assert.Equal(4, preview.Skipped.Count);
+        if (OperatingSystem.IsWindows())
+        {
+            var item = Assert.Single(preview.Items);
+            Assert.Equal("photo.png", item.Name);
+            Assert.Equal("Imagens", item.Category);
+            Assert.Equal(5, preview.TotalBytes);
+            Assert.Equal(4, preview.Skipped.Count);
+        }
+        else
+        {
+            // Unix file systems do not model the Windows Hidden attribute set above.
+            Assert.Equal(new[] { "hidden.pdf", "photo.png" }, preview.Items.Select(item => item.Name).OrderBy(name => name));
+            Assert.Equal(11, preview.TotalBytes);
+            Assert.Equal(3, preview.Skipped.Count);
+        }
     }
 
     [Fact]
