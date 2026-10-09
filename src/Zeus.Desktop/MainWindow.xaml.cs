@@ -57,10 +57,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private DesktopTheme _selectedTheme = DesktopTheme.Complete;
     private UsageProfile _selectedProfile = UsageProfile.Balanced;
     private bool _reduceAnimations, _reduceTransparency, _needsBluetooth = true, _needsPrinting = true, _needsCloudSync = true, _needsVirtualization;
+    private bool _desktopClockEnabled, _desktopClockShowDate = true, _desktopClockShowSeconds, _desktopClockAlwaysOnTop;
+    private double _desktopClockOpacity = 0.88, _desktopClockLeft = 40, _desktopClockTop = 80;
+    private DesktopClockWindow? _desktopClock;
     private bool _offlineRestartConfirmed, _offlineRecoveryConfirmed;
     private bool _networkResetReviewed, _networkResetRecoveryReady;
     private bool _wingetAuditReadable = true;
     private bool _closingAfterActivityDrain;
+    private bool _isClosing;
     private int _activityStorageWarningShown;
     private DatabaseHealth? _storageHealth;
     private PowerPlanInfo? _selectedPowerPlan;
@@ -280,6 +284,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public UsageProfile SelectedProfile { get => _selectedProfile; set { if (Enum.IsDefined(value) && Set(ref _selectedProfile, value)) ProfileChanged(); } }
     public bool ReduceAnimations { get => _reduceAnimations; set { if (Set(ref _reduceAnimations, value)) ProfileChanged(); } }
     public bool ReduceTransparency { get => _reduceTransparency; set { if (Set(ref _reduceTransparency, value)) ProfileChanged(); } }
+    public bool DesktopClockEnabled { get => _desktopClockEnabled; set { if (Set(ref _desktopClockEnabled, value)) ClockChanged(); } }
+    public bool DesktopClockShowDate { get => _desktopClockShowDate; set { if (Set(ref _desktopClockShowDate, value)) ClockChanged(); } }
+    public bool DesktopClockShowSeconds { get => _desktopClockShowSeconds; set { if (Set(ref _desktopClockShowSeconds, value)) ClockChanged(); } }
+    public bool DesktopClockAlwaysOnTop { get => _desktopClockAlwaysOnTop; set { if (Set(ref _desktopClockAlwaysOnTop, value)) ClockChanged(); } }
+    public double DesktopClockOpacity { get => _desktopClockOpacity; set { if (Set(ref _desktopClockOpacity, Math.Clamp(value, 0.45, 1))) ClockChanged(); } }
     public bool FirstRunSetupComplete { get => _firstRunSetupComplete; private set { if (Set(ref _firstRunSetupComplete, value)) Notify(nameof(FirstRunSetupVisibility)); } }
     public Visibility FirstRunSetupVisibility => FirstRunSetupComplete ? Visibility.Collapsed : Visibility.Visible;
     public bool NeedsBluetooth { get => _needsBluetooth; set { if (Set(ref _needsBluetooth, value)) ProfileChanged(); } }
@@ -306,6 +315,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 IsTechnicalMode = p.IsTechnicalMode;
                 FirstRunSetupComplete = p.FirstRunSetupComplete;
                 NeedsBluetooth = p.NeedsBluetooth; NeedsPrinting = p.NeedsPrinting; NeedsCloudSync = p.NeedsCloudSync; NeedsVirtualization = p.NeedsVirtualization;
+                var clock = p.Clock ?? new();
+                _desktopClockEnabled = clock.Enabled; _desktopClockShowDate = clock.ShowDate; _desktopClockShowSeconds = clock.ShowSeconds;
+                _desktopClockAlwaysOnTop = clock.AlwaysOnTop; _desktopClockOpacity = Math.Clamp(clock.Opacity, 0.45, 1);
+                _desktopClockLeft = clock.Left; _desktopClockTop = clock.Top;
             }
             catch (Exception error) when (IsStorageError(error)) { _startupWarnings.Add("As preferências salvas não puderam ser lidas; os valores padrão serão usados."); }
             try { _reports.AddRange(await _storage.ReadHistoryAsync()); RebuildHistory(); }
@@ -350,6 +363,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             { _startupWarnings.Add("O histórico de organização da Área de Trabalho não pôde ser lido; nenhum arquivo foi alterado."); }
             ApplyTheme();
             _loaded = true;
+            SyncDesktopClock();
             QueueActivity(new(DateTimeOffset.UtcNow, "application", "started", "info", "ZEUS iniciado."));
         }
         finally { SetBusy(false); }
@@ -597,7 +611,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         foreach (var title in new[] { "Processador", "Memória RAM", "Placas de vídeo", "Armazenamento", "Microsoft Defender", "Placa-mãe" }) HardwareCards.Add(new(title, "Aguardando leitura", "Dados locais do Windows"));
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
-    private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode);
+    private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
+        new(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop));
+    private void ClockChanged() { if (_loaded) { SyncDesktopClock(); QueuePreferencesSave(); } }
+    private void SyncDesktopClock()
+    {
+        if (!DesktopClockEnabled) { _desktopClock?.Close(); _desktopClock = null; return; }
+        if (_desktopClock is null)
+        {
+            _desktopClock = new DesktopClockWindow(() =>
+            {
+                if (_desktopClock is null) return;
+                _desktopClockLeft = _desktopClock.Left; _desktopClockTop = _desktopClock.Top; QueuePreferencesSave();
+            });
+            _desktopClock.Closed += (_, _) => { if (DesktopClockEnabled && !_isClosing) { _desktopClockEnabled = false; Notify(nameof(DesktopClockEnabled)); QueuePreferencesSave(); } _desktopClock = null; };
+            var area = SystemParameters.WorkArea;
+            _desktopClock.Left = Math.Clamp(_desktopClockLeft, area.Left, Math.Max(area.Left, area.Right - 220));
+            _desktopClock.Top = Math.Clamp(_desktopClockTop, area.Top, Math.Max(area.Top, area.Bottom - 90));
+            _desktopClock.Show();
+        }
+        _desktopClock.Configure(DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity);
+    }
     private void QueuePreferencesSave() { if (_loaded) _ = SavePreferencesAsync(); }
     private async Task SavePreferencesAsync()
     {
@@ -710,6 +744,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _ = Dispatcher.BeginInvoke(new Action(Close));
             return;
         }
+        _isClosing = true;
+        _desktopClock?.Close();
         _lifetime.Cancel();
     }
     private void SetBusy(bool busy)

@@ -430,6 +430,24 @@ public sealed class WpfExperienceTests
                 profile.ScrollToTop();
             }
         }
+        window.DesktopClockShowDate = false;
+        window.DesktopClockShowSeconds = true;
+        window.DesktopClockAlwaysOnTop = true;
+        window.DesktopClockOpacity = 0.72;
+        window.DesktopClockEnabled = true;
+        var clockDeadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        DesktopPreferences clockPreferences;
+        do
+        {
+            await Task.Delay(25);
+            clockPreferences = await new DesktopStorage(fixture).ReadPreferencesAsync();
+        } while (clockPreferences.Clock?.Enabled != true && DateTimeOffset.UtcNow < clockDeadline);
+        Assert.Equal(new DesktopClockPreferences(true, false, true, true, 0.72, clockPreferences.Clock!.Left, clockPreferences.Clock.Top), clockPreferences.Clock);
+        var desktopClock = Assert.Single(Application.Current!.Windows.OfType<DesktopClockWindow>());
+        Assert.True(desktopClock.IsVisible);
+        Assert.True(desktopClock.Topmost);
+        Assert.Equal(0.72, desktopClock.Opacity);
+        window.DesktopClockEnabled = false;
         Assert.All(window.MaintenanceChoices, choice => Assert.False(choice.IsSelected));
         Assert.False(window.CanExecute);
         // No button that repairs, installs a driver, deletes files, schedules a
