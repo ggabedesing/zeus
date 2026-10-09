@@ -13,14 +13,16 @@ internal sealed class DesktopClockWindow : Window
     private readonly TextBlock _date = new() { FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(0xC8, 0xD4, 0xE0)), HorizontalAlignment = HorizontalAlignment.Center };
     private readonly Border _surface = new() { Background = new SolidColorBrush(Color.FromArgb(225, 20, 28, 39)), BorderBrush = new SolidColorBrush(Color.FromArgb(100, 130, 160, 185)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(18, 10, 18, 11) };
     private readonly Action _positionChanged;
+    private readonly Func<bool> _isFullscreenForeground;
     private readonly DispatcherTimer _timer = new();
     private readonly DispatcherTimer _fullscreenTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private bool _showDate = true, _showSeconds, _use24HourFormat = true;
     private bool _alwaysOnTop, _hideDuringFullscreen = true;
 
-    public DesktopClockWindow(Action positionChanged)
+    public DesktopClockWindow(Action positionChanged, Func<bool>? isFullscreenForeground = null)
     {
         _positionChanged = positionChanged;
+        _isFullscreenForeground = isFullscreenForeground ?? (() => FullscreenWindowDetector.IsForegroundFullscreenOnClockMonitor(new WindowInteropHelper(this).Handle));
         Title = "Relógio ZEUS";
         Width = 220; Height = 88; SizeToContent = SizeToContent.Height;
         WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
@@ -73,7 +75,7 @@ internal sealed class DesktopClockWindow : Window
     internal void RefreshFullscreenVisibility()
     {
         if (IsLoaded) Visibility = ResolveFullscreenVisibility(_alwaysOnTop, _hideDuringFullscreen,
-            FullscreenWindowDetector.IsForegroundFullscreenOnClockMonitor(new WindowInteropHelper(this).Handle));
+            _isFullscreenForeground());
     }
 
     internal static Visibility ResolveFullscreenVisibility(bool alwaysOnTop, bool hideDuringFullscreen, bool foregroundIsFullscreen) =>

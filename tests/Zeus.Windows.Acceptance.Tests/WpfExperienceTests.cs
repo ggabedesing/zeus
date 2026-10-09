@@ -680,6 +680,17 @@ public sealed class WpfExperienceTests
         Assert.True(desktopClock.IsVisible);
         Assert.True(desktopClock.Topmost);
         Assert.Equal(0.72, desktopClock.Opacity);
+        var simulatedFullscreen = true;
+        var transitionClock = new DesktopClockWindow(() => { }, () => simulatedFullscreen) { Left = 360, Top = 260 };
+        transitionClock.Configure(false, false, true, true, 1, DesktopClockSize.Compact,
+            SystemColors.HighlightBrush, highContrast: false, hideDuringFullscreen: true);
+        transitionClock.Show();
+        transitionClock.RefreshFullscreenVisibility();
+        Assert.Equal(Visibility.Hidden, transitionClock.Visibility);
+        simulatedFullscreen = false;
+        transitionClock.RefreshFullscreenVisibility();
+        Assert.Equal(Visibility.Visible, transitionClock.Visibility);
+        transitionClock.Close();
         var clockLabels = FindVisualDescendants<TextBlock>(desktopClock).ToArray();
         Assert.Matches(@"^\d{2}:\d{2}:\d{2}\s+\S+$", clockLabels[0].Text);
         Assert.Equal(TimeSpan.FromSeconds(1), desktopClock.NextUpdateInterval);
