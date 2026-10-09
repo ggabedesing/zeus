@@ -1,8 +1,8 @@
 {
   "evidenceType": "desktop-clock-adaptive-wpf-acceptance",
   "date": "2026-10-09",
-  "sourceBaseCommit": "f9cef5b16abc5ccc975a5eb2e905b16ea617c0c8",
-  "sourceIncludesWorkingTreeChanges": true,
+  "sourceCommit": "420bc6d7e7a0d8d5bece03d0f504140c1ecfeeb1",
+  "sourceDirty": false,
   "testProject": "tests/Zeus.Windows.Acceptance.Tests/Zeus.Windows.Acceptance.Tests.csproj",
   "testName": "ActualApplicationLoadsRealInventoryAndRendersEveryWorkspaceAndTheme",
   "result": {
@@ -23,8 +23,11 @@
     "behavior": "Zeus.Desktop.exe opened a responsive main window and closed cleanly.",
     "runtime": "win-x64",
     "productVersion": "1.0.0",
-    "sourceDirty": true,
-    "zipSha256": "97eeba01bd82f7778dd34bee34a841bf541126defe713859dbb444886414e8a3"
+    "packageDirectory": "artifacts/clock-adaptive-clean-package/zeus-win-x64-420bc6d7e7a0-20261009T074932086Z-f094f5e5",
+    "zipPath": "artifacts/clock-adaptive-clean-package/zeus-win-x64.zip",
+    "sourceCommit": "420bc6d7e7a0d8d5bece03d0f504140c1ecfeeb1",
+    "sourceDirty": false,
+    "zipSha256": "1c5e5f71a7705f5cc983eed6f1805206566cc47185798bb7af4d8bb3082a89ff"
   },
   "limitations": [
     "This is automated acceptance on one Windows machine, not a power or CPU benchmark across hardware.",
