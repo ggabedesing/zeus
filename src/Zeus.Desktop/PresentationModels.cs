@@ -228,7 +228,7 @@ internal sealed record DesktopPreferences(bool IsMinimal, DesktopTheme Theme = D
     UsageProfile Profile = UsageProfile.Balanced, bool ReduceAnimations = false, bool ReduceTransparency = false,
     bool NeedsBluetooth = true, bool NeedsPrinting = true, bool NeedsCloudSync = true, bool NeedsVirtualization = false,
     bool FirstRunSetupComplete = true, bool IsTechnicalMode = false, DesktopClockPreferences? Clock = null,
-    AppAccentColor AccentColor = AppAccentColor.ThemeDefault);
+    AppAccentColor AccentColor = AppAccentColor.ThemeDefault, string? VisualLayoutPresetId = null);
 
 internal sealed record DesktopClockPreferences(bool Enabled = false, bool ShowDate = true, bool ShowSeconds = false,
     bool AlwaysOnTop = false, double Opacity = 0.88, double Left = 40, double Top = 80,

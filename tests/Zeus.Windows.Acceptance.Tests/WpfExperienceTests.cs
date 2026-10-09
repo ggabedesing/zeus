@@ -712,6 +712,7 @@ public sealed class WpfExperienceTests
         while (window.IsVisible && DateTimeOffset.UtcNow < closeDeadline) await Task.Delay(25);
         Assert.False(window.IsVisible, "The main window must finish closing after its activity writes drain.");
         Assert.Empty(Application.Current.Windows.OfType<DesktopClockWindow>());
+        Assert.Equal("aurora", (await new DesktopStorage(fixture).ReadPreferencesAsync()).VisualLayoutPresetId);
     }
 
     private static async Task RenderAsync(MainWindow window, string fileName)

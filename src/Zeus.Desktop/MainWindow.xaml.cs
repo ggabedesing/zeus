@@ -334,6 +334,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             if (value is null || !VisualLayoutPresets.Contains(value) || !Set(ref _selectedVisualLayoutPreset, value)) return;
             Notify(nameof(SelectedVisualLayoutPreview));
+            QueuePreferencesSave();
         }
     }
     public VisualLayoutPreview SelectedVisualLayoutPreview => CreateVisualLayoutPreview(SelectedVisualLayoutPreset);
@@ -393,6 +394,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 var p = await _storage.ReadPreferencesAsync();
                 SelectedTheme = p.IsMinimal ? DesktopTheme.Minimal : p.Theme;
                 SelectedAccentColor = Enum.IsDefined(p.AccentColor) ? p.AccentColor : AppAccentColor.ThemeDefault;
+                SelectedVisualLayoutPreset = VisualLayoutPresets.FirstOrDefault(preset =>
+                    string.Equals(preset.Id, p.VisualLayoutPresetId, StringComparison.Ordinal)) ?? VisualLayoutPresets[0];
                 SelectedProfile = p.Profile; ReduceAnimations = p.ReduceAnimations; ReduceTransparency = p.ReduceTransparency;
                 IsTechnicalMode = p.IsTechnicalMode;
                 FirstRunSetupComplete = p.FirstRunSetupComplete;
@@ -763,7 +766,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
-        new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop, SelectedDesktopClockSize) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor);
+        new DesktopClockPreferences(DesktopClockEnabled, DesktopClockShowDate, DesktopClockShowSeconds, DesktopClockAlwaysOnTop, DesktopClockOpacity, _desktopClock?.Left ?? _desktopClockLeft, _desktopClock?.Top ?? _desktopClockTop, SelectedDesktopClockSize) { Use24HourFormat = DesktopClockUse24HourFormat }, SelectedAccentColor, SelectedVisualLayoutPreset.Id);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
     internal static Point ResolveInitialClockPosition(double left, double top, double width, double height, Rect virtualScreen) =>

@@ -14,12 +14,13 @@ public sealed class DesktopStorageTests : IDisposable
     public async Task LightThemePreferencePersistsInSqlite()
     {
         var storage = new DesktopStorage(_root);
-        await storage.SavePreferencesAsync(new DesktopPreferences(false, DesktopTheme.Light, AccentColor: AppAccentColor.Green));
+        await storage.SavePreferencesAsync(new DesktopPreferences(false, DesktopTheme.Light, AccentColor: AppAccentColor.Green, VisualLayoutPresetId: "aurora"));
 
         var restored = await storage.ReadPreferencesAsync();
 
         Assert.Equal(DesktopTheme.Light, restored.Theme);
         Assert.Equal(AppAccentColor.Green, restored.AccentColor);
+        Assert.Equal("aurora", restored.VisualLayoutPresetId);
     }
 
     [Fact]
@@ -50,6 +51,7 @@ public sealed class DesktopStorageTests : IDisposable
         Assert.True(migratedPreferences.IsMinimal);
         Assert.False(migratedPreferences.IsTechnicalMode, "Older preferences must retain the default non-technical mode when the new field is absent.");
         Assert.Equal(AppAccentColor.ThemeDefault, migratedPreferences.AccentColor);
+        Assert.Null(migratedPreferences.VisualLayoutPresetId);
         Assert.True(migratedPreferences.Clock!.Use24HourFormat, "Older clock preferences without a format field must default to 24-hour time.");
         Assert.Null(migratedPreferences.Clock.Size);
         Assert.Equal(DesktopClockSize.Medium, MainWindow.ResolveClockSize(migratedPreferences.Clock.Size));
