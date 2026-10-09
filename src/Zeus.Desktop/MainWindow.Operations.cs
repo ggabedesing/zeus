@@ -426,8 +426,10 @@ public partial class MainWindow
                      .ThenByDescending(memory => memory.SharedUsageBytes ?? 0).Take(20))
         {
             var process = gpuMemory.ProcessName is { Length: > 0 } name ? $"{name} · PID {gpuMemory.ProcessId}" : $"PID {gpuMemory.ProcessId} · nome não mapeado";
+            var capacityShare = GpuProcessMemoryShare.GetDedicatedCapacityPercent(gpuMemory, observation.GpuMemory ?? []);
+            var capacityShareText = capacityShare is { } percent ? $"{percent:0.#}% da capacidade dedicada reportada do adaptador" : "proporção da capacidade indisponível (adaptador ou leitura não correspondidos unicamente)";
             PerformanceResourceRows.Add(new($"Memória GPU · {gpuMemory.AdapterInstance} · {process}",
-                $"Alocações reportadas: dedicada {FormatBytes(gpuMemory.DedicatedUsageBytes)} · compartilhada {FormatBytes(gpuMemory.SharedUsageBytes)} · local {FormatBytes(gpuMemory.LocalUsageBytes)} · não local {FormatBytes(gpuMemory.NonLocalUsageBytes)} · comprometida {FormatBytes(gpuMemory.TotalCommittedBytes)}. Isso não informa o orçamento do processo nem confirma pressão."));
+                $"Alocações reportadas: dedicada {FormatBytes(gpuMemory.DedicatedUsageBytes)} ({capacityShareText}) · compartilhada {FormatBytes(gpuMemory.SharedUsageBytes)} · local {FormatBytes(gpuMemory.LocalUsageBytes)} · não local {FormatBytes(gpuMemory.NonLocalUsageBytes)} · comprometida {FormatBytes(gpuMemory.TotalCommittedBytes)}. A proporção usa a capacidade do adaptador, não informa o orçamento do processo nem confirma pressão."));
         }
         if (observation.MemoryPaging is { } paging)
             PerformanceResourceRows.Add(new("RAM e paginação",

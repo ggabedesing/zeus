@@ -48,6 +48,24 @@ public sealed class PerformanceCounterTests
     }
 
     [Fact]
+    public void PerProcessDedicatedMemoryShareUsesOnlyOneMatchingAdapterCapacity()
+    {
+        const string adapter = "luid_0x00000000_0x0001057F_phys_0";
+        var process = new GpuProcessMemoryObservation("pid_42", adapter, 42, "game", 123,
+            2UL * 1024 * 1024 * 1024, 0, 0, 0, 0);
+        var matching = new GpuMemoryObservation(adapter.ToUpperInvariant(), 6UL * 1024 * 1024 * 1024,
+            0, 0, 8UL * 1024 * 1024 * 1024);
+
+        Assert.Equal(25d, GpuProcessMemoryShare.GetDedicatedCapacityPercent(process, [matching]));
+        Assert.Null(GpuProcessMemoryShare.GetDedicatedCapacityPercent(process,
+            [matching with { AdapterInstance = "luid_other" }]));
+        Assert.Null(GpuProcessMemoryShare.GetDedicatedCapacityPercent(process, [matching, matching]));
+        Assert.Null(GpuProcessMemoryShare.GetDedicatedCapacityPercent(process,
+            [matching with { DedicatedCapacityBytes = null }]));
+        Assert.Null(GpuProcessMemoryShare.GetDedicatedCapacityPercent(process with { DedicatedUsageBytes = null }, [matching]));
+    }
+
+    [Fact]
     public void GpuProcessMemoryComparisonMatchesPidStartTimeAndAdapterAndReportsCoverage()
     {
         const string adapter = "luid_0x00000000_0x0001057F_phys_0";
