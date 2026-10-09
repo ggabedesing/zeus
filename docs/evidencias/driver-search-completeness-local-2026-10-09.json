@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-09",
+  "feature": "explicit completeness and configured source for driver discovery",
+  "sourceCommit": "87f37ee7dfda962c6507e14426ffce43c98a4a42",
+  "sourceTreeDirty": false,
+  "localReadOnlyWindowsUpdateQuery": {
+    "checkedAtUtc": "2026-10-09T12:59:45.3559065+00:00",
+    "isComplete": true,
+    "serverSelection": 0,
+    "serviceId": null,
+    "sourceDescription": "Windows Update Agent default server; effective source unknown",
+    "candidateCount": 0,
+    "warningCount": 2,
+    "action": "No driver was downloaded, licensed, installed, or removed."
+  },
+  "automatedVerification": {
+    "focusedDriverServiceTestsPassed": 22,
+    "focusedDriverServiceTestsFailed": 0,
+    "fullReleaseSuitePassed": 520,
+    "fullReleaseSuiteFailed": 0,
+    "fullReleaseSuiteSkipped": 10,
+    "fullReleaseSuiteTotal": 530
+  },
+  "portablePackage": {
+    "runtime": "win-x64",
+    "sourceTreeDirty": false,
+    "portableExeSmoke": "main window opened, remained responsive, and closed cleanly",
+    "zip": "artifacts/driver-search-completeness-final/zeus-win-x64.zip",
+    "zipSha256": "18F27B102392CA71F9801D6C4FB070679C1AE1407325779DAA1645AA5CB5BBF6",
+    "exeSha256": "CE68FD9CB6F57A74EBF2B718E9B3AF3363B21DFF35D8637D05E0CC47AE428F46",
+    "productionAuthenticodeSignature": false
+  },
+  "scope": "The real query used the Windows Update source configured on this computer. Default server was reported and the effective server remains unknown. No driver package was downloaded or installed; no Windows configuration changed."
+}
