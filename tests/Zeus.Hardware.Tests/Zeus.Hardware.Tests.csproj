@@ -17,6 +17,14 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Zeus.Windows/Zeus.Windows.csproj" />
+    <ProjectReference Include="../../src/Zeus.Observer/Zeus.Observer.csproj" ReferenceOutputAssembly="false" />
     <Using Include="Xunit" />
   </ItemGroup>
+  <Target Name="CopyObserverHelper" AfterTargets="Build">
+    <ItemGroup>
+      <ObserverHelperFiles Include="$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.exe" Condition="Exists('$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.exe')" />
+      <ObserverHelperFiles Include="$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.dll;$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.deps.json;$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ObserverHelperFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

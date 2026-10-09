@@ -155,8 +155,14 @@ internal sealed class DesktopStorage
             GpuProcessMemory = LimitPerformanceItems(observation.GpuProcessMemory?
                 .OrderByDescending(memory => memory.DedicatedUsageBytes ?? 0)
                 .ThenByDescending(memory => memory.SharedUsageBytes ?? 0).ToArray(), 12, "processos com memória GPU", omissions),
+            Collectors = observation.Collectors?.Select(collector => collector with
+            {
+                Warnings = collector.Warnings.Take(4).Select(warning => warning.Length <= 256 ? warning : warning[..256]).ToArray()
+            }).ToArray(),
             Warnings = warnings
         };
+        if (observation.Collectors?.Any(collector => collector.Warnings.Count > 4 || collector.Warnings.Any(warning => warning.Length > 256)) == true)
+            omissions.Add("avisos por coletor resumidos; estado e tempo preservados");
         if (omissions.Count > 0)
             bounded = bounded with { Warnings = [.. bounded.Warnings, $"Histórico local resumido para caber no limite: {string.Join(", ", omissions)}; a amostra ao vivo não foi reduzida."] };
 

@@ -102,6 +102,7 @@ Reparos, instalação de drivers, criação de pontos de restauração e reiníc
 | `Zeus.Windows` | Inventário, carga, preferências, Windows Update e coordenação do auxiliar |
 | `Zeus.Maintenance` | Operações administrativas previamente implementadas |
 | `Zeus.Desktop` | Interface WPF, revisão do plano, histórico e exportação |
+| `Zeus.Observer` | Auxiliar sem elevação para coletores de desempenho com prazo e recuperação de dados parciais |
 | `tests/` | Regras portáveis, fronteiras de arquivos, registro e aceitação nativa |
 | `Zeus.SmokeCheck` | Diagnóstico nativo somente de leitura |
 
@@ -109,7 +110,7 @@ O [esquema e a migração do armazenamento local](docs/persistencia-local.md) de
 
 Leia [SECURITY.md](SECURITY.md) e o [relatório de viabilidade com fontes](docs/relatorio-viabilidade-zeus.md).
 
-O Observador também apresenta até 30 processos por atividade de I/O, com leitura/escrita/outras transferências, intervalo próprio e comparação por identidade e cobertura. São contadores de arquivos/rede/dispositivos, sem atribuição a disco físico ou comprovação de gargalo. Exportação JSON: esquema 12.
+O Observador também apresenta até 30 processos por atividade de I/O, com leitura/escrita/outras transferências, intervalo próprio e comparação por identidade e cobertura. São contadores de arquivos/rede/dispositivos, sem atribuição a disco físico ou comprovação de gargalo. Exportação JSON: esquema 13, com estados e tempos por coletor; relatórios antigos conservam esses campos como indisponíveis.
 
 Após um reparo concluído elegível, o Histórico oferece **Verificar após reparo (SCAN)**: nova sessão independente com vínculo recuperável, SFC/DISM estruturados e resultado desconhecido quando a evidência falta. Não inicia outro reparo nem comprova causalidade ou saúde completa. Contrato: [verificacao-apos-reparo.md](docs/verificacao-apos-reparo.md). Banco SQLite esquema 7.
 

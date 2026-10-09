@@ -4,6 +4,7 @@
     <Project Path="src/Zeus.Core/Zeus.Core.csproj" />
     <Project Path="src/Zeus.Desktop/Zeus.Desktop.csproj" />
     <Project Path="src/Zeus.Maintenance/Zeus.Maintenance.csproj" />
+    <Project Path="src/Zeus.Observer/Zeus.Observer.csproj" />
     <Project Path="src/Zeus.Storage/Zeus.Storage.csproj" />
     <Project Path="src/Zeus.Windows/Zeus.Windows.csproj" />
   </Folder>

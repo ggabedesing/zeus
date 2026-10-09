@@ -93,7 +93,7 @@ $filesToSign = @(
         Where-Object { $_.Name -match '^Zeus.*\.(exe|dll)$' } |
         Sort-Object Name
 )
-foreach ($required in @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Desktop.dll', 'Zeus.Maintenance.dll')) {
+foreach ($required in @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Observer.exe', 'Zeus.Desktop.dll', 'Zeus.Maintenance.dll', 'Zeus.Observer.dll')) {
     if (!($filesToSign | Where-Object Name -eq $required)) { throw "Required first-party binary is missing: $required" }
 }
 

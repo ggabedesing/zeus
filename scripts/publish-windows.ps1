@@ -43,6 +43,39 @@ function Test-PortableApplicationLaunch([string]$Executable, [string]$WorkingDir
     Write-Output 'Portable application smoke passed: main window opened, responded, and closed cleanly.'
 }
 
+function Test-PortableObserverLaunch([string]$Executable, [string]$WorkingDirectory) {
+    $info = New-Object System.Diagnostics.ProcessStartInfo
+    $info.FileName = $Executable
+    $info.WorkingDirectory = $WorkingDirectory
+    $info.Arguments = '--collector MemoryPaging --duration 2'
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    $info.StandardOutputEncoding = New-Object System.Text.UTF8Encoding($false, $true)
+    $process = [System.Diagnostics.Process]::Start($info)
+    try {
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        if (!$process.WaitForExit(15000)) {
+            $process.Kill()
+            if (!$process.WaitForExit(5000)) { throw 'Could not stop the portable Observer smoke process.' }
+            throw 'Portable Observer exceeded its launch smoke deadline.'
+        }
+        $outputText = $stdout.GetAwaiter().GetResult()
+        $errorText = $stderr.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0 -or [Text.Encoding]::UTF8.GetByteCount($outputText) -gt 2097152 -or
+            [Text.Encoding]::UTF8.GetByteCount($errorText) -gt 16384) { throw 'Portable Observer did not finish within its output contract.' }
+        $packets = @($outputText.Split([char]10) | Where-Object { ![string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_ | ConvertFrom-Json })
+        if ($packets.Count -eq 0) { throw 'Portable Observer produced no observation packets.' }
+        $last = $packets[$packets.Count - 1]
+        if ($last.Version -ne 1 -or !$last.Completed -or $last.Data.Category -ne 4 -or $last.Data.State -notin @(0,1,2)) {
+            throw 'Portable Observer did not confirm its RAM/paging collector protocol.'
+        }
+        Write-Output 'Portable Observer smoke passed: RAM/paging collector emitted a completed protocol response.'
+    } finally { $process.Dispose() }
+}
+
 function Add-ThirdPartyNotices([string]$Destination, [string]$Repository, [string]$Runtime, [string]$ProductVersion, [string]$SourceCommit, [string]$BuildId) {
     $dotnetCommand = Get-Command dotnet -CommandType Application -ErrorAction Stop
     $dotnetNotices = Join-Path (Split-Path -Parent $dotnetCommand.Source) 'ThirdPartyNotices.txt'
@@ -65,7 +98,7 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository, [strin
     $projectComponents = @{}
     $dependencyGraphs = [System.Collections.Generic.List[object]]::new()
     $supportedLibraryKeys = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($depsFile in @('Zeus.Desktop.deps.json', 'Zeus.Maintenance.deps.json')) {
+    foreach ($depsFile in @('Zeus.Desktop.deps.json', 'Zeus.Maintenance.deps.json', 'Zeus.Observer.deps.json')) {
         $depsPath = Join-Path $Destination $depsFile
         if (!(Test-Path -LiteralPath $depsPath -PathType Leaf)) { throw "Required dependency manifest missing: $depsFile" }
         $deps = Get-Content -LiteralPath $depsPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -236,7 +269,7 @@ function Add-ThirdPartyNotices([string]$Destination, [string]$Repository, [strin
 
     $spdxRelationships = [System.Collections.Generic.List[object]]::new()
     $relationshipKeys = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($root in @('Zeus.Desktop', 'Zeus.Maintenance')) {
+    foreach ($root in @('Zeus.Desktop', 'Zeus.Maintenance', 'Zeus.Observer')) {
         $rootComponent = @($componentByLibrary.Values | Where-Object name -eq $root | Select-Object -First 1)
         if ($rootComponent.Count -ne 1) { throw "SPDX inventory is missing first-party application $root." }
         $spdxRelationships.Add(@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = $rootComponent[0].SPDXID })
@@ -313,8 +346,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Desktop publication failed.' }
     dotnet publish src/Zeus.Maintenance/Zeus.Maintenance.csproj -c Release -r $Runtime --self-contained true "-p:Version=$ProductVersion" -o $destination
     if ($LASTEXITCODE -ne 0) { throw 'Maintenance helper publication failed.' }
+    dotnet publish src/Zeus.Observer/Zeus.Observer.csproj -c Release -r $Runtime --self-contained true "-p:Version=$ProductVersion" -o $destination
+    if ($LASTEXITCODE -ne 0) { throw 'Observer helper publication failed.' }
     Add-ThirdPartyNotices -Destination $destination -Repository $repository -Runtime $Runtime -ProductVersion $ProductVersion -SourceCommit $sourceCommit -BuildId $buildId
-    foreach ($assemblyName in @('Zeus.Desktop.dll', 'Zeus.Maintenance.dll')) {
+    foreach ($assemblyName in @('Zeus.Desktop.dll', 'Zeus.Maintenance.dll', 'Zeus.Observer.dll')) {
         $assemblyPath = Join-Path $destination $assemblyName
         if (!(Test-Path -LiteralPath $assemblyPath -PathType Leaf)) { throw "Required versioned assembly missing: $assemblyName" }
         $assembly = [Reflection.Assembly]::LoadFrom($assemblyPath)
@@ -324,7 +359,7 @@ try {
             throw "Published $assemblyName does not report ProductVersion $ProductVersion."
         }
     }
-    foreach ($executableName in @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe')) {
+    foreach ($executableName in @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Observer.exe')) {
         $executablePath = Join-Path $destination $executableName
         $executableVersion = (Get-Item -LiteralPath $executablePath).VersionInfo.ProductVersion
         if ($executableVersion -notmatch "^$([regex]::Escape($ProductVersion))(?:\+.*)?$") {
@@ -332,9 +367,10 @@ try {
         }
     }
     Test-PortableApplicationLaunch (Join-Path $destination 'Zeus.Desktop.exe') $destination
+    Test-PortableObserverLaunch (Join-Path $destination 'Zeus.Observer.exe') $destination
     Copy-Item README.md, SECURITY.md, CHANGELOG.md -Destination $destination
     Copy-Item docs/validacao-windows.md -Destination $destination
-    $files = @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Core.dll', 'Zeus.Windows.dll', 'Zeus.Cleanup.dll')
+    $files = @('Zeus.Desktop.exe', 'Zeus.Maintenance.exe', 'Zeus.Observer.exe', 'Zeus.Core.dll', 'Zeus.Windows.dll', 'Zeus.Cleanup.dll')
     $hashes = [ordered]@{}
     foreach ($file in $files) {
         $path = Join-Path $destination $file

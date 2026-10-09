@@ -10,6 +10,19 @@ public sealed class WindowsInventoryTests
         Assert.True(OperatingSystem.IsWindows(), "Run native performance acceptance on Windows.");
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var observation = await new WindowsPerformanceProbe().SampleAsync(TimeSpan.FromSeconds(2), deadline.Token);
+        Assert.NotNull(observation.Collectors);
+        Assert.Equal(7, observation.Collectors.Count);
+        Assert.Equal(7, observation.Collectors.Select(collector => collector.Category).Distinct().Count());
+        var cpuCollector = Assert.Single(observation.Collectors, collector => collector.Category == PerformanceCollectorCategory.CpuProcesses);
+        Assert.Contains(cpuCollector.State, new[] { PerformanceCollectorState.Complete, PerformanceCollectorState.Partial });
+        Assert.All(observation.Collectors, collector =>
+        {
+            Assert.True(collector.FinishedAt >= collector.StartedAt);
+            Assert.Equal(collector.FinishedAt - collector.StartedAt, collector.Duration);
+            Assert.NotNull(collector.Warnings);
+            if (collector.Category != PerformanceCollectorCategory.CpuProcesses)
+                Assert.True(collector.StartedAt >= cpuCollector.FinishedAt);
+        });
         Assert.NotNull(observation.CpuPercent);
         Assert.InRange(observation.CpuPercent.Value, 0, 100);
         Assert.True(observation.TotalMemoryBytes > 0);

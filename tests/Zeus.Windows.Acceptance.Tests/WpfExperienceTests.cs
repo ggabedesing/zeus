@@ -602,7 +602,7 @@ public sealed class WpfExperienceTests
             for (var index = 0; index < expectedEventRows.Length; index++)
                 Assert.Equal(expectedEventRows[index].Detail, window.EventDiagnosticRows[index].Detail);
             var exportedEventReport = window.CreateExportDocument();
-            Assert.Equal(12, exportedEventReport.SchemaVersion);
+            Assert.Equal(13, exportedEventReport.SchemaVersion);
             Assert.Equal(eventReport.Summary, exportedEventReport.EventDiagnostics!.Summary);
             Assert.Equal(eventReport.Findings, exportedEventReport.EventDiagnostics.Findings);
         }
@@ -1303,6 +1303,11 @@ public sealed class WpfExperienceTests
             $"A medição pela interface não terminou corretamente: {window.StatusTitle} · {window.StatusDetail}");
         Assert.Contains("não confirma", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(window.Performance!.IoProcesses);
+        Assert.NotNull(window.Performance.Collectors);
+        Assert.Equal(7, window.Performance.Collectors.Count);
+        Assert.Equal(7, window.PerformanceResourceRows.Count(row => row.Title.StartsWith("Coletor · ", StringComparison.Ordinal)));
+        Assert.All(window.PerformanceResourceRows.Where(row => row.Title.StartsWith("Coletor · ", StringComparison.Ordinal)), row =>
+            Assert.Contains("tempo de execução:", row.Detail));
         Assert.Equal(window.Performance.IoProcesses.Count, window.ProcessIoRows.Count);
         Assert.Contains("não comprova atividade de disco físico", window.ProcessIoSummary);
         Assert.All(window.ProcessIoRows, row =>
@@ -1311,8 +1316,9 @@ public sealed class WpfExperienceTests
             Assert.Contains("intervalo do processo:", row.Detail);
         });
         var processIoExport = window.CreateExportDocument();
-        Assert.Equal(12, processIoExport.SchemaVersion);
+        Assert.Equal(13, processIoExport.SchemaVersion);
         Assert.Equal(window.Performance.IoProcesses, processIoExport.Performance!.IoProcesses);
+        Assert.Equal(window.Performance.Collectors, processIoExport.Performance.Collectors);
         var savedPerformanceSession = Assert.Single(await new DesktopStorage(fixture).ReadPerformanceSessionsAsync(),
             session => session.Label == "Medição manual · Jogo teste + OBS");
         Assert.Single(savedPerformanceSession.Samples);

@@ -9,8 +9,9 @@ $ErrorActionPreference = 'Stop'
 $repository = Split-Path -Parent $PSScriptRoot
 $PayloadDirectory = [IO.Path]::GetFullPath($PayloadDirectory)
 if (!(Test-Path -LiteralPath (Join-Path $PayloadDirectory 'Zeus.Desktop.exe') -PathType Leaf) -or
-    !(Test-Path -LiteralPath (Join-Path $PayloadDirectory 'Zeus.Maintenance.exe') -PathType Leaf)) {
-    throw 'Payload must be a complete published ZEUS folder containing both application executables.'
+    !(Test-Path -LiteralPath (Join-Path $PayloadDirectory 'Zeus.Maintenance.exe') -PathType Leaf) -or
+    !(Test-Path -LiteralPath (Join-Path $PayloadDirectory 'Zeus.Observer.exe') -PathType Leaf)) {
+    throw 'Payload must be a complete published ZEUS folder containing Desktop, Maintenance and Observer executables.'
 }
 if ($ProductVersion -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') { throw 'ProductVersion must contain three or four numeric fields.' }
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $repository 'artifacts' }

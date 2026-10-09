@@ -14,6 +14,7 @@
     <ProjectReference Include="../Zeus.Cleanup/Zeus.Cleanup.csproj" />
     <ProjectReference Include="../Zeus.Windows/Zeus.Windows.csproj" />
     <ProjectReference Include="../Zeus.Maintenance/Zeus.Maintenance.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Zeus.Observer/Zeus.Observer.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../Zeus.Storage/Zeus.Storage.csproj" />
     <InternalsVisibleTo Include="Zeus.Windows.Acceptance.Tests" />
   </ItemGroup>
@@ -28,5 +29,15 @@
       <MaintenanceHelperFiles Include="$(MaintenanceOutputDirectory)/Zeus.Maintenance.runtimeconfig.json" Condition="Exists('$(MaintenanceOutputDirectory)/Zeus.Maintenance.runtimeconfig.json')" />
     </ItemGroup>
     <Copy SourceFiles="@(MaintenanceHelperFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyObserverHelper" AfterTargets="Build">
+    <PropertyGroup>
+      <ObserverOutputDirectory>$(MSBuildProjectDirectory)/../Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)</ObserverOutputDirectory>
+    </PropertyGroup>
+    <ItemGroup>
+      <ObserverHelperFiles Include="$(ObserverOutputDirectory)/Zeus.Observer.exe" Condition="Exists('$(ObserverOutputDirectory)/Zeus.Observer.exe')" />
+      <ObserverHelperFiles Include="$(ObserverOutputDirectory)/Zeus.Observer.dll;$(ObserverOutputDirectory)/Zeus.Observer.deps.json;$(ObserverOutputDirectory)/Zeus.Observer.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ObserverHelperFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
   </Target>
 </Project>

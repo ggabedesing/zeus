@@ -35,4 +35,11 @@
     <Copy SourceFiles="@(MaintenanceContractFiles)" DestinationFolder="$(OutDir)MaintenanceContract" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(MaintenanceContractRuntimeFiles)" DestinationFolder="$(OutDir)MaintenanceContract/runtimes/%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
+  <Target Name="CopyObserverContractHelper" AfterTargets="Build">
+    <ItemGroup>
+      <ObserverContractFiles Include="$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.exe" Condition="Exists('$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.exe')" />
+      <ObserverContractFiles Include="$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.dll;$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.deps.json;$(MSBuildProjectDirectory)/../../src/Zeus.Observer/bin/$(Configuration)/$(TargetFramework)/Zeus.Observer.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ObserverContractFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

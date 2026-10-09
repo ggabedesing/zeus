@@ -492,7 +492,8 @@ public partial class MainWindow
         if (_performanceBaseline.Length > 0 && observation.CollectedAt > _performanceBaseline[^1].CollectedAt)
             _performanceComparison = null;
         var memory = observation.TotalMemoryBytes == 0 ? "indisponível" : $"{ByteFormatting.Format(observation.AvailableMemoryBytes)} de {ByteFormatting.Format(observation.TotalMemoryBytes)}";
-        PerformanceSummary = $"CPU: {(observation.CpuPercent.HasValue ? $"{observation.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · {observation.ActivityContext?.Summary ?? "Contexto de jogo/OBS indisponível."} · Intervalo medido da CPU: {observation.SamplingDuration.TotalSeconds:0.#} s; GPU, disco e rede são leituras ao final · {observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
+        var cpuInterval = observation.SamplingDuration > TimeSpan.Zero ? $"{observation.SamplingDuration.TotalSeconds:0.#} s" : "indisponível";
+        PerformanceSummary = $"CPU: {(observation.CpuPercent.HasValue ? $"{observation.CpuPercent:0.#}%" : "indisponível")} · RAM disponível: {memory} · {observation.ActivityContext?.Summary ?? "Contexto de jogo/OBS indisponível."} · Intervalo medido da CPU: {cpuInterval}; GPU, disco e rede são leituras ao final · {observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}";
         ProcessRows.Clear();
         foreach (var process in observation.Processes)
             ProcessRows.Add(new($"{process.Name} · PID {process.Id}", $"CPU do computador: {(process.CpuPercent.HasValue ? $"{process.CpuPercent:0.#}%" : "indisponível")} · núcleos equivalentes: {(process.CpuCoresUsed is { } cores ? cores.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture) : "indisponível")} · memória residente: {ByteFormatting.Format(process.WorkingSetBytes)}\n{FormatProcessIo(process)}"));
@@ -504,6 +505,33 @@ public partial class MainWindow
             : $"{observation.IoProcesses.Count} entradas com taxas disponíveis (até 30), ordenadas pela soma disponível de leitura, escrita e outras transferências. Inclui arquivos, rede e dispositivos; não comprova atividade de disco físico, conflito ou gargalo. A ausência na lista não prova ausência de I/O.";
         Notify(nameof(ProcessIoSummary));
         PerformanceResourceRows.Clear();
+        foreach (var collector in observation.Collectors ?? [])
+        {
+            var label = collector.Category switch
+            {
+                PerformanceCollectorCategory.CpuProcesses => "CPU e processos",
+                PerformanceCollectorCategory.GpuEngines => "Atividade GPU",
+                PerformanceCollectorCategory.GpuAdapterMemory => "Memória GPU",
+                PerformanceCollectorCategory.GpuProcessMemory => "Memória GPU por processo",
+                PerformanceCollectorCategory.MemoryPaging => "RAM e paginação",
+                PerformanceCollectorCategory.Disks => "Discos",
+                PerformanceCollectorCategory.Networks => "Rede",
+                _ => "Não identificado"
+            };
+            var state = collector.State switch
+            {
+                PerformanceCollectorState.Complete => "Leitura concluída",
+                PerformanceCollectorState.Partial => "Leitura parcial",
+                PerformanceCollectorState.Unavailable => "Indisponível",
+                PerformanceCollectorState.TimedOut => "Prazo excedido; dados recebidos podem estar incompletos",
+                _ => "Falha na leitura"
+            };
+            PerformanceResourceRows.Add(new($"Coletor · {label}",
+                $"{state} · tempo de execução: {collector.Duration.TotalSeconds:0.##} s · leitura entre {collector.StartedAt.ToLocalTime():HH:mm:ss} e {collector.FinishedAt.ToLocalTime():HH:mm:ss}. " +
+                string.Join(" ", collector.Warnings)));
+        }
+        if (observation.Collectors is null)
+            PerformanceResourceRows.Add(new("Coletores", "Estado e duração por coletor indisponíveis neste relatório antigo."));
         foreach (var engine in (observation.GpuEngines ?? []).OrderByDescending(engine => engine.UtilizationPercent).Take(20))
         {
             var process = engine.ProcessId is { } pid
@@ -1330,7 +1358,7 @@ public partial class MainWindow
     }
 
     internal ExportDocument CreateExportDocument() =>
-        new(12, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
+        new(13, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
             new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(),
             _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan,
             _performanceSessionExports, EventPatternAnalyzer.AnalyzeInventory(_snapshot?.WindowsInventory));
