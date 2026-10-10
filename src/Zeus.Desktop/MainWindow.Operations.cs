@@ -274,7 +274,7 @@ public partial class MainWindow
             await BeginPerformanceSessionAsync(id, sessionLabel, started);
             try
             {
-                var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(5), token);
+                var observation = await SamplePerformanceWithObsAsync(TimeSpan.FromSeconds(5), token);
                 DisplayPerformanceObservation(observation);
                 await StorePerformanceObservationAsync(id, observation);
                 BuildPersonalPlan(); Notify(nameof(Performance));
@@ -336,7 +336,7 @@ public partial class MainWindow
                         id = _performanceSessionId = Guid.NewGuid();
                         await BeginPerformanceSessionAsync(id, sessionLabel, DateTimeOffset.UtcNow);
                     }
-                    var observation = await _performanceProbe.SampleAsync(TimeSpan.FromSeconds(2), token);
+                    var observation = await SamplePerformanceWithObsAsync(TimeSpan.FromSeconds(2), token);
                     DisplayPerformanceObservation(observation);
                     await StorePerformanceObservationAsync(id, observation);
                     BuildPersonalPlan();
@@ -474,6 +474,8 @@ public partial class MainWindow
         if (last is not null)
         {
             _performance = last.Observation;
+            DisplayObsObservation(last.Observation.Obs);
+            ObsConnectionSummary = "Evidência histórica; não representa o estado atual do OBS. " + ObsConnectionSummary;
             PerformanceSummary = $"Histórico recuperado: {_performanceHistory.Snapshot().Count} amostras locais. Última leitura em {last.Observation.CollectedAt.ToLocalTime():dd/MM HH:mm:ss}.";
         }
         if (_performanceBaseline.Length >= 3)
@@ -505,6 +507,7 @@ public partial class MainWindow
             : $"{observation.IoProcesses.Count} entradas com taxas disponíveis (até 30), ordenadas pela soma disponível de leitura, escrita e outras transferências. Inclui arquivos, rede e dispositivos; não comprova atividade de disco físico, conflito ou gargalo. A ausência na lista não prova ausência de I/O.";
         Notify(nameof(ProcessIoSummary));
         PerformanceResourceRows.Clear();
+        DisplayObsObservation(observation.Obs);
         foreach (var collector in observation.Collectors ?? [])
         {
             var label = collector.Category switch
@@ -1358,7 +1361,7 @@ public partial class MainWindow
     }
 
     internal ExportDocument CreateExportDocument() =>
-        new(13, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
+        new(14, DateTimeOffset.UtcNow, _snapshot, _reports, _performance, Recommendations.ToArray(),
             new(SelectedProfile, ReduceAnimations, ReduceTransparency), UserChanges.ToArray(), CleanupSessions.ToArray(),
             _performanceHistory.Snapshot(), _performanceBaseline, _performanceComparison, _optimizationPlan,
             _performanceSessionExports, EventPatternAnalyzer.AnalyzeInventory(_snapshot?.WindowsInventory));

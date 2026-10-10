@@ -131,6 +131,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _openUri = openUri ?? OpenSystemUri;
         _databaseDialogCallbacks = databaseDialogCallbacks;
         _storage = new(storageRoot);
+        _obsCredentials = new(storageRoot is null ? null : Path.Combine(storageRoot, "ObsConnection"));
         _userOptimization = new(storageRoot is null ? null : Path.Combine(storageRoot, "Changes"));
         _desktopOrganizer = new(storageRoot is null ? null : Path.Combine(storageRoot, "Desktop"), storageRoot is null ? null : Path.Combine(storageRoot, "DesktopOrganization"));
         _cleanup = new(storageRoot is null ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp") : Path.Combine(storageRoot, "Temporary"),
@@ -699,6 +700,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 IsTechnicalMode = p.IsTechnicalMode;
                 _checkZeusUpdatesAutomatically = p.CheckZeusUpdatesAutomatically;
                 _lastZeusUpdateCheckUtc = p.LastZeusUpdateCheckUtc;
+                _observeObs = p.ObserveObs;
+                _observeObsDraft = _observeObs;
+                _obsPort = p.ObsPort is >= 1 and <= 65535 ? p.ObsPort : 4455;
+                _obsPortDraft = _obsPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                ObsConnectionSummary = _observeObs ? "Conexão local salva. Consulte agora ou inicie uma medição para obter dados atuais." : "Conexão opcional desativada. Processo ou engine GPU não confirmam transmissão.";
+                Notify(nameof(ObserveObs)); Notify(nameof(ObsPortDraft));
                 Notify(nameof(CheckZeusUpdatesAutomatically));
                 FirstRunSetupComplete = p.FirstRunSetupComplete;
                 NeedsBluetooth = p.NeedsBluetooth; NeedsPrinting = p.NeedsPrinting; NeedsCloudSync = p.NeedsCloudSync; NeedsVirtualization = p.NeedsVirtualization;
@@ -1014,6 +1021,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _ => ("Comece pela tarefa lenta", "Meça durante o uso que apresenta lentidão. Revise temporários e inicialização antes de escolher reparos ou alterações de energia.")
         };
         Recommendations.Add(new(profile.Item1, profile.Item2, "Perfil e medição de carga disponíveis neste aplicativo"));
+        if (_performance?.Obs is { State: not ObsObservationState.Disabled } obs)
+            Recommendations.Add(new("OBS · estado informado na medição",
+                $"Transmissão: {FormatObsActivity(obs.Streaming)}. Gravação: {FormatObsRecording(obs.Recording, obs.RecordingPaused)}. " +
+                $"Fonte: API local OBS, consultada em {obs.FinishedAt.ToLocalTime():dd/MM HH:mm:ss}. {obs.Summary} " +
+                "Confira os frames e suas janelas em Hardware e carga. Essa leitura não identifica codec, gargalo ou benefício de uma alteração.",
+                "Consultar evidências em Hardware e carga"));
         if (ReduceAnimations || ReduceTransparency) Recommendations.Add(new("Preferências visuais escolhidas", $"Você escolheu {(ReduceAnimations ? "reduzir animações" : "preservar animações")} e {(ReduceTransparency ? "reduzir transparência" : "preservar transparência")}. Aplique em Perfil; o estado anterior será registrado.", "Aplicar preferências visuais"));
         var required = new List<string>(); if (NeedsBluetooth) required.Add("Bluetooth"); if (NeedsPrinting) required.Add("impressão"); if (NeedsCloudSync) required.Add("sincronização"); if (NeedsVirtualization) required.Add("virtualização");
         Recommendations.Add(new("Recursos necessários ao seu uso", required.Count > 0 ? $"Seu plano preserva {string.Join(", ", required)}. Revise programas relacionados antes de desativar sua inicialização." : "Você não marcou dependências adicionais. As alterações continuam seletivas; nenhum serviço é desativado automaticamente.", "Revise cada entrada em Inicialização"));
@@ -1080,7 +1093,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void ProfileChanged() { BuildPersonalPlan(); NotifyActionState(); QueuePreferencesSave(); }
     private DesktopPreferences CurrentPreferences() => new(IsMinimal, SelectedTheme, SelectedProfile, ReduceAnimations, ReduceTransparency, NeedsBluetooth, NeedsPrinting, NeedsCloudSync, NeedsVirtualization, FirstRunSetupComplete, IsTechnicalMode,
         _desktopClockSettingsPreviewing ? _savedClockPreferences : CaptureDesktopClockPreferences(), SelectedAccentColor, SelectedVisualLayoutPreset.Id, _customVisualLayoutsJson, _customAccentHex,
-        CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc, ReduceZeusMotion, SelectedDensity);
+        CheckZeusUpdatesAutomatically, _lastZeusUpdateCheckUtc, ReduceZeusMotion, SelectedDensity,
+        _observeObs, _obsPort);
     internal static DesktopClockSize ResolveClockSize(DesktopClockSize? savedSize) =>
         savedSize is { } size && Enum.IsDefined(size) ? size : DesktopClockSize.Medium;
     internal static DesktopClockStyle ResolveClockStyle(DesktopClockStyle savedStyle) =>
@@ -1424,6 +1438,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _isClosing = true;
             _desktopClock?.Close();
             _lifetime.Cancel();
+            _ = _obsClient.DisposeAsync();
             return;
         }
         QueueActivity(new(DateTimeOffset.UtcNow, "application", "stopping", "info", "ZEUS encerrando."));
@@ -1442,6 +1457,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _isClosing = true;
         _desktopClock?.Close();
         _lifetime.Cancel();
+        _ = _obsClient.DisposeAsync();
     }
     private void SetBusy(bool busy)
     {

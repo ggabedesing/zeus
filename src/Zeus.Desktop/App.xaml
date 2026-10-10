@@ -114,6 +114,7 @@
             </Setter>
         </Style>
         <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource LogBackgroundBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Padding" Value="{DynamicResource InputContentPadding}"/></Style>
+        <Style TargetType="PasswordBox"><Setter Property="Background" Value="{DynamicResource LogBackgroundBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Padding" Value="{DynamicResource InputContentPadding}"/></Style>
         <ControlTemplate x:Key="ComboDropDownToggleTemplate" TargetType="ToggleButton">
             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"

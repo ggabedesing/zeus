@@ -1,0 +1,34 @@
+{
+  "milestone": "obs-readonly-local-connection",
+  "recordedAtUtc": "2026-10-09T23:10:00Z",
+  "branch": "feat/zeus-windows-mvp",
+  "runtime": "win-x64",
+  "developmentBuild": true,
+  "signedRelease": false,
+  "build": { "warnings": 0, "errors": 0 },
+  "tests": {
+    "fullSuiteBeforeFinalRecordingPauseChange": { "passed": 726, "failed": 0, "skipped": 12, "total": 738 },
+    "obsClientFinal": { "passed": 27, "failed": 0, "skipped": 0, "total": 27 },
+    "obsAcceptanceFinal": { "passed": 19, "failed": 0, "skipped": 1, "total": 20 },
+    "obsCredentialFinal": { "passed": 9, "failed": 0, "skipped": 0, "total": 9 },
+    "wpfObsScreen": { "passed": 1, "failed": 0, "skipped": 0, "total": 1 }
+  },
+  "verification": {
+    "protocol": "Loopback fixtures validated OBS protocol 5 authentication, fragmented messages, request correlation, allowlist, timeout, cancellation, reconnect, counter reset, stream/output transitions and paused recording.",
+    "credentials": "DPAPI current-user storage, atomic ciphertext, corruption/size handling, missing ancestor creation, junction rejection and delete-open locking passed on Windows.",
+    "ui": "WPF acceptance saved, forgot and disabled OBS connection; invalid port stayed local; password was cleared from the PasswordBox; no server contact occurred while saving; Hardware and carga connection card rendered.",
+    "portableExe": "Published Zeus.Desktop.exe opened, responded and closed cleanly.",
+    "realObs": "Not executed: no authorized real OBS WebSocket session was enabled for this validation."
+  },
+  "package": {
+    "folder": "artifacts/obs-release-package",
+    "desktopExeSha256": "3905bb230805cb127239acdd26ad721bc87ab3cb7413fa2937f0b028b8b28084",
+    "zip": "artifacts/zeus-pc-obs-readonly-win-x64-20261009.zip",
+    "zipSha256": "242ba05c3833868433acd943120f6a49e00b668b8aa720978ec3dd2ea545a971"
+  },
+  "limitations": [
+    "OBS server must already be enabled by the user on loopback; ZEUS does not enable or configure it.",
+    "Codec, encoder cause, network-wide packet loss and continuity across an unobserved stop/restart remain unknown.",
+    "Production code signing and real OBS streaming acceptance remain pending."
+  ]
+}

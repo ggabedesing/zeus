@@ -159,10 +159,12 @@ internal sealed class DesktopStorage
             {
                 Warnings = collector.Warnings.Take(4).Select(warning => warning.Length <= 256 ? warning : warning[..256]).ToArray()
             }).ToArray(),
+            Obs = observation.Obs is { } obs ? obs with { Summary = obs.Summary.Length <= 1024 ? obs.Summary : obs.Summary[..1024] } : null,
             Warnings = warnings
         };
         if (observation.Collectors?.Any(collector => collector.Warnings.Count > 4 || collector.Warnings.Any(warning => warning.Length > 256)) == true)
             omissions.Add("avisos por coletor resumidos; estado e tempo preservados");
+        if (observation.Obs?.Summary.Length > 1024) omissions.Add("resumo OBS limitado; estado e medidas preservados");
         if (omissions.Count > 0)
             bounded = bounded with { Warnings = [.. bounded.Warnings, $"Histórico local resumido para caber no limite: {string.Join(", ", omissions)}; a amostra ao vivo não foi reduzida."] };
 

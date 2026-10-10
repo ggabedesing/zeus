@@ -2,6 +2,8 @@
 
 ## Não lançado
 
+- OBS passa a ter conexão local opcional somente leitura, desativada por padrão, com estados reais informados pela API, frames por fonte e deltas com janela temporal; credenciais DPAPI ficam fora de histórico, exportação e backup do banco. Relatório aditivo no esquema 14; codec e leitura ausente permanecem desconhecidos.
+
 - A aparência agora tem uma preferência independente para remover o fade entre áreas do ZEUS, persistida nas preferências locais e sempre subordinada ao movimento reduzido e ao alto contraste do Windows.
 - A consulta de release do ZEUS agora pode ser ativada para executar automaticamente no máximo a cada 24 horas; permanece desativada por padrão, não envia inventário, não baixa nem instala pacotes e permite cancelar a consulta em andamento desativando a opção.
 - As opções do relógio flutuante agora entram em prévia temporária; confirmar salva aparência e posição, enquanto cancelar restaura o estado anterior, inclusive depois de mover ou recentralizar o relógio.

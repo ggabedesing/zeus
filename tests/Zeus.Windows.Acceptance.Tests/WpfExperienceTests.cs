@@ -602,7 +602,7 @@ public sealed class WpfExperienceTests
             for (var index = 0; index < expectedEventRows.Length; index++)
                 Assert.Equal(expectedEventRows[index].Detail, window.EventDiagnosticRows[index].Detail);
             var exportedEventReport = window.CreateExportDocument();
-            Assert.Equal(13, exportedEventReport.SchemaVersion);
+            Assert.Equal(14, exportedEventReport.SchemaVersion);
             Assert.Equal(eventReport.Summary, exportedEventReport.EventDiagnostics!.Summary);
             Assert.Equal(eventReport.Findings, exportedEventReport.EventDiagnostics.Findings);
         }
@@ -1293,6 +1293,7 @@ public sealed class WpfExperienceTests
         confirmClockPreviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, confirmClockPreviewButton));
         Assert.False(window.IsDesktopClockSettingsPreviewing);
         performanceLabel.Text = "Jogo teste + OBS";
+        await VerifyObsConnectionControlsAsync(window, fixture);
         var measureButton = Assert.IsType<Button>(window.FindName("MeasurePerformanceButton"));
         Assert.Equal("measure-performance", AutomationProperties.GetAutomationId(measureButton));
         measureButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent, measureButton));
@@ -1303,6 +1304,9 @@ public sealed class WpfExperienceTests
             $"A medição pela interface não terminou corretamente: {window.StatusTitle} · {window.StatusDetail}");
         Assert.Contains("não confirma", window.StatusDetail, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(window.Performance!.IoProcesses);
+        Assert.Equal(ObsObservationState.Disabled, window.Performance.Obs!.State);
+        Assert.Null(window.Performance.Obs.Streaming);
+        Assert.Null(window.Performance.Obs.Recording);
         Assert.NotNull(window.Performance.Collectors);
         Assert.Equal(7, window.Performance.Collectors.Count);
         Assert.Equal(7, window.PerformanceResourceRows.Count(row => row.Title.StartsWith("Coletor · ", StringComparison.Ordinal)));
@@ -1316,9 +1320,10 @@ public sealed class WpfExperienceTests
             Assert.Contains("intervalo do processo:", row.Detail);
         });
         var processIoExport = window.CreateExportDocument();
-        Assert.Equal(13, processIoExport.SchemaVersion);
+        Assert.Equal(14, processIoExport.SchemaVersion);
         Assert.Equal(window.Performance.IoProcesses, processIoExport.Performance!.IoProcesses);
         Assert.Equal(window.Performance.Collectors, processIoExport.Performance.Collectors);
+        Assert.Equal(window.Performance.Obs, processIoExport.Performance.Obs);
         var savedPerformanceSession = Assert.Single(await new DesktopStorage(fixture).ReadPerformanceSessionsAsync(),
             session => session.Label == "Medição manual · Jogo teste + OBS");
         Assert.Single(savedPerformanceSession.Samples);
@@ -1402,6 +1407,54 @@ public sealed class WpfExperienceTests
         var recoveryCopy = Assert.Single(recoveryCopies);
         Assert.True((await new ZeusDatabase(recoveryCopy).CheckHealthAsync()).IsHealthy);
         SqliteConnection.ClearAllPools();
+    }
+
+    private static async Task VerifyObsConnectionControlsAsync(MainWindow window, string fixture)
+    {
+        var save = Assert.IsType<Button>(window.FindName("SaveObsConnectionButton"));
+        var forget = Assert.IsType<Button>(window.FindName("ForgetObsPasswordButton"));
+        var read = Assert.IsType<Button>(window.FindName("ReadObsButton"));
+        var password = Assert.IsType<PasswordBox>(window.FindName("ObsPasswordBox"));
+        var credential = new ObsCredentialStore(Path.Combine(fixture, "ObsConnection"));
+        async Task ClickAsync(Button button)
+        {
+            Assert.True(button.IsEnabled);
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+            while (!window.CanRefresh && DateTimeOffset.UtcNow < deadline) await Task.Delay(25);
+            Assert.True(window.CanRefresh, "OBS UI operation should complete without collecting or changing OBS.");
+        }
+        window.ObsPortDraft = "0";
+        await ClickAsync(save);
+        Assert.Contains("entre 1 e 65535", window.ObsConnectionSummary);
+        window.ObsPortDraft = "4455";
+        window.ObserveObs = true;
+        password.Password = "UI fixture OBS password";
+        await ClickAsync(save);
+        Assert.True((await new DesktopStorage(fixture).ReadPreferencesAsync()).ObserveObs);
+        Assert.Equal("UI fixture OBS password", credential.Load());
+        Assert.Empty(password.Password);
+        Assert.Empty(window.ObsRows); // Saving an opt-in must not contact the server.
+        Assert.DoesNotContain("UI fixture OBS password", window.ObsConnectionSummary);
+        await ClickAsync(forget);
+        Assert.Null(credential.Load());
+        window.ObserveObs = false;
+        await ClickAsync(save);
+        await ClickAsync(read);
+        Assert.Contains("desativada", window.ObsConnectionSummary);
+        Assert.All(window.ObsRows, row => Assert.Equal("Indisponível", row.Detail));
+        Assert.False((await new DesktopStorage(fixture).ReadPreferencesAsync()).ObserveObs);
+        var previousTab = window.WorkspaceTabs.SelectedItem;
+        window.WorkspaceTabs.SelectedItem = window.WorkspaceTabs.Items.Cast<TabItem>()
+            .Single(tab => AutomationProperties.GetAutomationId(tab) == "HardwareTab");
+        var card = Assert.IsType<Border>(window.FindName("ObsConnectionCard"));
+        card.BringIntoView();
+        await Task.Delay(250);
+        window.UpdateLayout();
+        AssertControlFitsWindow(window, save);
+        AssertControlFitsWindow(window, password);
+        await RenderAsync(window, "zeus-obs-local-connection.png");
+        window.WorkspaceTabs.SelectedItem = previousTab;
     }
 
     private sealed class DatabaseRecoveryTestState

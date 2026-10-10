@@ -52,7 +52,8 @@ public sealed record PerformanceObservation(
     IReadOnlyList<GpuProcessMemoryObservation>? GpuProcessMemory = null,
     MemoryPagingObservation? MemoryPaging = null,
     IReadOnlyList<ProcessObservation>? IoProcesses = null,
-    IReadOnlyList<PerformanceCollectorStatus>? Collectors = null);
+    IReadOnlyList<PerformanceCollectorStatus>? Collectors = null,
+    ObsObservation? Obs = null);
 
 /// <summary>
 /// A bounded, read-only observation, not a benchmark or prediction of performance
