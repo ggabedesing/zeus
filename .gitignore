@@ -10,3 +10,8 @@ artifacts/
 .DS_Store
 .dotnet/
 .nuget/
+**/node_modules/
+**/dist/
+**/release/
+**/native-bin/
+**/*.tsbuildinfo

@@ -3,6 +3,7 @@
     <Project Path="src/Zeus.Cleanup/Zeus.Cleanup.csproj" />
     <Project Path="src/Zeus.Core/Zeus.Core.csproj" />
     <Project Path="src/Zeus.Desktop/Zeus.Desktop.csproj" />
+    <Project Path="src/Zeus.LocalApi/Zeus.LocalApi.csproj" />
     <Project Path="src/Zeus.Maintenance/Zeus.Maintenance.csproj" />
     <Project Path="src/Zeus.Observer/Zeus.Observer.csproj" />
     <Project Path="src/Zeus.Storage/Zeus.Storage.csproj" />
