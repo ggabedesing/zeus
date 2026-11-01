@@ -1,6 +1,6 @@
 # Zeus — interface
 
-Interface do otimizador local Zeus: uma tela para analisar o Windows, escolher ajustes e acompanhar a execução real.
+Interface do otimizador local Zeus: Otimizar, Personalizar, Sistema e Histórico. Inclui a seleção de temas, imagem de bloqueio, cenas animadas e layouts próprios do Zeus, preferências por aplicativo e manutenção do Windows com saída real.
 
 O motor está no repositório https://github.com/ggabedesing/zeus-pc/tree/codex/zeus-otimizacao.
 
